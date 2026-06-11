@@ -1,0 +1,138 @@
+const svc = require('./payment.service');
+const trialSvc = require('../course/trial.service');
+const R = require('../../utils/response');
+
+async function initiate(req, res, next) {
+  try {
+    const result = await svc.initiatePayment(
+      req.tenant.tenantId, req.params.courseId, req.user.sub, req.body
+    );
+    R.success(res, result);
+  } catch (err) { next(err); }
+}
+
+async function confirm(req, res, next) {
+  try {
+    const result = await svc.confirmPayment(
+      req.tenant.tenantId, req.params.paymentId, req.user.sub
+    );
+    R.success(res, result, 'Payment confirmed — enrollment created');
+  } catch (err) { next(err); }
+}
+
+async function capturePaypal(req, res, next) {
+  try {
+    const result = await svc.capturePaypalPayment(
+      req.tenant.tenantId, req.params.paymentId, req.user.sub
+    );
+    R.success(res, result, 'PayPal payment captured — enrollment created');
+  } catch (err) { next(err); }
+}
+
+async function refund(req, res, next) {
+  try {
+    const payment = await svc.refundPayment(
+      req.tenant.tenantId, req.params.paymentId, req.user.sub, req.body
+    );
+    R.success(res, { payment }, 'Payment refunded');
+  } catch (err) { next(err); }
+}
+
+async function myPayments(req, res, next) {
+  try {
+    const result = await svc.getMyPayments(req.tenant.tenantId, req.user.sub, req.query);
+    R.success(res, result);
+  } catch (err) { next(err); }
+}
+
+async function coursePayments(req, res, next) {
+  try {
+    const result = await svc.getCoursePayments(req.tenant.tenantId, req.params.courseId, req.query);
+    R.success(res, result);
+  } catch (err) { next(err); }
+}
+
+// ── Trial endpoints ───────────────────────────────────────────────────────────
+async function startTrial(req, res, next) {
+  try {
+    const enrollment = await trialSvc.startTrial(
+      req.tenant.tenantId, req.params.courseId, req.user.sub
+    );
+    R.created(res, { enrollment }, 'Trial started');
+  } catch (err) { next(err); }
+}
+
+async function upgradeTrial(req, res, next) {
+  try {
+    const enrollment = await trialSvc.upgradeTrial(
+      req.tenant.tenantId, req.params.courseId, req.user.sub
+    );
+    R.success(res, { enrollment }, 'Upgraded to full access');
+  } catch (err) { next(err); }
+}
+
+async function trialStatus(req, res, next) {
+  try {
+    const status = await trialSvc.getTrialStatus(
+      req.tenant.tenantId, req.params.courseId, req.user.sub
+    );
+    R.success(res, { trial: status });
+  } catch (err) { next(err); }
+}
+
+async function listMethods(req, res, next) {
+  try {
+    const methods = await svc.getPaymentMethods(req.user.sub, req.tenant.tenantId);
+    R.success(res, { methods });
+  } catch (err) { next(err); }
+}
+
+async function setupIntent(req, res, next) {
+  try {
+    const result = await svc.createSetupIntent(req.user.sub, req.tenant.tenantId);
+    R.success(res, result);
+  } catch (err) { next(err); }
+}
+
+async function deleteMethod(req, res, next) {
+  try {
+    const result = await svc.deletePaymentMethod(req.user.sub, req.tenant.tenantId, req.params.methodId);
+    R.success(res, result, 'Payment method removed');
+  } catch (err) { next(err); }
+}
+
+async function receiptPdf(req, res, next) {
+  try {
+    await svc.generateReceiptPdf(
+      req.tenant.tenantId, req.params.paymentId, req.user.sub, res
+    );
+  } catch (err) { next(err); }
+}
+
+async function initiatePaypalSubscription(req, res, next) {
+  try {
+    const result = await svc.initiatePaypalSubscription(
+      req.tenant.tenantId, req.user.sub, req.body
+    );
+    R.success(res, result, 'PayPal subscription initiated — redirect user to approveUrl');
+  } catch (err) { next(err); }
+}
+
+async function cancelPaypalSubscription(req, res, next) {
+  try {
+    await svc.cancelPaypalSubscription(
+      req.tenant.tenantId, req.user.sub,
+      req.params.subscriptionId,
+      req.body.reason
+    );
+    R.success(res, null, 'PayPal subscription cancelled');
+  } catch (err) { next(err); }
+}
+
+module.exports = {
+  initiate, confirm, capturePaypal, refund, myPayments, coursePayments,
+  startTrial, upgradeTrial, trialStatus,
+  listMethods, setupIntent, deleteMethod,
+  receiptPdf,
+  initiatePaypalSubscription, cancelPaypalSubscription,
+};

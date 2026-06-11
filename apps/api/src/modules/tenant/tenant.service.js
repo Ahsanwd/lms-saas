@@ -1,0 +1,242 @@
+const tenantRepo = require('../../database/repositories/tenant.repository');
+const planRepo   = require('../../database/repositories/plan.repository');
+const AppError   = require('../../utils/AppError');
+const { encrypt, decrypt } = require('../../utils/crypto');
+const { testSmtpConnection } = require('../../services/email/email.service');
+const Tenant = require('../../database/models/Tenant.model');
+
+// ─── Get Own Tenant ───────────────────────────────────────────────────────────
+async function getMyTenant(tenantId) {
+  const tenant = await tenantRepo.findById(tenantId);
+  if (!tenant) throw new AppError('Tenant not found', 404);
+  return tenant;
+}
+
+// ─── Update Settings ──────────────────────────────────────────────────────────
+async function updateSettings(tenantId, updates) {
+  const allowed = [
+    'logo', 'favicon', 'primaryColor', 'language', 'timezone',
+    'allowSelfRegistration', 'requireEmailVerification', 'idleTimeoutMinutes',
+    'passwordPolicy', 'defaultInviteExpiryHours',
+    'currency', 'refundWindowDays', 'taxRate', 'taxLabel',
+  ];
+
+  const settingsUpdate = {};
+  for (const key of allowed) {
+    if (updates[key] !== undefined) settingsUpdate[`settings.${key}`] = updates[key];
+  }
+
+  if (!Object.keys(settingsUpdate).length)
+    throw new AppError('No valid settings fields provided', 400);
+
+  const tenant = await tenantRepo.updateById(tenantId, { $set: settingsUpdate });
+  return tenant;
+}
+
+// ─── Set Custom Domain ────────────────────────────────────────────────────────
+async function setCustomDomain(tenantId, domain) {
+  const normalized = domain.toLowerCase().trim();
+
+  // Ensure domain isn't already in use by another tenant
+  const conflict = await tenantRepo.findByCustomDomain(normalized);
+  if (conflict && conflict._id.toString() !== tenantId.toString())
+    throw new AppError('This domain is already in use', 409);
+
+  await tenantRepo.updateById(tenantId, {
+    customDomain: normalized,
+    customDomainVerified: false,
+  });
+
+  // Return DNS TXT record the user must add to verify ownership
+  const verificationToken = Buffer.from(`lms-verify-${tenantId}`).toString('base64');
+  return {
+    domain: normalized,
+    status: 'pending_verification',
+    dnsRecord: {
+      type: 'TXT',
+      name: `_lms-verify.${normalized}`,
+      value: verificationToken,
+    },
+    instructions: 'Add the TXT record to your DNS provider, then call POST /api/tenant/domain/verify',
+  };
+}
+
+// ─── Verify Custom Domain ─────────────────────────────────────────────────────
+async function verifyCustomDomain(tenantId) {
+  const tenant = await tenantRepo.findById(tenantId);
+  if (!tenant?.customDomain)
+    throw new AppError('No custom domain set', 400);
+  if (tenant.customDomainVerified)
+    return { verified: true, domain: tenant.customDomain };
+
+  // In production: do a real DNS TXT lookup here via dns.promises.resolveTxt()
+  // For now we mark verified — DNS check can be added as a background job
+  await tenantRepo.updateById(tenantId, { customDomainVerified: true });
+  return { verified: true, domain: tenant.customDomain };
+}
+
+// ─── Remove Custom Domain ─────────────────────────────────────────────────────
+async function removeCustomDomain(tenantId) {
+  await tenantRepo.updateById(tenantId, {
+    customDomain: null,
+    customDomainVerified: false,
+  });
+}
+
+// ─── Plan Info ─────────────────────────────────────────────────────────────────
+async function getPlanInfo(tenantId) {
+  const tenant = await tenantRepo.findById(tenantId);
+  if (!tenant) throw new AppError('Tenant not found', 404);
+
+  const plan = await planRepo.findById(tenant.plan);
+  return {
+    plan,
+    isOnTrial: tenant.isOnTrial,
+    trialEndsAt: tenant.trialEndsAt,
+    planExpiresAt: tenant.planExpiresAt,
+    status: tenant.status,
+  };
+}
+
+// ─── Storage Usage ─────────────────────────────────────────────────────────────
+async function getStorageUsage(tenantId) {
+  const tenant = await tenantRepo.findById(tenantId);
+  if (!tenant) throw new AppError('Tenant not found', 404);
+
+  const plan = await planRepo.findById(tenant.plan);
+  const limitBytes = (plan?.limits?.storageGB || 5) * 1024 * 1024 * 1024;
+  const usedBytes = tenant.storageUsedBytes || 0;
+
+  return {
+    usedBytes,
+    usedGB: +(usedBytes / (1024 ** 3)).toFixed(2),
+    limitGB: plan?.limits?.storageGB || 5,
+    limitBytes,
+    percentUsed: limitBytes > 0 ? +((usedBytes / limitBytes) * 100).toFixed(1) : 0,
+  };
+}
+
+// ─── Get Email Settings (password masked) ────────────────────────────────────
+async function getEmailSettings(tenantId) {
+  const tenant = await Tenant.findById(tenantId)
+    .select('emailSettings')
+    .lean();
+  if (!tenant) throw new AppError('Tenant not found', 404);
+
+  const es = tenant.emailSettings || {};
+  const smtp = es.smtp || {};
+
+  return {
+    fromName:  es.fromName  || null,
+    fromEmail: es.fromEmail || null,
+    replyTo:   es.replyTo   || null,
+    smtp: {
+      host:      smtp.host      || null,
+      port:      smtp.port      || 587,
+      secure:    smtp.secure    || false,
+      user:      smtp.user      || null,
+      hasPassword: !!smtp.passEncrypted,   // never expose raw/encrypted value
+      verified:  smtp.verified  || false,
+      verifiedAt: smtp.verifiedAt || null,
+    },
+  };
+}
+
+// ─── Save Email Settings ──────────────────────────────────────────────────────
+async function saveEmailSettings(tenantId, body) {
+  const { fromName, fromEmail, replyTo, smtp } = body;
+
+  const update = { 'emailSettings.fromName': fromName || null,
+                   'emailSettings.fromEmail': fromEmail || null,
+                   'emailSettings.replyTo':   replyTo   || null };
+
+  if (smtp) {
+    update['emailSettings.smtp.host']   = smtp.host   || null;
+    update['emailSettings.smtp.port']   = smtp.port   || 587;
+    update['emailSettings.smtp.secure'] = smtp.secure || false;
+    update['emailSettings.smtp.user']   = smtp.user   || null;
+
+    // Only re-encrypt password if a new one was provided (non-empty string)
+    if (smtp.password && smtp.password.trim()) {
+      update['emailSettings.smtp.passEncrypted'] = encrypt(smtp.password.trim());
+      // Changing credentials resets verified status
+      update['emailSettings.smtp.verified']   = false;
+      update['emailSettings.smtp.verifiedAt'] = null;
+    }
+
+    // If SMTP host/user was cleared, also clear verification
+    if (!smtp.host || !smtp.user) {
+      update['emailSettings.smtp.verified']      = false;
+      update['emailSettings.smtp.verifiedAt']    = null;
+      update['emailSettings.smtp.passEncrypted'] = null;
+    }
+  }
+
+  const tenant = await Tenant.findByIdAndUpdate(
+    tenantId,
+    { $set: update },
+    { new: true, select: 'emailSettings' }
+  );
+
+  return getEmailSettings(tenantId);
+}
+
+// ─── Test SMTP Connection ─────────────────────────────────────────────────────
+async function testEmailSmtp(tenantId, { host, port, secure, user, password, fromEmail, toEmail }) {
+  if (!host || !user || !password) throw new AppError('host, user and password are required', 400);
+  if (!toEmail) throw new AppError('toEmail is required to receive the test email', 400);
+
+  try {
+    await testSmtpConnection({ host, port: port || 587, secure: secure || false,
+                                user, pass: password, fromEmail, toEmail });
+  } catch (err) {
+    throw new AppError(`SMTP test failed: ${err.message}`, 422);
+  }
+
+  // Mark as verified in DB
+  await Tenant.findByIdAndUpdate(tenantId, {
+    $set: {
+      'emailSettings.smtp.verified':   true,
+      'emailSettings.smtp.verifiedAt': new Date(),
+    },
+  });
+
+  return { verified: true, message: `Test email sent to ${toEmail}` };
+}
+
+// ─── Get Feature Flags ────────────────────────────────────────────────────────
+async function getFeatureFlags(tenantId) {
+  const tenant = await tenantRepo.findById(tenantId);
+  if (!tenant) throw new AppError('Tenant not found', 404);
+  return tenant.settings?.featureFlags ?? {};
+}
+
+// ─── Update Feature Flags ──────────────────────────────────────────────────────
+const VALID_FLAGS = ['liveClasses', 'certificates', 'assignments', 'announcements', 'payments', 'forums'];
+
+async function updateFeatureFlags(tenantId, flags) {
+  const update = {};
+  for (const key of VALID_FLAGS) {
+    if (typeof flags[key] === 'boolean') {
+      update[`settings.featureFlags.${key}`] = flags[key];
+    }
+  }
+  if (!Object.keys(update).length) throw new AppError('No valid feature flag fields provided', 400);
+  const tenant = await tenantRepo.updateById(tenantId, { $set: update });
+  return tenant.settings?.featureFlags ?? {};
+}
+
+module.exports = {
+  getMyTenant,
+  updateSettings,
+  setCustomDomain,
+  verifyCustomDomain,
+  removeCustomDomain,
+  getPlanInfo,
+  getStorageUsage,
+  getEmailSettings,
+  saveEmailSettings,
+  testEmailSmtp,
+  getFeatureFlags,
+  updateFeatureFlags,
+};

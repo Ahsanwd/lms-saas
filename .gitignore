@@ -1,0 +1,11 @@
+node_modules
+.turbo
+.env
+.env.local
+.env.*.local
+dist
+.next
+build
+*.log
+apps/api/keys/*.key
+apps/api/uploads/

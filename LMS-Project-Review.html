@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>LMS SaaS — Project Review</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #1a1a2e;
+    background: #f8f9fa;
+  }
+
+  /* ── Print ─────────────────────────────────────────────── */
+  @media print {
+    body { background: white; font-size: 11px; }
+    .cover { min-height: 0; padding: 40px 60px; }
+    .no-break { page-break-inside: avoid; }
+    .page-break { page-break-before: always; }
+    .section { box-shadow: none; border: 1px solid #e2e8f0; }
+    .badge { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .cover-bg, .tag, .status-dot, .endpoint-chip, .role-pill { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+
+  /* ── Layout ─────────────────────────────────────────────── */
+  .page { max-width: 900px; margin: 0 auto; padding: 24px 16px; }
+
+  /* ── Cover ───────────────────────────────────────────────── */
+  .cover {
+    background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 60%, #1d4ed8 100%);
+    color: white;
+    padding: 60px;
+    border-radius: 16px;
+    margin-bottom: 32px;
+    min-height: 220px;
+    position: relative;
+    overflow: hidden;
+  }
+  .cover::before {
+    content: '';
+    position: absolute;
+    top: -60px; right: -60px;
+    width: 260px; height: 260px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.05);
+  }
+  .cover::after {
+    content: '';
+    position: absolute;
+    bottom: -80px; left: 30%;
+    width: 200px; height: 200px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.04);
+  }
+  .cover-eyebrow {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: #93c5fd;
+    margin-bottom: 12px;
+  }
+  .cover h1 { font-size: 36px; font-weight: 800; line-height: 1.15; margin-bottom: 8px; }
+  .cover-sub { font-size: 16px; color: #bfdbfe; margin-bottom: 24px; }
+  .cover-meta { display: flex; gap: 24px; flex-wrap: wrap; }
+  .cover-meta span {
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 20px;
+    padding: 4px 14px;
+    font-size: 11px;
+    font-weight: 500;
+    color: #dbeafe;
+  }
+
+  /* ── Section card ─────────────────────────────────────────── */
+  .section {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    margin-bottom: 24px;
+    overflow: hidden;
+  }
+  .section-header {
+    padding: 16px 24px;
+    border-bottom: 1px solid #f1f5f9;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .section-icon {
+    width: 34px; height: 34px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+  .section-title { font-size: 15px; font-weight: 700; color: #0f172a; }
+  .section-sub { font-size: 11px; color: #94a3b8; margin-top: 1px; }
+  .section-body { padding: 20px 24px; }
+
+  /* ── Grid ─────────────────────────────────────────────────── */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  @media (max-width: 640px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+
+  /* ── Card ─────────────────────────────────────────────────── */
+  .card {
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .card-title { font-weight: 700; font-size: 12px; color: #1e293b; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+  .card ul { padding-left: 16px; color: #475569; }
+  .card ul li { margin-bottom: 3px; font-size: 12px; }
+
+  /* ── Module row ───────────────────────────────────────────── */
+  .module {
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    margin-bottom: 12px;
+    overflow: hidden;
+  }
+  .module-head {
+    background: #f8fafc;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .module-name { font-weight: 700; font-size: 13px; color: #0f172a; }
+  .module-path { font-size: 11px; color: #64748b; font-family: 'Consolas', monospace; }
+  .module-body { padding: 10px 16px; }
+  .endpoint-chip {
+    display: inline-block;
+    background: #f1f5f9;
+    color: #334155;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 10.5px;
+    font-family: 'Consolas', monospace;
+    margin: 2px;
+  }
+  .endpoint-chip.post { background: #dcfce7; color: #166534; }
+  .endpoint-chip.patch { background: #fef9c3; color: #854d0e; }
+  .endpoint-chip.del { background: #fee2e2; color: #991b1b; }
+
+  /* ── Page row ─────────────────────────────────────────────── */
+  .page-row {
+    display: flex;
+    gap: 14px;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+  }
+  .page-row-icon {
+    width: 38px; height: 38px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .page-row-title { font-weight: 700; font-size: 13px; color: #0f172a; font-family: 'Consolas', monospace; }
+  .page-row-desc { font-size: 11.5px; color: #475569; margin-top: 3px; }
+  .page-row ul { padding-left: 16px; margin-top: 6px; }
+  .page-row ul li { font-size: 11.5px; color: #475569; margin-bottom: 2px; }
+
+  /* ── Role pills ───────────────────────────────────────────── */
+  .role-pill {
+    display: inline-block;
+    border-radius: 12px;
+    padding: 2px 10px;
+    font-size: 10.5px;
+    font-weight: 600;
+    margin: 2px;
+  }
+  .r-super { background: #fce7f3; color: #9d174d; }
+  .r-tenant { background: #ede9fe; color: #5b21b6; }
+  .r-instructor { background: #dbeafe; color: #1e40af; }
+  .r-student { background: #dcfce7; color: #166534; }
+
+  /* ── Status dot ───────────────────────────────────────────── */
+  .done { display: inline-flex; align-items: center; gap: 4px; }
+  .done::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #22c55e; }
+
+  /* ── Tags ─────────────────────────────────────────────────── */
+  .tag {
+    display: inline-block;
+    border-radius: 6px;
+    padding: 3px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    margin: 2px;
+  }
+  .tag-blue { background: #dbeafe; color: #1e40af; }
+  .tag-purple { background: #ede9fe; color: #5b21b6; }
+  .tag-green { background: #dcfce7; color: #166534; }
+  .tag-orange { background: #ffedd5; color: #9a3412; }
+  .tag-gray { background: #f1f5f9; color: #475569; }
+
+  /* ── Rule list ─────────────────────────────────────────────── */
+  .rule-list { list-style: none; padding: 0; }
+  .rule-list li {
+    padding: 8px 12px;
+    border-left: 3px solid #e2e8f0;
+    margin-bottom: 8px;
+    font-size: 12px;
+    color: #334155;
+    background: #f8fafc;
+    border-radius: 0 6px 6px 0;
+  }
+  .rule-list li strong { color: #0f172a; }
+
+  /* ── Model table ───────────────────────────────────────────── */
+  table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+  th { background: #f8fafc; text-align: left; padding: 8px 12px; font-weight: 700; color: #475569; border-bottom: 2px solid #e2e8f0; }
+  td { padding: 7px 12px; border-bottom: 1px solid #f1f5f9; color: #334155; vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  code { font-family: 'Consolas', monospace; background: #f1f5f9; border-radius: 3px; padding: 1px 5px; font-size: 10.5px; color: #1e293b; }
+
+  /* ── Next steps ─────────────────────────────────────────────── */
+  .step {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    padding: 14px 0;
+    border-bottom: 1px solid #f1f5f9;
+  }
+  .step:last-child { border-bottom: none; }
+  .step-num {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: #1d4ed8;
+    color: white;
+    font-weight: 800;
+    font-size: 12px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .step-title { font-weight: 700; font-size: 13px; color: #0f172a; margin-bottom: 3px; }
+  .step-desc { font-size: 11.5px; color: #475569; }
+
+  /* ── Footer ─────────────────────────────────────────────────── */
+  .footer {
+    text-align: center;
+    font-size: 11px;
+    color: #94a3b8;
+    padding: 24px 0 8px;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ══ COVER ═══════════════════════════════════════════════════════ -->
+  <div class="cover">
+    <p class="cover-eyebrow">Full-Stack SaaS — Project Review</p>
+    <h1>LMS SaaS Platform</h1>
+    <p class="cover-sub">Multi-tenant Learning Management System — Complete Build Summary</p>
+    <div class="cover-meta">
+      <span>📅 Built: May 2026</span>
+      <span>📁 F:\lms-saas\</span>
+      <span>⚙️ Turborepo Monorepo</span>
+      <span>✅ All Pages Complete</span>
+    </div>
+  </div>
+
+  <!-- ══ OVERVIEW ════════════════════════════════════════════════════ -->
+  <div class="section no-break">
+    <div class="section-header">
+      <div class="section-icon" style="background:#dbeafe;">🏗️</div>
+      <div>
+        <div class="section-title">Project Overview</div>
+        <div class="section-sub">What was built and for whom</div>
+      </div>
+    </div>
+    <div class="section-body">
+      <p style="color:#475569;font-size:12.5px;margin-bottom:16px;">
+        A production-grade, multi-tenant LMS SaaS where each customer (tenant) gets their own isolated data space,
+        subdomain, and optionally a dedicated database. The platform supports four distinct user roles with different
+        capabilities, a full course builder, 9-type quiz engine, billing/subscription management, and certificate issuance.
+      </p>
+      <div class="grid-3">
+        <div class="card">
+          <div class="card-title">👥 User Roles</div>
+          <ul>
+            <li><span class="role-pill r-super">Super Admin</span> — platform owner</li>
+            <li><span class="role-pill r-tenant">Tenant Admin</span> — school owner</li>
+            <li><span class="role-pill r-instructor">Instructor</span> — course creator</li>
+            <li><span class="role-pill r-student">Student</span> — learner</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="card-title">🏢 Multi-Tenancy</div>
+          <ul>
+            <li>Subdomain-based tenant resolution</li>
+            <li>Shared DB (default) or dedicated DB per tenant</li>
+            <li>tenantId first in all compound indexes</li>
+            <li>Custom domain support</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="card-title">🔐 Auth &amp; Security</div>
+          <ul>
+            <li>JWT RS256 (asymmetric keys)</li>
+            <li>Access token: 15 min</li>
+            <li>Refresh token: 7 days, rotating</li>
+            <li>Silent refresh on 401 (failed-queue)</li>
+            <li>RBAC permissions per role</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ TECH STACK ═══════════════════════════════════════════════════ -->
+  <div class="section no-break">
+    <div class="section-header">
+      <div class="section-icon" style="background:#ede9fe;">⚡</div>
+      <div>
+        <div class="section-title">Technology Stack</div>
+        <div class="section-sub">Every tool used across the monorepo</div>
+      </div>
+    </div>
+    <div class="section-body">
+      <div class="grid-2">
+        <div>
+          <p style="font-weight:700;font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Frontend — apps/web</p>
+          <div>
+            <span class="tag tag-blue">Next.js 14 (App Router)</span>
+            <span class="tag tag-blue">TypeScript</span>
+            <span class="tag tag-blue">Tailwind CSS</span>
+            <span class="tag tag-blue">React Query (TanStack)</span>
+            <span class="tag tag-blue">Zustand (persist)</span>
+            <span class="tag tag-blue">Axios</span>
+            <span class="tag tag-blue">js-cookie</span>
+          </div>
+        </div>
+        <div>
+          <p style="font-weight:700;font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Backend — apps/api</p>
+          <div>
+            <span class="tag tag-purple">Node.js + Express</span>
+            <span class="tag tag-purple">MongoDB + Mongoose</span>
+            <span class="tag tag-purple">CommonJS (require/exports)</span>
+            <span class="tag tag-purple">Bull + Redis (email queue)</span>
+            <span class="tag tag-purple">Nodemailer</span>
+            <span class="tag tag-purple">Multer (file uploads)</span>
+          </div>
+        </div>
+        <div>
+          <p style="font-weight:700;font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Infrastructure</p>
+          <div>
+            <span class="tag tag-green">Turborepo (monorepo)</span>
+            <span class="tag tag-green">MongoDB Atlas (prod)</span>
+            <span class="tag tag-green">Local storage → S3 abstracted</span>
+            <span class="tag tag-green">Manual billing (cash)</span>
+          </div>
+        </div>
+        <div>
+          <p style="font-weight:700;font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Planned Deployment</p>
+          <div>
+            <span class="tag tag-orange">Render (API server)</span>
+            <span class="tag tag-orange">Vercel (Next.js frontend)</span>
+            <span class="tag tag-orange">MongoDB Atlas (database)</span>
+            <span class="tag tag-orange">Redis Cloud (queue)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ BACKEND MODULES ══════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:#dcfce7;">🛠️</div>
+      <div>
+        <div class="section-title">Backend Modules — 8 Complete</div>
+        <div class="section-sub">apps/api/src/modules/ — all endpoints, services, repositories</div>
+      </div>
+    </div>
+    <div class="section-body">
+
+      <div class="module no-break">
+        <div class="module-head">
+          <div>
+            <span class="module-name">Module 1 — Authentication</span>
+            <span class="module-path"> &nbsp;/api/auth</span>
+          </div>
+          <span class="done">Complete</span>
+        </div>
+        <div class="module-body">
+          <span class="endpoint-chip post">POST /register</span>
+          <span class="endpoint-chip post">POST /login</span>
+          <span class="endpoint-chip post">POST /verify-email</span>
+          <span class="endpoint-chip post">POST /resend-verification</span>
+          <span class="endpoint-chip post">POST /forgot-password</span>
+          <span class="endpoint-chip post">POST /reset-password</span>
+          <span class="endpoint-chip post">POST /refresh</span>
+          <span class="endpoint-chip post">POST /logout</span>
+          <span class="endpoint-chip post">POST /logout-all</span>
+          <span class="endpoint-chip">GET /me</span>
+        </div>
+      </div>
+
+      <div class="module no-break">
+        <div class="module-head">
+          <div>
+            <span class="module-name">Module 2 — Users</span>
+            <span class="module-path"> &nbsp;/api/users</span>
+          </div>
+          <span class="done">Complete</span>
+        </div>
+        <div class="module-body">
+          <span class="endpoint-chip">GET /</span>
+          <span class="endpoint-chip">GET /:id</span>
+          <span class="endpoint-chip patch">PATCH /profile</span>
+          <span class="endpoint-chip post">POST /change-password</span>
+          <span class="endpoint-chip post">POST /invite</span>
+          <span class="endpoint-chip post">POST /accept-invite</span>
+          <span class="endpoint-chip patch">PATCH /:id/role</span>
+          <span class="endpoint-chip post">POST /:id/suspend</span>
+          <span class="endpoint-chip post">POST /:id/unsuspend</span>
+          <span class="endpoint-chip del">DELETE /:id</span>
+          <span class="endpoint-chip">GET /sessions</span>
+          <span class="endpoint-chip del">DELETE /sessions/:id</span>
+        </div>
+      </div>
+
+      <div class="module no-break">
+        <div class="module-head">
+          <div>
+            <span class="module-name">Module 3 — Tenant</span>
+            <span class="module-path"> &nbsp;/api/tenant &nbsp;+&nbsp; /api/admin/tenants</span>
+          </div>
+          <span class="done">Complete</span>
+        </div>
+        <div class="module-body">
+          <span class="endpoint-chip">GET /settings</span>
+          <span class="endpoint-chip patch">PATCH /settings</span>
+          <span class="endpoint-chip patch">PATCH /custom-domain</span>
+          <span class="endpoint-chip">GET /plan</span>
+          <span class="endpoint-chip">GET /storage</span>
+          <span style="color:#94a3b8;font-size:10.5px;margin: 0 6px;">| Super Admin:</span>
+          <span class="endpoint-chip">GET / (list all)</span>
+          <span class="endpoint-chip post">POST /</span>
+          <span class="endpoint-chip patch">PATCH /:id</span>
+          <span class="endpoint-chip del">DELETE /:id</span>
+          <span class="endpoint-chip post">POST /:id/suspend</span>
+          <span class="endpoint-chip post">POST /:id/restore</span>
+          <span class="endpoint-chip patch">PATCH /:id/plan</span>
+          <span class="endpoint-chip">GET /:id/stats</span>
+        </div>
+      </div>
+
+      <div class="module no-break">
+        <div class="module-head">
+          <div>
+            <span class="module-name">Module 4 — Courses</span>
+            <span class="module-path"> &nbsp;/api/courses</span>
+          </div>
+          <span class="done">Complete</span>
+        </div>
+        <div class="module-body">
+          <b style="font-size:10.5px;color:#64748b;">Categories:</b>
+          <span class="endpoint-chip">GET /categories</span>
+          <span class="endpoint-chip post">POST /categories</span>
+          <span class="endpoint-chip patch">PATCH /categories/:id</span>
+          <span class="endpoint-chip del">DELETE /categories/:id</span>
+          <br/><b style="font-size:10.5px;color:#64748b;">Courses:</b>
+          <span class="endpoint-chip">GET /</span>
+          <span class="endpoint-chip post">POST /</span>
+          <span class="endpoint-chip">GET /:id</span>
+          <span class="endpoint-chip patch">PATCH /:id</span>
+          <span class="endpoint-chip del">DELETE /:id</span>
+          <span class="endpoint-chip post">POST /:id/thumbnail</span>
+          <span class="endpoint-chip post">POST /:id/publish</span>
+          <span class="endpoint-chip post">POST /:id/archive</span>
+          <br/><b style="font-size:10.5px;color:#64748b;">Sections:</b>
+          <span class="endpoint-chip">GET /:id/sections</span>
+          <span class="endpoint-chip post">POST /:id/sections</span>
+          <span class="endpoint-chip patch">PATCH /:id/sections/:sid</span>
+          <span class="endpoint-chip del">DELETE /:id/sections/:sid</span>
+          <span class="endpoint-chip patch">PATCH /:id/sections/reorder</span>
+          <br/><b style="font-size:10.5px;color:#64748b;">Lessons:</b>
+          <span class="endpoint-chip">GET /:id/sections/:sid/lessons</span>
+          <span class="endpoint-chip post">POST /:id/sections/:sid/lessons</span>
+          <span class="endpoint-chip patch">PATCH /:id/sections/:sid/lessons/:lid</span>
+          <span class="endpoint-chip del">DELETE /:id/sections/:sid/lessons/:lid</span>
+          <span class="endpoint-chip post">POST /:id/lessons/:lid/video</span>
+          <span class="endpoint-chip post">POST /:id/lessons/:lid/file</span>
+          <span class="endpoint-chip post">POST /:id/lessons/:lid/attachments</span>
+          <br/><b style="font-size:10.5px;color:#64748b;">Enrollment &amp; Progress:</b>
+          <span class="endpoint-chip post">POST /:id/enroll</span>
+          <span class="endpoint-chip del">DELETE /:id/enroll</span>
+          <span class="endpoint-chip">GET /:id/students</span>
+          <span class="endpoint-chip">GET /my-enrollments</span>
+          <span class="endpoint-chip">GET /:id/progress</span>
+          <span class="endpoint-chip post">POST /:id/progress/lessons/:lid</span>
+          <span class="endpoint-chip">GET /:id/certificate</span>
+        </div>
+      </div>
+
+      <div class="module no-break">
+        <div class="module-head">
+          <div>
+            <span class="module-name">Module 5 — Quizzes</span>
+            <span class="module-path"> &nbsp;/api/quizzes</span>
+          </div>
+          <span class="done">Complete</span>
+        </div>
+        <div class="module-body">
+          <span class="endpoint-chip">GET /</span>
+          <span class="endpoint-chip post">POST /</span>
+          <span class="endpoint-chip">GET /:id</span>
+          <span class="endpoint-chip patch">PATCH /:id</span>
+          <span class="endpoint-chip del">DELETE /:id</span>
+          <span class="endpoint-chip">GET /question-bank</span>
+          <span class="endpoint-chip post">POST /questions</span>
+          <span class="endpoint-chip patch">PATCH /questions/:qid</span>
+          <span class="endpoint-chip del">DELETE /questions/:qid</span>
+          <span class="endpoint-chip patch">PUT /:id/questions</span>
+          <span class="endpoint-chip post">POST /:id/attempt</span>
+          <span class="endpoint-chip post">POST /:id/attempt/submit</span>
+          <span class="endpoint-chip">GET /:id/attempts</span>
+          <span class="endpoint-chip">GET /:id/attempts/my</span>
+          <span class="endpoint-chip patch">PATCH /:id/attempts/:aid/grade</span>
+          <span class="endpoint-chip">GET /:id/analytics</span>
+          <p style="font-size:11px;color:#64748b;margin-top:8px;">
+            <strong>9 Question types:</strong> multiple_choice · multiple_select · true_false · fill_blank · short_answer · essay · matching · ordering · image
+          </p>
+        </div>
+      </div>
+
+      <div class="module no-break">
+        <div class="module-head">
+          <div>
+            <span class="module-name">Module 6 — Billing</span>
+            <span class="module-path"> &nbsp;/api/billing &nbsp;+&nbsp; /api/admin/billing</span>
+          </div>
+          <span class="done">Complete</span>
+        </div>
+        <div class="module-body">
+          <b style="font-size:10.5px;color:#64748b;">Tenant:</b>
+          <span class="endpoint-chip">GET /subscription</span>
+          <span class="endpoint-chip">GET /invoices</span>
+          <span class="endpoint-chip">GET /plans</span>
+          <span class="endpoint-chip post">POST /coupon/validate</span>
+          <br/><b style="font-size:10.5px;color:#64748b;">Super Admin:</b>
+          <span class="endpoint-chip">GET /subscriptions</span>
+          <span class="endpoint-chip post">POST /subscriptions</span>
+          <span class="endpoint-chip patch">PATCH /subscriptions/:id</span>
+          <span class="endpoint-chip post">POST /subscriptions/:id/upgrade</span>
+          <span class="endpoint-chip post">POST /subscriptions/:id/cancel</span>
+          <span class="endpoint-chip">GET /invoices</span>
+          <span class="endpoint-chip patch">PATCH /invoices/:id/pay</span>
+          <span class="endpoint-chip post">POST /coupons</span>
+          <span class="endpoint-chip patch">PATCH /coupons/:id</span>
+          <span class="endpoint-chip del">DELETE /coupons/:id</span>
+          <span class="endpoint-chip">GET /revenue</span>
+        </div>
+      </div>
+
+      <div class="module no-break">
+        <div class="module-head">
+          <div>
+            <span class="module-name">Module 7 — Dashboards</span>
+            <span class="module-path"> &nbsp;/api/dashboard &nbsp;+&nbsp; /api/admin/dashboard</span>
+          </div>
+          <span class="done">Complete</span>
+        </div>
+        <div class="module-body">
+          <span class="endpoint-chip">GET /dashboard</span>
+          <span style="color:#94a3b8;font-size:10.5px;">→ auto-dispatches by role (tenant_admin / instructor / student)</span>
+          <br/>
+          <span class="endpoint-chip">GET /admin/dashboard</span>
+          <span style="color:#94a3b8;font-size:10.5px;">→ platform metrics, revenue, tenant health, expiring subscriptions</span>
+        </div>
+      </div>
+
+      <div class="module no-break">
+        <div class="module-head">
+          <div>
+            <span class="module-name">Module 8 — Infrastructure / Core</span>
+            <span class="module-path"> &nbsp;config/ · database/ · middlewares/ · utils/ · jobs/ · services/</span>
+          </div>
+          <span class="done">Complete</span>
+        </div>
+        <div class="module-body">
+          <div class="grid-2" style="gap:8px;">
+            <div>
+              <b style="font-size:10.5px;color:#64748b;">Database Layer</b>
+              <ul style="padding-left:14px;color:#475569;font-size:11.5px;">
+                <li>17 Mongoose models</li>
+                <li>15 Repository classes (all queries here)</li>
+                <li>Plugins: tenantScope, softDelete, auditFields</li>
+                <li>Shared + dedicated DB connection logic</li>
+              </ul>
+            </div>
+            <div>
+              <b style="font-size:10.5px;color:#64748b;">Middlewares &amp; Utils</b>
+              <ul style="padding-left:14px;color:#475569;font-size:11.5px;">
+                <li>resolveTenant — X-Tenant-Subdomain header</li>
+                <li>authenticate — JWT RS256 verify</li>
+                <li>authorize(permission) — RBAC guard</li>
+                <li>AppError, logger, response helper</li>
+                <li>Bull email queue + 3 Nodemailer templates</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ DATABASE MODELS ══════════════════════════════════════════════ -->
+  <div class="section page-break no-break">
+    <div class="section-header">
+      <div class="section-icon" style="background:#fef9c3;">🗄️</div>
+      <div>
+        <div class="section-title">Database Models — 17 Collections</div>
+        <div class="section-sub">MongoDB · Mongoose · All multi-tenant scoped via tenantId</div>
+      </div>
+    </div>
+    <div class="section-body">
+      <table>
+        <thead>
+          <tr>
+            <th>Model</th>
+            <th>Key Fields</th>
+            <th>Soft Delete</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><code>Tenant</code></td><td>name, subdomain, customDomain, status, settings, plan, storageUsedBytes</td><td>✅</td><td>Root of every tenant scope</td></tr>
+          <tr><td><code>User</code></td><td>tenantId, email, role, passwordHash, status, avatar</td><td>✅</td><td>Roles: super_admin, tenant_admin, instructor, student</td></tr>
+          <tr><td><code>RefreshToken</code></td><td>userId, token (hashed), deviceInfo, expiresAt</td><td>❌</td><td>Rotated on every use</td></tr>
+          <tr><td><code>Invite</code></td><td>tenantId, email, token, role, expiresAt, acceptedAt</td><td>❌</td><td>Used for user invitations</td></tr>
+          <tr><td><code>Plan</code></td><td>name, slug, price {monthly,yearly}, limits, features, dbMode</td><td>❌</td><td>Platform-level (super admin only)</td></tr>
+          <tr><td><code>Subscription</code></td><td>tenantId, planId, status, billingCycle, currentPeriodEnd</td><td>❌</td><td>One active per tenant</td></tr>
+          <tr><td><code>Invoice</code></td><td>tenantId, invoiceNumber, total, status, dueDate, paidAt</td><td>❌ Immutable</td><td>Financial records, never deleted</td></tr>
+          <tr><td><code>Coupon</code></td><td>code, discountType, discountValue, usageLimit, usedCount</td><td>✅</td><td>Applied at billing checkout</td></tr>
+          <tr><td><code>Category</code></td><td>tenantId, name, slug, parentId, order</td><td>✅</td><td>Hierarchical (parentId)</td></tr>
+          <tr><td><code>Course</code></td><td>tenantId, instructorId, title, slug, level, price, status, totalLessons</td><td>✅</td><td>status: draft/published/archived</td></tr>
+          <tr><td><code>Section</code></td><td>tenantId, courseId, title, order, isPublished</td><td>✅</td><td>Ordered within a course</td></tr>
+          <tr><td><code>Lesson</code></td><td>tenantId, courseId, sectionId, type, video{}, file{}, content, isPreview</td><td>✅</td><td>Types: video/text/file/quiz</td></tr>
+          <tr><td><code>Enrollment</code></td><td>tenantId, courseId, userId, status, certificateIssued, completedAt</td><td>❌</td><td>status: active/completed/refunded</td></tr>
+          <tr><td><code>CourseProgress</code></td><td>tenantId, courseId, userId, completedLessons, percentage, lastLessonId</td><td>❌</td><td>Aggregate per student per course</td></tr>
+          <tr><td><code>LessonProgress</code></td><td>tenantId, courseId, lessonId, userId, status, watchedDurationSeconds</td><td>❌</td><td>status: not_started/in_progress/completed</td></tr>
+          <tr><td><code>Question</code></td><td>tenantId, type, text, options[], matchingPairs[], correctOrder[], points</td><td>✅</td><td>9 types, shared question bank</td></tr>
+          <tr><td><code>Quiz</code></td><td>tenantId, courseId, lessonId, title, settings{timer,passingScore,maxAttempts}, status</td><td>✅</td><td>Linked to a lesson (type=quiz)</td></tr>
+          <tr><td><code>QuizAttempt</code></td><td>tenantId, quizId, userId, servedQuestions[], answers[], score, status</td><td>❌</td><td>status: in_progress/submitted/auto_graded/pending_manual</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══ FRONTEND PAGES ════════════════════════════════════════════════ -->
+  <div class="section page-break">
+    <div class="section-header">
+      <div class="section-icon" style="background:#fce7f3;">🖥️</div>
+      <div>
+        <div class="section-title">Frontend Pages — All Complete</div>
+        <div class="section-sub">apps/web · Next.js 14 App Router · TypeScript · Tailwind CSS</div>
+      </div>
+    </div>
+    <div class="section-body">
+
+      <p style="font-weight:700;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Auth Pages — app/(auth)/</p>
+
+      <div class="grid-2" style="margin-bottom:20px;">
+        <div class="card">
+          <div class="card-title">🔑 Login &amp; Register</div>
+          <ul>
+            <li><code>/login</code> — email/password, role-based redirect</li>
+            <li><code>/register</code> — tenantName + subdomain creation</li>
+            <li><code>/verify-email</code> — token verify + 60s resend cooldown</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="card-title">🔒 Password &amp; Invite</div>
+          <ul>
+            <li><code>/forgot-password</code> — no user enumeration</li>
+            <li><code>/reset-password</code> — token from URL query param</li>
+            <li><code>/accept-invite</code> — pre-fills email from invite token</li>
+          </ul>
+        </div>
+      </div>
+
+      <p style="font-weight:700;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Dashboard Pages — app/(dashboard)/</p>
+
+      <div class="page-row no-break">
+        <div class="page-row-icon" style="background:#dbeafe;">📊</div>
+        <div>
+          <div class="page-row-title">/dashboard/student &nbsp;·&nbsp; /dashboard/instructor &nbsp;·&nbsp; /dashboard/tenant-admin &nbsp;·&nbsp; /admin/dashboard</div>
+          <div class="page-row-desc">Role-dispatched dashboards with live stats from the API. Student sees enrollments + progress. Instructor sees courses + pending grades. Tenant Admin sees users + revenue. Super Admin sees platform metrics + expiring subscriptions.</div>
+        </div>
+      </div>
+
+      <div class="page-row no-break">
+        <div class="page-row-icon" style="background:#dcfce7;">📚</div>
+        <div>
+          <div class="page-row-title">/courses &nbsp;&amp;&nbsp; /courses/new</div>
+          <div class="page-row-desc">Instructors/admins see management table (status badge, enroll count, actions). Students see browsable catalog with level/price filters. New course creation via react-hook-form + zod.</div>
+        </div>
+      </div>
+
+      <div class="page-row no-break">
+        <div class="page-row-icon" style="background:#fce7f3;">🏗️</div>
+        <div>
+          <div class="page-row-title">/courses/[id] — Course Builder + Student View</div>
+          <div class="page-row-desc">Role-aware. Instructors get a full builder with 3 tabs:</div>
+          <ul>
+            <li><strong>Overview tab</strong> — thumbnail upload (multipart), title, description, level, price, capacity, save</li>
+            <li><strong>Curriculum tab</strong> — sections accordion; double-click to inline-edit titles; add/delete/publish sections; lesson modal (create/edit) with video + file upload per lesson; lesson type icons</li>
+            <li><strong>Students tab</strong> — enrolled students table with progress status</li>
+            <li><strong>Header actions</strong> — Publish / Archive / Restore with live status badge</li>
+            <li><strong>Students see</strong> — course banner, progress bar, Enroll/Continue CTA, curriculum preview with lock icons on non-preview lessons</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="page-row no-break">
+        <div class="page-row-icon" style="background:#fef9c3;">▶️</div>
+        <div>
+          <div class="page-row-title">/courses/[id]/learn — Student Course Player</div>
+          <div class="page-row-desc">Two-column fixed layout (288px sidebar + scrollable content). Sidebar shows section headers and lesson list with green checkmarks from lessonDetails progress data. Content area switches on lesson type:</div>
+          <ul>
+            <li><strong>video</strong> — HTML5 &lt;video controls&gt; for local/Vimeo, YouTube &lt;iframe&gt; embed for YouTube URLs</li>
+            <li><strong>text</strong> — white-space:pre-wrap rendered content</li>
+            <li><strong>file</strong> — centred download button with file size display</li>
+            <li><strong>quiz</strong> — inline QuizLesson component (info → taking → result, 3-phase)</li>
+            <li><strong>Navigation</strong> — Prev / Mark Complete / Complete &amp; Next; URL ?lessonId= for deep-linking</li>
+            <li><strong>Completion modal</strong> — shows on 100% progress → routes to /certificates/:courseId</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="page-row no-break">
+        <div class="page-row-icon" style="background:#ede9fe;">📝</div>
+        <div>
+          <div class="page-row-title">/quizzes/[id] — Quiz Builder + Student Quiz Taking</div>
+          <div class="page-row-desc">Role-aware. Students get a 3-phase flow, instructors get a builder:</div>
+          <ul>
+            <li><strong>Student Info Screen</strong> — quiz meta (questions, pass%, attempts), past attempt history, Start/Retake button</li>
+            <li><strong>Student Taking Screen</strong> — all 9 question types rendered, countdown timer (auto-submits at 0), question navigator, submit confirmation modal</li>
+            <li><strong>Student Result Screen</strong> — score circle, pass/fail badge, pending-manual state message</li>
+            <li><strong>Instructor Questions tab</strong> — question list, Question Bank modal (search + type filter), set questions via PUT</li>
+            <li><strong>Instructor Settings tab</strong> — toggle panel for timer, shuffling, max attempts, passing score, retake, show answers</li>
+            <li><strong>Instructor Attempts tab</strong> — all attempts table, Grade modal for essay / manual-type questions</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="page-row no-break">
+        <div class="page-row-icon" style="background:#dcfce7;">🎓</div>
+        <div>
+          <div class="page-row-title">/certificates/[courseId] — Certificate View + Print</div>
+          <div class="page-row-desc">
+            Fetches <code>GET /courses/:id/certificate</code> → <code>{ studentName, courseTitle, instructorName, completedAt, issuedAt }</code>. Returns 404 if course not completed (shown as error alert + Go Back button).
+          </div>
+          <ul>
+            <li>Certificate card: top + bottom gradient border, badge shield icon, student name in Georgia serif, course title in primary color</li>
+            <li>Footer row: completion date + instructor name with signature-line underrules</li>
+            <li>"Print / Save PDF" → window.print(); action buttons hidden on print; global CSS hides sidebar + header on print</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="page-row no-break">
+        <div class="page-row-icon" style="background:#ffedd5;">⚙️</div>
+        <div>
+          <div class="page-row-title">/quizzes &nbsp;·&nbsp; /users &nbsp;·&nbsp; /billing &nbsp;·&nbsp; /settings &nbsp;·&nbsp; /profile &nbsp;·&nbsp; /my-learning &nbsp;·&nbsp; /admin/tenants &nbsp;·&nbsp; /admin/billing</div>
+          <div class="page-row-desc">Additional management pages built as part of the frontend foundation — quiz list with create modal, user management table, billing/subscription view, profile editor, and all admin management pages.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══ CORE LIB ═════════════════════════════════════════════════════ -->
+  <div class="section no-break">
+    <div class="section-header">
+      <div class="section-icon" style="background:#f1f5f9;">🧩</div>
+      <div>
+        <div class="section-title">Frontend Core Library</div>
+        <div class="section-sub">apps/web/lib · stores · components/ui · hooks · types</div>
+      </div>
+    </div>
+    <div class="section-body">
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">📡 lib/api.ts — Axios Instance</div>
+          <ul>
+            <li>Base URL from <code>NEXT_PUBLIC_API_URL</code></li>
+            <li>Attaches <code>Authorization: Bearer &lt;token&gt;</code> on every request</li>
+            <li>Attaches <code>X-Tenant-Subdomain</code> header for tenant routing</li>
+            <li>Silent 401 → POST /auth/refresh → retry with new token</li>
+            <li>Failed-queue: concurrent requests wait while refreshing</li>
+            <li>On refresh failure: clear cookies → redirect /login</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="card-title">🏪 stores/auth.store.ts — Zustand</div>
+          <ul>
+            <li>Persisted to localStorage via zustand/middleware</li>
+            <li><code>user: User | null</code>, <code>isAuthenticated</code>, <code>isLoading</code></li>
+            <li><code>login(email, password)</code> → sets access token + subdomain cookie</li>
+            <li><code>logout()</code> → calls /auth/logout, clears all state</li>
+            <li><code>fetchMe()</code> → GET /auth/me → populates user</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="card-title">🎨 components/ui/</div>
+          <ul>
+            <li><code>Button</code> — variants: primary/secondary/ghost/danger/outline; loading state</li>
+            <li><code>Input</code> — label, error, hint, leftIcon, rightIcon</li>
+            <li><code>Card</code> + CardHeader, CardTitle, CardContent, CardFooter</li>
+            <li><code>Alert</code> — info/success/warning/error variants</li>
+            <li><code>Badge</code> — default/success/warning/danger/info</li>
+            <li><code>Spinner</code> + <code>PageLoader</code></li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="card-title">🔧 lib/utils.ts &amp; types/index.ts</div>
+          <ul>
+            <li><code>cn()</code> — clsx + tailwind-merge</li>
+            <li><code>formatDate()</code>, <code>formatDuration()</code>, <code>formatBytes()</code></li>
+            <li><code>formatCurrency()</code>, <code>getInitials()</code>, <code>truncate()</code></li>
+            <li><code>types/index.ts</code> — full TS types for all 17 models</li>
+            <li>Role, User, Tenant, Plan, Course, Section, Lesson, Quiz, QuizAttempt, Enrollment, CourseProgress…</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ ARCHITECTURE RULES ════════════════════════════════════════════ -->
+  <div class="section no-break">
+    <div class="section-header">
+      <div class="section-icon" style="background:#fee2e2;">📐</div>
+      <div>
+        <div class="section-title">Key Architecture Rules</div>
+        <div class="section-sub">Never change these — they hold the system together</div>
+      </div>
+    </div>
+    <div class="section-body">
+      <ul class="rule-list">
+        <li><strong>tenantId ALWAYS first</strong> in every compound MongoDB index — ensures tenant isolation at the query planner level.</li>
+        <li><strong>All DB queries through Repository layer</strong> — no direct Mongoose calls inside services. Keeps data access testable and consistent.</li>
+        <li><strong>Super Admin routes mounted BEFORE resolveTenant middleware</strong> — otherwise the middleware fails trying to find a tenant from the platform admin's requests.</li>
+        <li><strong>Soft delete on all collections EXCEPT:</strong> Enrollment, Invoice, LessonProgress, CourseProgress, QuizAttempt — these are audit/financial records and must not be hidden from history.</li>
+        <li><strong>Invoices are immutable</strong> — once created they are never edited, only marked paid/cancelled. A new invoice is created for corrections.</li>
+        <li><strong>CommonJS throughout the backend</strong> — <code>require()</code> / <code>module.exports</code> only. No ES module syntax in apps/api.</li>
+        <li><strong>JWT RS256 private + public keys</strong> live at <code>apps/api/keys/</code> — never commit to Git. They are loaded at boot and used for all token signing/verification.</li>
+        <li><strong>X-Tenant-Subdomain header</strong> is how every API request identifies which tenant it belongs to. Frontend attaches it from the cookie on every Axios request.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ══ NEXT STEPS ════════════════════════════════════════════════════ -->
+  <div class="section no-break">
+    <div class="section-header">
+      <div class="section-icon" style="background:#dcfce7;">🚀</div>
+      <div>
+        <div class="section-title">What's Next</div>
+        <div class="section-sub">Recommended steps to go from complete codebase to live production</div>
+      </div>
+    </div>
+    <div class="section-body">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div>
+          <div class="step-title">Local Testing — Connect MongoDB &amp; Smoke Test</div>
+          <div class="step-desc">Start MongoDB locally, seed a test tenant + users, run the API (<code>npm run dev</code> in Turborepo), and test all major flows: register → verify email → login → create course → enroll → complete → certificate. Use Postman or Insomnia for backend endpoints.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div>
+          <div class="step-title">MongoDB Atlas — Production Database</div>
+          <div class="step-desc">Create a free M0 cluster on MongoDB Atlas, whitelist IPs, create a DB user, copy the connection string into environment variables. Enable Atlas Search if you want full-text course search later.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div>
+          <div class="step-title">Deploy API — Render.com</div>
+          <div class="step-desc">Push <code>apps/api</code> to GitHub, create a new Web Service on Render, set root directory to <code>apps/api</code>, add all environment variables (MONGO_URI, JWT keys, REDIS_URL, SMTP config), and deploy. Add Redis via Render's Redis service or Redis Cloud.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div>
+          <div class="step-title">Deploy Frontend — Vercel</div>
+          <div class="step-desc">Import the monorepo on Vercel, set root directory to <code>apps/web</code>, add <code>NEXT_PUBLIC_API_URL</code> pointing to the Render API URL, and deploy. Set up a custom domain if desired.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">5</div>
+        <div>
+          <div class="step-title">Optional Future Features</div>
+          <div class="step-desc">Stripe payment integration (replace manual billing), S3/Cloudflare R2 for file storage (replace local multer), email delivery via Resend or SendGrid (replace SMTP), video transcoding via Mux or Cloudflare Stream, analytics dashboard with real charts (Recharts/Chart.js), mobile app (React Native).</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ SUMMARY STATS ════════════════════════════════════════════════ -->
+  <div class="section no-break">
+    <div class="section-header">
+      <div class="section-icon" style="background:#fef9c3;">📈</div>
+      <div>
+        <div class="section-title">Project Stats at a Glance</div>
+      </div>
+    </div>
+    <div class="section-body">
+      <div class="grid-3">
+        <div style="text-align:center;padding:16px 8px;border:1px solid #e2e8f0;border-radius:10px;">
+          <div style="font-size:32px;font-weight:800;color:#1d4ed8;">8</div>
+          <div style="font-size:11px;color:#64748b;font-weight:600;margin-top:2px;">Backend Modules</div>
+        </div>
+        <div style="text-align:center;padding:16px 8px;border:1px solid #e2e8f0;border-radius:10px;">
+          <div style="font-size:32px;font-weight:800;color:#1d4ed8;">17</div>
+          <div style="font-size:11px;color:#64748b;font-weight:600;margin-top:2px;">MongoDB Models</div>
+        </div>
+        <div style="text-align:center;padding:16px 8px;border:1px solid #e2e8f0;border-radius:10px;">
+          <div style="font-size:32px;font-weight:800;color:#1d4ed8;">15</div>
+          <div style="font-size:11px;color:#64748b;font-weight:600;margin-top:2px;">Repositories</div>
+        </div>
+        <div style="text-align:center;padding:16px 8px;border:1px solid #e2e8f0;border-radius:10px;">
+          <div style="font-size:32px;font-weight:800;color:#7c3aed;">4</div>
+          <div style="font-size:11px;color:#64748b;font-weight:600;margin-top:2px;">User Roles</div>
+        </div>
+        <div style="text-align:center;padding:16px 8px;border:1px solid #e2e8f0;border-radius:10px;">
+          <div style="font-size:32px;font-weight:800;color:#7c3aed;">9</div>
+          <div style="font-size:11px;color:#64748b;font-weight:600;margin-top:2px;">Quiz Question Types</div>
+        </div>
+        <div style="text-align:center;padding:16px 8px;border:1px solid #e2e8f0;border-radius:10px;">
+          <div style="font-size:32px;font-weight:800;color:#7c3aed;">3,230+</div>
+          <div style="font-size:11px;color:#64748b;font-weight:600;margin-top:2px;">Lines of Frontend Code</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    LMS SaaS Platform — Project Review &nbsp;·&nbsp; Built May 2026 &nbsp;·&nbsp; F:\lms-saas\
+  </div>
+
+</div>
+</body>
+</html>
