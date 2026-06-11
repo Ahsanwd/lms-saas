@@ -1,12 +1,13 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import api, { setAccessToken, setTenantSubdomain } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth.store';
 import { Spinner } from '@/components/ui';
 
-export default function GoogleCallbackPage() {
+function GoogleCallbackPage() {
   const router      = useRouter();
   const searchParams = useSearchParams();
   const { setUser, setSubdomain } = useAuthStore();
@@ -55,4 +56,8 @@ export default function GoogleCallbackPage() {
       <p className="text-sm text-gray-500">Signing you in with Google…</p>
     </div>
   );
+}
+
+export default function GoogleCallbackPageWrapper() {
+  return <Suspense><GoogleCallbackPage /></Suspense>;
 }

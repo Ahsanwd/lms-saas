@@ -1,12 +1,13 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import api from '@/lib/api';
 
 type Phase = 'processing' | 'success' | 'error';
 
-export default function StripeConnectCallbackPage() {
+function StripeConnectCallbackPage() {
   const router       = useRouter();
   const params       = useSearchParams();
   const [phase, setPhase] = useState<Phase>('processing');
@@ -90,4 +91,8 @@ export default function StripeConnectCallbackPage() {
       </div>
     </div>
   );
+}
+
+export default function StripeConnectCallbackPageWrapper() {
+  return <Suspense><StripeConnectCallbackPage /></Suspense>;
 }

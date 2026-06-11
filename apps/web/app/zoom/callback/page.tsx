@@ -1,10 +1,11 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import api from '@/lib/api';
 
-export default function ZoomCallbackPage() {
+function ZoomCallbackPage() {
   const router      = useRouter();
   const params      = useSearchParams();
   const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing');
@@ -85,4 +86,8 @@ export default function ZoomCallbackPage() {
       </div>
     </div>
   );
+}
+
+export default function ZoomCallbackPageWrapper() {
+  return <Suspense><ZoomCallbackPage /></Suspense>;
 }

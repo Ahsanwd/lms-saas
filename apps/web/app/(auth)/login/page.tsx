@@ -1,5 +1,6 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -8,7 +9,7 @@ import { useAuthStore } from '@/stores/auth.store';
 import { Button, Alert } from '@/components/ui';
 import { AxiosError } from 'axios';
 
-export default function LoginPage() {
+function LoginPage() {
   const router      = useRouter();
   const searchParams = useSearchParams();
   const { setUser, setSubdomain } = useAuthStore();
@@ -238,4 +239,8 @@ export default function LoginPage() {
       </p>
     </>
   );
+}
+
+export default function LoginPageWrapper() {
+  return <Suspense><LoginPage /></Suspense>;
 }
