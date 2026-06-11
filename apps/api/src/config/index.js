@@ -2,7 +2,10 @@ require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 
-const readKey = (keyPath) => {
+const readKey = (inlineKey, keyPath) => {
+  // Prefer inline env var (production/Render) over file path (local dev)
+  if (inlineKey) return inlineKey.replace(/\\n/g, '\n');
+  if (!keyPath) return null;
   const resolved = path.resolve(keyPath);
   if (!fs.existsSync(resolved)) return null;
   return fs.readFileSync(resolved, 'utf8');
@@ -23,10 +26,10 @@ module.exports = {
   },
 
   jwt: {
-    accessPrivateKey: readKey(process.env.JWT_ACCESS_PRIVATE_KEY_PATH),
-    accessPublicKey: readKey(process.env.JWT_ACCESS_PUBLIC_KEY_PATH),
-    refreshPrivateKey: readKey(process.env.JWT_REFRESH_PRIVATE_KEY_PATH),
-    refreshPublicKey: readKey(process.env.JWT_REFRESH_PUBLIC_KEY_PATH),
+    accessPrivateKey: readKey(process.env.JWT_ACCESS_PRIVATE_KEY, process.env.JWT_ACCESS_PRIVATE_KEY_PATH),
+    accessPublicKey: readKey(process.env.JWT_ACCESS_PUBLIC_KEY, process.env.JWT_ACCESS_PUBLIC_KEY_PATH),
+    refreshPrivateKey: readKey(process.env.JWT_REFRESH_PRIVATE_KEY, process.env.JWT_REFRESH_PRIVATE_KEY_PATH),
+    refreshPublicKey: readKey(process.env.JWT_REFRESH_PUBLIC_KEY, process.env.JWT_REFRESH_PUBLIC_KEY_PATH),
     accessExpiry: process.env.JWT_ACCESS_EXPIRY || '15m',
     refreshExpiry: process.env.JWT_REFRESH_EXPIRY || '7d',
   },
