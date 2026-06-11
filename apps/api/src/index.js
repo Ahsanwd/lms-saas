@@ -50,7 +50,7 @@ require('./jobs/queue').analyticsReportQueue().add(
 const app    = express();
 const server = http.createServer(app);
 const io     = new Server(server, {
-  cors: { origin: config.app.url, credentials: true },
+  cors: { origin: /\.vercel\.app$|localhost/, credentials: true },
 });
 
 const { setIO } = require('./services/socket/io');
@@ -62,7 +62,21 @@ require('./modules/chat/chat.socket')(io);
 app.use((req, _res, next) => { req.io = io; next(); });
 
 app.use(helmet());
-app.use(cors({ origin: config.app.url, credentials: true }));
+const allowedOrigins = [
+  config.app.url,
+  /\.vercel\.app$/,
+  /localhost:\d+$/,
+].filter(Boolean);
+app.use(cors({
+  origin: (origin, cb) => {
+    if (!origin) return cb(null, true);
+    const allowed = allowedOrigins.some(o =>
+      o instanceof RegExp ? o.test(origin) : o === origin
+    );
+    cb(null, allowed ? origin : false);
+  },
+  credentials: true,
+}));
 app.use(compression());
 
 // Stripe webhook MUST receive the raw body — register before express.json()
