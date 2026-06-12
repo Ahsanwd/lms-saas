@@ -472,7 +472,7 @@ function CreateInvoiceModal({ onClose }: { onClose: () => void }) {
                 placeholder="SUMMER20" className="font-mono" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Due Date (optional)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
               <TextInput value={dueDate} onChange={setDueDate} type="date" />
             </div>
           </div>
