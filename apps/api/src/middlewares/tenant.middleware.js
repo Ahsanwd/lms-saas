@@ -10,12 +10,17 @@ async function resolveTenant(req, res, next) {
 
     let tenant;
 
+    // Determine the API's own hostname so we don't mistake it for a tenant subdomain.
+    // e.g. lms-saas-hqex.onrender.com has 3 parts but is NOT a tenant subdomain.
+    const apiHost = (process.env.API_URL || '').replace(/^https?:\/\//, '').split('/')[0];
+    const isApiOwnHost = apiHost && host === apiHost;
+
     const parts = host.split('.');
-    if (parts.length >= 3) {
-      // Production: resolve from subdomain (demo.lmsplatform.com)
+    if (!isApiOwnHost && parts.length >= 3) {
+      // Production custom domain: resolve from subdomain (demo.lmsplatform.com)
       tenant = await tenantRepo.findBySubdomain(parts[0]);
     } else {
-      // Try custom domain first, then fall back to X-Tenant-Subdomain header (local dev)
+      // Try custom domain first, then fall back to X-Tenant-Subdomain header (local dev + Render)
       tenant = await tenantRepo.findByCustomDomain(host);
       if (!tenant) {
         const subdomain = req.headers['x-tenant-subdomain'];
