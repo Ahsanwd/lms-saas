@@ -372,7 +372,7 @@ async function updateLesson(tenantId, courseId, sectionId, lessonId, data, user)
   if (!lesson || lesson.courseId.toString() !== courseId) throw new AppError('Lesson not found', 404);
 
   const update = { updatedBy: user.sub };
-  const fields = ['title', 'content', 'isPublished', 'isPreview', 'discussionEnabled', 'notes', 'durationSeconds', 'dripDays', 'dripDate'];
+  const fields = ['title', 'type', 'content', 'isPublished', 'isPreview', 'discussionEnabled', 'notes', 'durationSeconds', 'dripDays', 'dripDate'];
   for (const f of fields) {
     if (data[f] !== undefined) update[f] = data[f];
   }

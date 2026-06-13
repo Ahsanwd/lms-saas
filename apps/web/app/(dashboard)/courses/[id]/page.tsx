@@ -284,7 +284,6 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
 
           {/* ── Body ── */}
           <div className="p-6 space-y-6">
-            {error && <Alert variant="error">{error}</Alert>}
 
             {/* Title */}
             <div>
@@ -1066,14 +1065,21 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
           </div>
 
           {/* ── Sticky footer ── */}
-          <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-gray-100 bg-white flex-shrink-0">
-            <button type="button" onClick={onClose}
-              className="px-5 py-2.5 text-sm font-semibold text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-xl transition-colors">
-              Cancel
-            </button>
-            <Button type="submit" loading={isBusy} className="px-8 py-2.5 rounded-xl font-semibold">
-              {uploading ? 'Uploading…' : isEdit ? 'Save Changes' : selectedFile ? 'Save & Upload' : 'Add Lesson'}
-            </Button>
+          <div className="flex-shrink-0 border-t border-gray-100 bg-white">
+            {error && (
+              <div className="px-6 pt-3">
+                <Alert variant="error">{error}</Alert>
+              </div>
+            )}
+            <div className="flex items-center justify-between gap-3 px-6 py-4">
+              <button type="button" onClick={onClose}
+                className="px-5 py-2.5 text-sm font-semibold text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-xl transition-colors">
+                Cancel
+              </button>
+              <Button type="submit" loading={isBusy} className="px-8 py-2.5 rounded-xl font-semibold">
+                {uploading ? 'Uploading…' : isEdit ? 'Save Changes' : selectedFile ? 'Save & Upload' : 'Add Lesson'}
+              </Button>
+            </div>
           </div>
         </form>
       </div>
