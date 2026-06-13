@@ -1100,6 +1100,10 @@ interface LessonRowProps {
   lesson: Lesson;
   onEdit: (lesson: Lesson) => void;
   onDeleted: () => void;
+  isFirst: boolean;
+  isLast: boolean;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
 }
 
 // ─── Live Session Modal (instructor controls) ─────────────────────────────────
@@ -1291,7 +1295,7 @@ function LiveSessionModal({ lessonId, lessonTitle, onClose }: { lessonId: string
   );
 }
 
-function LessonRow({ courseId, sectionId, lesson, onEdit, onDeleted }: LessonRowProps) {
+function LessonRow({ courseId, sectionId, lesson, onEdit, onDeleted, isFirst, isLast, onMoveUp, onMoveDown }: LessonRowProps) {
   const videoRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -1333,6 +1337,29 @@ function LessonRow({ courseId, sectionId, lesson, onEdit, onDeleted }: LessonRow
 
   return (
     <div className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 group border-b border-gray-50 last:border-0">
+      {/* Up / Down reorder buttons */}
+      <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+        <button
+          onClick={(e) => { e.stopPropagation(); onMoveUp(); }}
+          disabled={isFirst}
+          title="Move up"
+          className="p-0.5 rounded hover:bg-gray-200 disabled:opacity-25 disabled:cursor-not-allowed text-gray-400 hover:text-gray-700 transition-colors"
+        >
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" />
+          </svg>
+        </button>
+        <button
+          onClick={(e) => { e.stopPropagation(); onMoveDown(); }}
+          disabled={isLast}
+          title="Move down"
+          className="p-0.5 rounded hover:bg-gray-200 disabled:opacity-25 disabled:cursor-not-allowed text-gray-400 hover:text-gray-700 transition-colors"
+        >
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+      </div>
       {/* Type icon */}
       <div className="flex-shrink-0 w-7 h-7 rounded-md bg-gray-100 flex items-center justify-center">
         {lesson.type === 'video' && (
@@ -1490,7 +1517,22 @@ function SectionRow({ courseId, section, onRefresh }: SectionRowProps) {
     }
   };
 
-  const lessons = section.lessons ?? [];
+  const [lessons, setLessons] = useState<Lesson[]>(section.lessons ?? []);
+  useEffect(() => { setLessons(section.lessons ?? []); }, [section.lessons]);
+
+  const reorderMutation = useMutation({
+    mutationFn: (items: { id: string; order: number }[]) =>
+      api.patch(`/courses/${courseId}/sections/${section._id}/lessons/reorder`, { items }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['sections', courseId] }),
+  });
+
+  const moveLesson = (fromIdx: number, toIdx: number) => {
+    const updated = [...lessons];
+    const [moved] = updated.splice(fromIdx, 1);
+    updated.splice(toIdx, 0, moved);
+    setLessons(updated);
+    reorderMutation.mutate(updated.map((l, i) => ({ id: l._id, order: i + 1 })));
+  };
 
   return (
     <div className="border border-gray-200 rounded-lg overflow-hidden">
@@ -1575,7 +1617,7 @@ function SectionRow({ courseId, section, onRefresh }: SectionRowProps) {
               </button>
             </div>
           ) : (
-            lessons.map((lesson) => (
+            lessons.map((lesson, idx) => (
               <LessonRow
                 key={lesson._id}
                 courseId={courseId}
@@ -1583,6 +1625,10 @@ function SectionRow({ courseId, section, onRefresh }: SectionRowProps) {
                 lesson={lesson}
                 onEdit={(l) => setLessonModal(l)}
                 onDeleted={() => qc.invalidateQueries({ queryKey: ['sections', courseId] })}
+                isFirst={idx === 0}
+                isLast={idx === lessons.length - 1}
+                onMoveUp={() => moveLesson(idx, idx - 1)}
+                onMoveDown={() => moveLesson(idx, idx + 1)}
               />
             ))
           )}
