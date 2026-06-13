@@ -1420,8 +1420,13 @@ function LessonContent({ lesson }: { lesson: Lesson }) {
         if (m) cloudEmbedUrl = `https://drive.google.com/file/d/${m[1]}/preview`;
       } else if (provider === 'dropbox' || lesson.file.url.includes('dropbox.com')) {
         cloudEmbedUrl = lesson.file.url.replace('www.dropbox.com', 'dl.dropboxusercontent.com').replace('?dl=0', '?raw=1');
-      } else if (provider === 'onedrive' || lesson.file.url.includes('onedrive.live.com') || lesson.file.url.includes('sharepoint.com')) {
-        cloudEmbedUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(lesson.file.url)}`;
+      } else if (provider === 'onedrive' || lesson.file.url.includes('onedrive.live.com') || lesson.file.url.includes('sharepoint.com') || lesson.file.url.includes('1drv.ms')) {
+        // 1drv.ms short URLs work directly in iframe; full OneDrive URLs use Office viewer
+        if (lesson.file.url.includes('1drv.ms')) {
+          cloudEmbedUrl = lesson.file.url; // direct iframe embed
+        } else {
+          cloudEmbedUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(lesson.file.url)}`;
+        }
       }
 
       return (
