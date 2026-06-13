@@ -7,7 +7,6 @@ import api from '@/lib/api';
 import { Button, Spinner } from '@/components/ui';
 import { useAuthStore } from '@/stores/auth.store';
 import { cn } from '@/lib/utils';
-import { AxiosError } from 'axios';
 import { connectSocket, disconnectSocket } from '@/lib/socket';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -325,7 +324,7 @@ export default function ThreadDetailPage() {
 
   const deleteThreadMut = useMutation({
     mutationFn: () => api.delete(`/forum/threads/${threadId}`),
-    onSuccess: () => router.push(`/courses/${courseId}`),
+    onSuccess: () => router.push(`/courses/${courseId}/forum`),
   });
 
   const pinMut          = useMutation({ mutationFn: () => api.patch(`/forum/threads/${threadId}/pin`),              onSuccess: refresh });
@@ -363,8 +362,8 @@ export default function ThreadDetailPage() {
     return (
       <div className="max-w-3xl mx-auto px-4 py-12 text-center">
         <p className="text-gray-500 font-medium mb-4">Thread not found or you don't have access.</p>
-        <Button variant="outline" onClick={() => router.push(`/courses/${courseId}`)}>
-          ← Back to Course
+        <Button variant="outline" onClick={() => router.push(`/courses/${courseId}/forum`)}>
+          ← Back to Forum
         </Button>
       </div>
     );
@@ -404,13 +403,13 @@ export default function ThreadDetailPage() {
 
       {/* Back button */}
       <button
-        onClick={() => router.push(`/courses/${courseId}`)}
+        onClick={() => router.push(`/courses/${courseId}/forum`)}
         className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
         </svg>
-        Back to Course Forum
+        Back to Forum
       </button>
 
       {/* Thread card */}

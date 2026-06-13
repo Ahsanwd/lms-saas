@@ -330,7 +330,7 @@ export default function MyLearningPage() {
                     )}
                     {/* Forum shortcut */}
                     <button
-                      onClick={() => router.push(`/courses/${course._id}?tab=forum`)}
+                      onClick={() => router.push(`/courses/${course._id}/forum`)}
                       className="w-full py-1.5 border border-gray-100 text-gray-400 rounded-xl text-xs font-medium hover:bg-gray-50 hover:text-gray-600 transition-colors flex items-center justify-center gap-1.5"
                     >
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

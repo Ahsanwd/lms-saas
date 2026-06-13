@@ -388,7 +388,7 @@ function RevenueTab() {
                     <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#9ca3af' }} />
                     <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} tickFormatter={(v) => `$${v}`} width={48} />
                     <RechartsTip
-                      formatter={(v: number) => [`$${Number(v).toFixed(2)}`, 'Revenue']}
+                      formatter={(v: number | undefined) => [`$${Number(v ?? 0).toFixed(2)}`, 'Revenue']}
                       contentStyle={{ fontSize: 12, borderRadius: 8 }}
                     />
                     <Bar dataKey="revenue" fill="#3B82F6" radius={[3, 3, 0, 0]} />

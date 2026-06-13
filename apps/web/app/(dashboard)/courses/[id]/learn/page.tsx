@@ -28,7 +28,7 @@ const LESSON_ICON: Record<string, string> = {
 // ── Sidebar ───────────────────────────────────────────────────────────────────
 function Sidebar({
   sections, activeLessonId, activeQuizId, completedIds,
-  courseQuizzes, onSelect, onSelectQuiz, isOpen, onClose,
+  courseQuizzes, onSelect, onSelectQuiz, isOpen, onClose, courseId,
 }: {
   sections: Section[];
   activeLessonId: string;
@@ -39,7 +39,9 @@ function Sidebar({
   onSelectQuiz: (quiz: CourseQuizSummary) => void;
   isOpen: boolean;
   onClose: () => void;
+  courseId: string;
 }) {
+  const router = useRouter();
   const totalLessons = sections.flatMap(s => s.lessons ?? []).length;
   const doneCount = completedIds.size;
   const pct = totalLessons > 0 ? Math.round((doneCount / totalLessons) * 100) : 0;
@@ -198,6 +200,17 @@ function Sidebar({
           </div>
         )}
       </nav>
+      {/* Forum shortcut pinned at the very bottom of the sidebar */}
+      <button
+        onClick={() => router.push(`/courses/${courseId}/forum`)}
+        className="flex items-center gap-2.5 px-4 py-3 border-t border-gray-100 text-sm text-gray-500 hover:text-primary-700 hover:bg-primary-50 transition-colors w-full text-left flex-shrink-0"
+      >
+        <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+            d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+        </svg>
+        <span className="font-medium">Course Forum</span>
+      </button>
     </aside>
     </>
   );
@@ -1954,6 +1967,7 @@ export default function LearnPage() {
         onSelectQuiz={goToQuiz}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
+        courseId={id}
       />
 
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
