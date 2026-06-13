@@ -10,6 +10,7 @@ import { PageLoader } from '@/components/ui';
 import { applyBrandColor } from '@/lib/brandColor';
 import api from '@/lib/api';
 import type { Role } from '@/types';
+import { Toaster } from 'sonner';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router   = useRouter();
@@ -97,6 +98,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {children}
         </main>
       </div>
+      <Toaster position="bottom-right" richColors closeButton />
     </div>
   );
 }

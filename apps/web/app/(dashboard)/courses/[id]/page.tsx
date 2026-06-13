@@ -10,6 +10,7 @@ import { AxiosError } from 'axios';
 import { cn } from '@/lib/utils';
 import type { Course, Section, Lesson, LessonType, CourseLevel, Category } from '@/types';
 import { loadStripe } from '@stripe/stripe-js';
+import { toast } from 'sonner';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { getStripePromise } from '@/lib/stripe';
 import { PayPalScriptProvider, PayPalButtons, usePayPalScriptReducer } from '@paypal/react-paypal-js';
@@ -202,10 +203,14 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
         } catch { /* non-fatal — quiz settings can be edited later */ }
       }
 
+      toast.success(isEdit ? 'Lesson updated successfully' : 'Lesson created successfully');
       onClose();
     },
-    onError: (err: AxiosError<{ message: string }>) =>
-      setError(err.response?.data?.message ?? 'Failed to save lesson'),
+    onError: (err: AxiosError<{ message: string }>) => {
+      const msg = err.response?.data?.message ?? 'Failed to save lesson';
+      setError(msg);
+      toast.error(msg);
+    },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
