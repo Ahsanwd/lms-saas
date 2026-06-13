@@ -355,6 +355,9 @@ async function createLesson(tenantId, courseId, sectionId, data, user) {
     notes: data.notes || null,
     durationSeconds: data.durationSeconds || 0,
     ...(data.liveClass ? { liveClass: data.liveClass } : {}),
+    ...(data.video ? { video: data.video } : {}),
+    ...(data.audio ? { audio: data.audio } : {}),
+    ...(data.file  ? { file:  data.file  } : {}),
     createdBy: user.sub,
   });
 
