@@ -28,7 +28,7 @@ const LESSON_ICON: Record<string, string> = {
 // ── Sidebar ───────────────────────────────────────────────────────────────────
 function Sidebar({
   sections, activeLessonId, activeQuizId, completedIds,
-  courseQuizzes, onSelect, onSelectQuiz,
+  courseQuizzes, onSelect, onSelectQuiz, isOpen, onClose,
 }: {
   sections: Section[];
   activeLessonId: string;
@@ -37,24 +37,52 @@ function Sidebar({
   courseQuizzes: CourseQuizSummary[];
   onSelect: (lesson: Lesson) => void;
   onSelectQuiz: (quiz: CourseQuizSummary) => void;
+  isOpen: boolean;
+  onClose: () => void;
 }) {
   const totalLessons = sections.flatMap(s => s.lessons ?? []).length;
   const doneCount = completedIds.size;
   const pct = totalLessons > 0 ? Math.round((doneCount / totalLessons) * 100) : 0;
 
   return (
-    <aside className="w-72 flex-shrink-0 bg-white border-r border-gray-100 flex flex-col h-full overflow-hidden">
-      {/* Header with mini progress */}
-      <div className="px-4 py-3 border-b border-gray-100 bg-gray-50 space-y-2">
-        <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Course Content</p>
-        <div className="flex items-center gap-2">
-          <div className="flex-1 h-1 bg-gray-200 rounded-full overflow-hidden">
-            <div className="h-full bg-primary-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+    <>
+      {/* Backdrop – mobile only, shown when sidebar drawer is open */}
+      <div
+        className={cn(
+          'fixed inset-0 bg-black/40 z-40 lg:hidden transition-opacity duration-300',
+          isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        )}
+        onClick={onClose}
+        aria-hidden="true"
+      />
+      <aside className={cn(
+        'bg-white border-r border-gray-100 flex flex-col overflow-hidden transition-transform duration-300 ease-in-out',
+        'fixed inset-y-0 left-0 z-50 w-[85vw] max-w-[320px]',
+        'lg:relative lg:inset-auto lg:z-auto lg:w-72 lg:flex-shrink-0 lg:h-full lg:translate-x-0',
+        isOpen ? 'translate-x-0' : '-translate-x-full'
+      )}>
+        {/* Header with mini progress */}
+        <div className="px-4 py-3 border-b border-gray-100 bg-gray-50 space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Course Content</p>
+            <button
+              onClick={onClose}
+              className="lg:hidden p-1.5 rounded-lg hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors"
+              aria-label="Close menu"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
-          <span className="text-[11px] font-medium text-gray-500 flex-shrink-0">{doneCount}/{totalLessons}</span>
+          <div className="flex items-center gap-2">
+            <div className="flex-1 h-1 bg-gray-200 rounded-full overflow-hidden">
+              <div className="h-full bg-primary-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+            </div>
+            <span className="text-[11px] font-medium text-gray-500 flex-shrink-0">{doneCount}/{totalLessons}</span>
+          </div>
         </div>
-      </div>
-      <nav className="flex-1 overflow-y-auto">
+        <nav className="flex-1 overflow-y-auto">
         {sections.map((section) => (
           <div key={section._id}>
             <div className="px-4 pt-3.5 pb-1">
@@ -69,7 +97,7 @@ function Sidebar({
               return (
                 <button
                   key={lesson._id}
-                  onClick={() => !isDripped && onSelect(lesson)}
+                  onClick={() => { if (!isDripped) { onSelect(lesson); onClose(); } }}
                   disabled={isDripped}
                   className={cn(
                     'w-full text-left px-3 py-2.5 flex items-center gap-2.5 text-sm transition-colors border-l-2',
@@ -142,7 +170,7 @@ function Sidebar({
               return (
                 <button
                   key={quiz._id}
-                  onClick={() => onSelectQuiz(quiz)}
+                  onClick={() => { onSelectQuiz(quiz); onClose(); }}
                   className={cn(
                     'w-full text-left px-3 py-2.5 flex items-center gap-2.5 text-sm transition-colors border-l-2',
                     isActive
@@ -171,6 +199,7 @@ function Sidebar({
         )}
       </nav>
     </aside>
+    </>
   );
 }
 
@@ -1799,6 +1828,7 @@ export default function LearnPage() {
 
   const [activeLessonId, setActiveLessonId] = useState<string>(searchParams.get('lessonId') ?? '');
   const [activeQuizId, setActiveQuizId] = useState<string>('');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const { data: course } = useQuery<Course>({
     queryKey: ['course', id],
@@ -1922,12 +1952,24 @@ export default function LearnPage() {
         courseQuizzes={courseQuizzes}
         onSelect={goTo}
         onSelectQuiz={goToQuiz}
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
       />
 
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         {/* Top bar */}
         <div className="bg-white border-b border-gray-100 px-5 py-2.5 flex items-center justify-between gap-4 flex-shrink-0 shadow-sm">
           <div className="flex items-center gap-3 min-w-0">
+            {/* Hamburger – mobile only */}
+            <button
+              onClick={() => setSidebarOpen(o => !o)}
+              className="lg:hidden flex items-center justify-center w-9 h-9 rounded-lg hover:bg-gray-100 text-gray-500 flex-shrink-0 transition-colors"
+              aria-label="Toggle course menu"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
             <button
               onClick={() => router.push(`/courses/${id}`)}
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 flex-shrink-0 transition-colors text-sm"
