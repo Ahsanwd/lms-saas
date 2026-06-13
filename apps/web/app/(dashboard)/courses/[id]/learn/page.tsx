@@ -1420,14 +1420,10 @@ function LessonContent({ lesson }: { lesson: Lesson }) {
         if (m) cloudEmbedUrl = `https://drive.google.com/file/d/${m[1]}/preview`;
       } else if (provider === 'dropbox' || lesson.file.url.includes('dropbox.com')) {
         cloudEmbedUrl = lesson.file.url.replace('www.dropbox.com', 'dl.dropboxusercontent.com').replace('?dl=0', '?raw=1');
-      } else if (provider === 'onedrive' || lesson.file.url.includes('onedrive.live.com') || lesson.file.url.includes('sharepoint.com') || lesson.file.url.includes('1drv.ms')) {
-        // 1drv.ms short URLs work directly in iframe; full OneDrive URLs use Office viewer
-        if (lesson.file.url.includes('1drv.ms')) {
-          cloudEmbedUrl = lesson.file.url; // direct iframe embed
-        } else {
-          cloudEmbedUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(lesson.file.url)}`;
-        }
+      } else if (provider === 'onedrive' || lesson.file.url.includes('onedrive.live.com') || lesson.file.url.includes('sharepoint.com')) {
+        cloudEmbedUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(lesson.file.url)}`;
       }
+      // Note: 1drv.ms short URLs block iframe embedding — shown as open button below
 
       return (
         <div className="space-y-4">
@@ -1476,13 +1472,13 @@ function LessonContent({ lesson }: { lesson: Lesson }) {
                 {sizeLabel && <p className="text-xs text-gray-500 mt-0.5">{sizeLabel}</p>}
               </div>
               <a
-                href={lesson.file.url} download={lesson.file.name} target="_blank" rel="noopener noreferrer"
+                href={lesson.file.url} target="_blank" rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm flex-shrink-0"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                 </svg>
-                Download
+                {(provider === 'onedrive' || lesson.file.url?.includes('1drv.ms')) ? 'Open in OneDrive' : (provider === 'gdrive' || lesson.file.url?.includes('drive.google.com')) ? 'Open in Drive' : 'Download'}
               </a>
             </div>
           </div>
