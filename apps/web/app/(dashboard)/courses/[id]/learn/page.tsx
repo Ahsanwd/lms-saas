@@ -1400,15 +1400,44 @@ function LessonContent({ lesson }: { lesson: Lesson }) {
   }
 
   if (lesson.type === 'file') {
+    if (lesson.file?.embedCode) {
+      return (
+        <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-sm bg-gray-100" style={{ height: '70vh' }}
+          dangerouslySetInnerHTML={{ __html: lesson.file.embedCode }} />
+      );
+    }
     if (lesson.file?.url) {
       const sizeKB = lesson.file.sizeBytes ? Math.round(lesson.file.sizeBytes / 1024) : null;
       const sizeLabel = sizeKB === null ? null : sizeKB < 1024 ? `${sizeKB} KB` : `${(sizeKB / 1024).toFixed(1)} MB`;
       const ext = lesson.file.name?.split('.').pop()?.toUpperCase() ?? 'FILE';
       const isPdf = lesson.file.mimeType === 'application/pdf' || lesson.file.name?.toLowerCase().endsWith('.pdf');
+      const provider = lesson.file.provider;
+
+      // Build cloud embed URL for Google Drive / Dropbox / OneDrive
+      let cloudEmbedUrl: string | null = null;
+      if (provider === 'gdrive' || lesson.file.url.includes('drive.google.com')) {
+        const m = lesson.file.url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+        if (m) cloudEmbedUrl = `https://drive.google.com/file/d/${m[1]}/preview`;
+      } else if (provider === 'dropbox' || lesson.file.url.includes('dropbox.com')) {
+        cloudEmbedUrl = lesson.file.url.replace('www.dropbox.com', 'dl.dropboxusercontent.com').replace('?dl=0', '?raw=1');
+      } else if (provider === 'onedrive' || lesson.file.url.includes('onedrive.live.com') || lesson.file.url.includes('sharepoint.com')) {
+        cloudEmbedUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(lesson.file.url)}`;
+      }
+
       return (
         <div className="space-y-4">
-          {/* PDF inline viewer */}
-          {isPdf && (
+          {/* Cloud file embed viewer */}
+          {cloudEmbedUrl && (
+            <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-sm bg-gray-100">
+              <div className="flex items-center gap-2 px-4 py-2.5 bg-white border-b border-gray-200">
+                <span className="text-xs font-bold text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded uppercase">{provider ?? 'FILE'}</span>
+                <span className="text-sm text-gray-700 font-medium truncate flex-1">{lesson.file.name || lesson.title}</span>
+              </div>
+              <iframe src={cloudEmbedUrl} className="w-full" style={{ height: '70vh' }} title={lesson.title} allow="autoplay" />
+            </div>
+          )}
+          {/* PDF inline viewer (uploaded files) */}
+          {!cloudEmbedUrl && isPdf && (
             <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-sm bg-gray-100">
               <div className="flex items-center gap-2 px-4 py-2.5 bg-white border-b border-gray-200">
                 <span className="text-xs font-bold text-red-600 bg-red-50 border border-red-100 px-2 py-0.5 rounded">PDF</span>
