@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { Button, Badge, Spinner, Alert, Card } from '@/components/ui';
@@ -3710,11 +3710,14 @@ function PayPalForm({
 function StudentView() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const courseId = params.id as string;
   const qc = useQueryClient();
   const [enrollError, setEnrollError] = useState('');
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
-  const [studentTab, setStudentTab] = useState<'overview' | 'forum'>('overview');
+  const [studentTab, setStudentTab] = useState<'overview' | 'forum'>(
+    searchParams.get('tab') === 'forum' ? 'forum' : 'overview'
+  );
 
   // ── Coupon state ─────────────────────────────────────────────────────────────
   const [showCoupon, setShowCoupon]   = useState(false);
