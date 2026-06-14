@@ -145,10 +145,11 @@ function QuestionRenderer({ question, index, answer, onChange, showResult, earne
     return 'border-gray-200';
   };
 
-  // ordering state helpers
+  // ordering state helpers — items come from correctOrder (shuffled by server), not options[]
   const orderedItems = (() => {
     const a = answer as { orderingAnswer?: string[] } | undefined;
-    return a?.orderingAnswer ?? options.map(o => o.text);
+    if (a?.orderingAnswer) return a.orderingAnswer;
+    return question.correctOrder?.length ? [...question.correctOrder] : options.map(o => o.text);
   })();
 
   const moveItem = (from: number, to: number) => {

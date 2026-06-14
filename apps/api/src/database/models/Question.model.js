@@ -49,8 +49,8 @@ const questionSchema = new mongoose.Schema(
     // Fill blank / short answer — expected correct answer string
     correctAnswer: { type: String, default: null },
 
-    // Ordering — correct indices order e.g. [2, 0, 1]
-    correctOrder: [{ type: Number }],
+    // Ordering — correct sequence of item texts e.g. ['Step 1', 'Step 2']
+    correctOrder: [{ type: String }],
 
     explanation: { type: String, default: null },
 
