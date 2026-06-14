@@ -353,32 +353,51 @@ function QuizUI({ quizId }: { quizId: string }) {
 
   // ── Result screen ──
   if (phase === 'result' && result) {
+    const isPending = result.status === 'pending_manual';
     return (
       <div className="max-w-lg mx-auto py-8 space-y-6">
-        <div className={cn(
-          'rounded-xl p-8 text-center',
-          result.passed ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
-        )}>
-          <div className={cn('text-5xl font-bold mb-2', result.passed ? 'text-green-600' : 'text-red-600')}>
-            {result.percentage}%
-          </div>
-          <p className={cn('text-lg font-semibold', result.passed ? 'text-green-700' : 'text-red-700')}>
-            {result.passed ? '🎉 Passed!' : 'Not passed'}
-          </p>
-          <p className="text-sm text-gray-500 mt-1">
-            {result.score} / {result.maxScore} points · Pass at {quizDetail.settings.passingScore}%
-          </p>
-          {result.status === 'pending_manual' && (
-            <p className="text-xs text-yellow-700 bg-yellow-50 rounded-lg px-3 py-1.5 mt-3 inline-block">
-              Some answers need manual review by your instructor.
+        {isPending ? (
+          /* Pending manual grading — hide score entirely */
+          <div className="rounded-xl p-8 text-center bg-amber-50 border border-amber-200 space-y-4">
+            <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto">
+              <svg className="w-8 h-8 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h3 className="text-xl font-semibold text-amber-900">Quiz Submitted!</h3>
+            <p className="text-sm text-amber-800 leading-relaxed">
+              Your quiz includes questions that need to be reviewed by your instructor.
+              Your result will be available once grading is complete.
             </p>
-          )}
-        </div>
-        {quizDetail.settings.allowRetake && (
-          <Button variant="outline" className="w-full" onClick={() => { setResult(null); setPhase('info'); }}>
-            Back to Quiz Info
-          </Button>
+            <div className="inline-flex items-center gap-2 bg-amber-100 text-amber-700 text-sm font-medium px-4 py-2 rounded-full border border-amber-200">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+              </svg>
+              You will be notified when your result is ready
+            </div>
+          </div>
+        ) : (
+          /* Fully graded — show score */
+          <div className={cn(
+            'rounded-xl p-8 text-center',
+            result.passed ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
+          )}>
+            <div className={cn('text-5xl font-bold mb-2', result.passed ? 'text-green-600' : 'text-red-600')}>
+              {result.percentage}%
+            </div>
+            <p className={cn('text-lg font-semibold', result.passed ? 'text-green-700' : 'text-red-700')}>
+              {result.passed ? '🎉 Passed!' : 'Not passed'}
+            </p>
+            <p className="text-sm text-gray-500 mt-1">
+              {result.score} / {result.maxScore} points · Pass at {quizDetail.settings.passingScore}%
+            </p>
+          </div>
         )}
+        <Button variant="outline" className="w-full" onClick={() => { setResult(null); setPhase('info'); }}>
+          Back to Quiz Info
+        </Button>
       </div>
     );
   }
