@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { Button, Badge, Spinner, Alert, Card, CardHeader, CardTitle, CardContent } from '@/components/ui';
@@ -352,12 +352,14 @@ function QuizInfoScreen({
   onStart,
   starting,
   startError,
+  isPreview = false,
 }: {
   quiz: QuizDetail;
   myAttempts: AttemptSummary[];
   onStart: () => void;
   starting: boolean;
   startError: string;
+  isPreview?: boolean;
 }) {
   const { settings } = quiz;
   const completedAttempts = myAttempts.filter(a =>
@@ -367,8 +369,8 @@ function QuizInfoScreen({
   const attemptsLeft = settings.maxAttempts > 0
     ? Math.max(0, settings.maxAttempts - completedAttempts.length)
     : Infinity;
-  const canStart = quiz.status === 'published' &&
-    (attemptsLeft > 0 || settings.allowRetake) &&
+  const canStart = (isPreview || quiz.status === 'published') &&
+    (isPreview || attemptsLeft > 0 || settings.allowRetake) &&
     !inProgress;
 
   return (
@@ -948,7 +950,7 @@ function QuizResultScreen({
 
 // ─── Student View (state machine) ────────────────────────────────────────────
 
-function StudentView() {
+function StudentView({ isPreview = false }: { isPreview?: boolean }) {
   const params = useParams();
   const router = useRouter();
   const quizId = params.id as string;
@@ -1048,13 +1050,29 @@ function StudentView() {
 
   return (
     <div className="p-4 sm:p-6">
+      {isPreview && (
+        <div className="mb-4 flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+          <svg className="w-4 h-4 text-amber-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+          </svg>
+          <span className="text-sm text-amber-800 font-medium">Preview Mode — you are viewing this quiz as a student would see it</span>
+          <button
+            onClick={() => router.push(`/quizzes/${quizId}`)}
+            className="ml-auto text-xs text-amber-700 hover:text-amber-900 font-medium underline flex-shrink-0"
+          >
+            Exit Preview
+          </button>
+        </div>
+      )}
+
       <div className="mb-5">
-        <button onClick={() => router.push('/quizzes')}
+        <button onClick={() => router.push(isPreview ? `/quizzes/${quizId}` : '/quizzes')}
           className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
-          Back to Quizzes
+          {isPreview ? 'Exit Preview' : 'Back to Quizzes'}
         </button>
       </div>
 
@@ -1065,6 +1083,7 @@ function StudentView() {
           onStart={handleStart}
           starting={startMutation.isPending}
           startError={startError}
+          isPreview={isPreview}
         />
       )}
       {phase === 'taking' && activeAttempt && (
@@ -2511,6 +2530,13 @@ function InstructorView() {
               </p>
             </div>
             <div className="flex items-center gap-2 flex-wrap flex-shrink-0">
+              <Button variant="outline" size="sm"
+                onClick={() => router.push(`/quizzes/${quizId}?preview=1`)}>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+                Preview
+              </Button>
               <Button variant="outline" size="sm" loading={duplicateMutation.isPending}
                 onClick={() => duplicateMutation.mutate()}>
                 Duplicate
@@ -2566,5 +2592,8 @@ function InstructorView() {
 
 export default function QuizDetailPage() {
   const user = useAuthStore((s) => s.user);
-  return user?.role === 'student' ? <StudentView /> : <InstructorView />;
+  const searchParams = useSearchParams();
+  const isPreview = searchParams.get('preview') === '1';
+  if (user?.role === 'student' || isPreview) return <StudentView isPreview={isPreview} />;
+  return <InstructorView />;
 }
