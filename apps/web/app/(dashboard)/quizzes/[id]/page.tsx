@@ -748,10 +748,16 @@ function QuizResultScreen({
         return sels.size === correctIds.size && Array.from(correctIds).every(id => sels.has(id));
       }
       case 'fill_blank': {
-        const txt = (a.textAnswer ?? '').trim().toLowerCase();
-        return txt.length > 0 && txt === (q.correctAnswer ?? '').toLowerCase();
+        const expected = (q.correctAnswer ?? '').trim().toLowerCase();
+        const given = (a.textAnswer ?? '').trim().toLowerCase();
+        return expected.length > 0 && given === expected;
       }
-      default: return null; // manual or complex types — no client-side verdict
+      case 'short_answer': {
+        const expected = (q.correctAnswer ?? '').trim().toLowerCase();
+        const given = (a.textAnswer ?? '').trim().toLowerCase();
+        return expected.length > 0 && given.includes(expected);
+      }
+      default: return null; // complex or essay — no client-side verdict
     }
   };
 
@@ -821,7 +827,7 @@ function QuizResultScreen({
           {submittedQuestions.map((q, i) => {
             const ans = submittedAnswers[q._id];
             const verdict = isCorrect(q, ans);
-            const isManual = q.type === 'essay' || q.type === 'short_answer';
+            const isManual = q.type === 'essay';
 
             return (
               <div key={q._id} className={`bg-white rounded-xl border px-5 py-4 space-y-3 ${
@@ -2021,7 +2027,8 @@ function AttemptDetailModal({ quizId, attemptId, onClose }: {
   const verdict = (ans: DetailAnswer) => {
     if (ans.isCorrect === true)  return 'correct';
     if (ans.isCorrect === false) return 'incorrect';
-    return 'manual';
+    // isCorrect is null — essay always needs manual grading; other types had a grading gap
+    return ans.questionId?.type === 'essay' ? 'pending' : 'ungraded';
   };
 
   const studentAnswerText = (ans: DetailAnswer): string => {
@@ -2104,13 +2111,17 @@ function AttemptDetailModal({ quizId, attemptId, onClose }: {
               const correctAns = correctAnswerText(q);
               return (
                 <div key={ans._id} className={`rounded-xl border px-4 py-3.5 space-y-2 ${
-                  v === 'correct' ? 'border-green-200 bg-green-50/30' :
-                  v === 'incorrect' ? 'border-red-200 bg-red-50/30' : 'border-gray-200'
+                  v === 'correct'   ? 'border-green-200 bg-green-50/30' :
+                  v === 'incorrect' ? 'border-red-200 bg-red-50/30' :
+                  v === 'pending'   ? 'border-amber-200 bg-amber-50/30' :
+                  'border-gray-200'
                 }`}>
                   <div className="flex items-start gap-2">
                     <span className={`flex-shrink-0 w-6 h-6 rounded-full text-xs font-semibold flex items-center justify-center mt-0.5 ${
-                      v === 'correct' ? 'bg-green-100 text-green-700' :
-                      v === 'incorrect' ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-500'
+                      v === 'correct'   ? 'bg-green-100 text-green-700' :
+                      v === 'incorrect' ? 'bg-red-100 text-red-600' :
+                      v === 'pending'   ? 'bg-amber-100 text-amber-700' :
+                      'bg-gray-100 text-gray-500'
                     }`}>{i + 1}</span>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900">{q?.text ?? '—'}</p>
@@ -2118,7 +2129,7 @@ function AttemptDetailModal({ quizId, attemptId, onClose }: {
                         <span className="text-xs text-gray-400 capitalize">{q?.type?.replace(/_/g, ' ')}</span>
                         {v === 'correct'   && <span className="text-xs text-green-600 font-medium">✓ Correct</span>}
                         {v === 'incorrect' && <span className="text-xs text-red-500 font-medium">✗ Incorrect</span>}
-                        {v === 'manual'    && <span className="text-xs text-amber-600 font-medium">Manually graded</span>}
+                        {v === 'pending'   && <span className="text-xs text-amber-600 font-medium">Pending grading</span>}
                         <span className="text-xs text-gray-400 ml-auto">{ans.pointsAwarded}/{ans.maxPoints} pts</span>
                       </div>
                     </div>
@@ -2126,8 +2137,10 @@ function AttemptDetailModal({ quizId, attemptId, onClose }: {
 
                   <div className="ml-8 space-y-1 text-sm">
                     <div className={`px-3 py-2 rounded-lg ${
-                      v === 'correct' ? 'bg-green-100 text-green-800' :
-                      v === 'incorrect' ? 'bg-red-50 text-red-700' : 'bg-gray-50 text-gray-700'
+                      v === 'correct'   ? 'bg-green-100 text-green-800' :
+                      v === 'incorrect' ? 'bg-red-50 text-red-700' :
+                      v === 'pending'   ? 'bg-amber-50 text-amber-800' :
+                      'bg-gray-50 text-gray-700'
                     }`}>
                       <span className="font-medium text-xs opacity-70 block mb-0.5">Student answer</span>
                       {studentAns}
@@ -2174,7 +2187,7 @@ function GradeModal({
   onGraded: () => void;
 }) {
   const manualQuestions = quiz.questions
-    .filter(q => q.questionId.type === 'essay' || q.questionId.type === 'short_answer')
+    .filter(q => q.questionId.type === 'essay')
     .map(q => q.questionId);
 
   const [grades, setGrades] = useState<Record<string, string>>(() =>
@@ -2303,8 +2316,21 @@ function AttemptsTab({ quizId, quiz }: { quizId: string; quiz: QuizDetail }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-500">{data?.total ?? 0} total attempts</p>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="text-sm text-gray-500">{data?.total ?? 0} total attempts</p>
+          {(() => {
+            const n = attempts.filter(a => a.status === 'pending_manual').length;
+            return n > 0 ? (
+              <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-800 text-xs font-semibold px-2.5 py-1 rounded-full">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                {n} need{n === 1 ? 's' : ''} grading
+              </span>
+            ) : null;
+          })()}
+        </div>
         {attempts.length > 0 && (
           <Button size="sm" variant="outline" onClick={exportCSV}>
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2352,7 +2378,10 @@ function AttemptsTab({ quizId, quiz }: { quizId: string; quiz: QuizDetail }) {
                     <div className="flex gap-2">
                       <Button size="sm" variant="outline" onClick={() => setViewingAttemptId(a._id)}>View</Button>
                       {a.status === 'pending_manual' && (
-                        <Button size="sm" variant="outline" onClick={() => setGradingAttempt(a)}>Grade</Button>
+                        <Button size="sm" onClick={() => setGradingAttempt(a)}
+                          className="bg-amber-500 hover:bg-amber-600 text-white border-0">
+                          Grade
+                        </Button>
                       )}
                     </div>
                   </div>

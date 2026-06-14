@@ -18,6 +18,12 @@ class QuestionRepository {
     return Question.find({ _id: { $in: ids }, tenantId, deletedAt: null });
   }
 
+  // Used during grading — skips the soft-delete filter so that questions
+  // deleted after an attempt was started can still be graded correctly.
+  findManyByIdsForGrading(tenantId, ids) {
+    return Question.find({ _id: { $in: ids }, tenantId });
+  }
+
   findForRandom(tenantId, filter = {}, count = 10) {
     return Question.aggregate([
       { $match: { tenantId, deletedAt: null, ...filter } },

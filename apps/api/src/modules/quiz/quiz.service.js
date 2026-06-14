@@ -294,7 +294,7 @@ async function submitAttempt(tenantId, quizId, attemptId, answers, user) {
 
   const quiz = await quizRepo.findById(tenantId, quizId);
   const questionIds = attempt.servedQuestions;
-  const questions = await questionRepo.findManyByIds(tenantId, questionIds);
+  const questions = await questionRepo.findManyByIdsForGrading(tenantId, questionIds);
 
   // Build answers with maxPoints from quiz question config
   const enrichedAnswers = answers.map(a => {
