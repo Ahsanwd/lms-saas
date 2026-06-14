@@ -2194,7 +2194,13 @@ function GradeModal({
     },
   });
 
-  const essayAnswers = (detail?.answers ?? []).filter(a => a.questionId?.type === 'essay');
+  // Show essay always; show short_answer when no correctAnswer is set (no keyword to auto-grade)
+  const essayAnswers = (detail?.answers ?? []).filter(a => {
+    const type = a.questionId?.type;
+    if (type === 'essay') return true;
+    if (type === 'short_answer' && !(a.questionId?.correctAnswer?.trim())) return true;
+    return false;
+  });
 
   const [grades, setGrades] = useState<Record<string, string>>({});
   const [error, setError] = useState('');
@@ -2233,7 +2239,7 @@ function GradeModal({
             <h3 className="font-semibold text-gray-900">Grade Essay Answers</h3>
             {!isLoading && essayAnswers.length > 0 && (
               <p className="text-xs text-gray-500 mt-0.5">
-                {essayAnswers.length} essay question{essayAnswers.length > 1 ? 's' : ''} — grade all before saving
+                {essayAnswers.length} question{essayAnswers.length > 1 ? 's' : ''} need grading — save after all are done
               </p>
             )}
           </div>
@@ -2259,8 +2265,8 @@ function GradeModal({
               return (
                 <div key={q._id} className="space-y-2 pb-5 border-b border-gray-100 last:border-0 last:pb-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-red-100 text-red-700">
-                      Essay {essayAnswers.length > 1 ? `${idx + 1}/${essayAnswers.length}` : ''}
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${q.type === 'essay' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
+                      {q.type === 'essay' ? 'Essay' : 'Short Answer'}{essayAnswers.length > 1 ? ` ${idx + 1}/${essayAnswers.length}` : ''}
                     </span>
                     <span className="text-xs text-gray-400">{q.points} pt{q.points !== 1 ? 's' : ''} max</span>
                   </div>
@@ -2301,7 +2307,7 @@ function GradeModal({
               <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              Please grade all {essayAnswers.length} essay questions before saving.
+              Please grade all {essayAnswers.length} questions before saving.
             </p>
           )}
           <div className="flex justify-end gap-2">

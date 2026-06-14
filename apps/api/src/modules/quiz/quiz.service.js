@@ -368,8 +368,11 @@ async function gradeEssayAnswers(tenantId, attemptId, grades, user) {
   // Resolve which submitted grades belong to essay questions only
   const gradedIds = grades.map(g => g.questionId);
   const gradedQuestions = await questionRepo.findManyByIdsForGrading(tenantId, gradedIds);
+  // Allow grading: essay always, and short_answer when no correctAnswer is set
   const essayIds = new Set(
-    gradedQuestions.filter(q => q.type === 'essay').map(q => q._id.toString())
+    gradedQuestions
+      .filter(q => q.type === 'essay' || (q.type === 'short_answer' && !(q.correctAnswer || '').trim()))
+      .map(q => q._id.toString())
   );
 
   // grades = [{ questionId, pointsAwarded, feedback }]

@@ -114,6 +114,13 @@ function gradeAttempt(questions, answers, settings = {}) {
       return { ...answer, isCorrect: null, pointsAwarded: 0 };
     }
 
+    // short_answer with no correctAnswer set has no keyword to match —
+    // must be reviewed manually by the instructor
+    if (question.type === 'short_answer' && !(question.correctAnswer || '').trim()) {
+      hasManual = true;
+      return { ...answer, isCorrect: null, pointsAwarded: 0 };
+    }
+
     const { isCorrect, pointsAwarded } = gradeAnswer(question, answer, settings);
     totalScore += Math.max(0, pointsAwarded); // score cannot go below 0
     return { ...answer, isCorrect, pointsAwarded: Math.max(0, pointsAwarded) };
