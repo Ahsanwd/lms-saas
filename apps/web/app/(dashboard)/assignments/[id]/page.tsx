@@ -228,8 +228,8 @@ function EditAssignmentModal({ assignment, onClose, onSaved }: EditModalProps) {
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
+      <div className="bg-white rounded-t-2xl sm:rounded-xl shadow-xl w-full sm:max-w-2xl max-h-[92vh] overflow-y-auto">
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-gray-900">Edit Assignment</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
@@ -250,7 +250,7 @@ function EditAssignmentModal({ assignment, onClose, onSaved }: EditModalProps) {
             <textarea value={form.instructions} onChange={(e) => setForm(f => ({ ...f, instructions: e.target.value }))}
               rows={5} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none" />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
               <input type="datetime-local" value={form.dueDate} onChange={(e) => setForm(f => ({ ...f, dueDate: e.target.value }))}
@@ -396,8 +396,8 @@ function GradeModal({ submission, assignment, onClose, onGraded }: GradeModalPro
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className={`bg-white rounded-xl shadow-xl w-full flex gap-0 ${showPDF ? 'max-w-5xl' : 'max-w-lg'}`}>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
+      <div className={`bg-white rounded-t-2xl sm:rounded-xl shadow-xl w-full flex gap-0 ${showPDF ? 'sm:max-w-5xl' : 'sm:max-w-lg'}`}>
         {/* PDF preview panel (#7) */}
         {showPDF && submission.fileUrl && (
           <div className="flex-1 border-r border-gray-200 flex flex-col rounded-l-xl overflow-hidden">
@@ -844,18 +844,18 @@ function InstructorView({ assignment, onUpdate }: InstructorViewProps) {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-5">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="space-y-1">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+        <div className="space-y-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-2xl font-bold text-gray-900">{assignment.title}</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{assignment.title}</h1>
             {statusBadge(assignment.status)}
           </div>
           {course     && <p className="text-sm text-gray-500">Course: {course.title}</p>}
           {instructor && <p className="text-sm text-gray-400">By {instructor.firstName} {instructor.lastName}</p>}
         </div>
-        <div className="flex gap-2 flex-shrink-0 flex-wrap items-center">
+        <div className="flex gap-2 flex-wrap items-center sm:flex-shrink-0">
           {templateSaved && (
             <span className="text-xs text-green-600 font-medium flex items-center gap-1">
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -910,8 +910,8 @@ function InstructorView({ assignment, onUpdate }: InstructorViewProps) {
 
       {/* Overview Tab */}
       {activeTab === 'overview' && (
-        <div className="grid grid-cols-3 gap-6">
-          <div className="col-span-2 space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <div className="lg:col-span-2 space-y-5">
             {assignment.description && (
               <Card>
                 <CardHeader><CardTitle>Description</CardTitle></CardHeader>
@@ -985,7 +985,7 @@ function InstructorView({ assignment, onUpdate }: InstructorViewProps) {
         <div className="space-y-4">
           {/* Stats row */}
           {stats && (
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[
                 { label: 'Submitted',    value: stats.totalSubmissions, color: 'text-blue-600' },
                 { label: 'Graded',       value: stats.graded,           color: 'text-green-600' },
@@ -1333,11 +1333,11 @@ function StudentView({ assignment }: StudentViewProps) {
   if (isLoading) return <div className="flex items-center justify-center h-64"><Spinner size="lg" /></div>;
 
   return (
-    <div className="p-6 max-w-3xl mx-auto space-y-6">
+    <div className="p-4 sm:p-6 max-w-3xl mx-auto space-y-5">
       {/* Header */}
       <div className="space-y-2">
         <div className="flex items-center gap-2 flex-wrap">
-          <h1 className="text-2xl font-bold text-gray-900">{assignment.title}</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{assignment.title}</h1>
           {submission && statusBadge(submission.status)}
           {!submission && overdue && <Badge variant="danger">Overdue</Badge>}
         </div>
@@ -1351,7 +1351,7 @@ function StudentView({ assignment }: StudentViewProps) {
       {/* Meta */}
       <Card>
         <CardContent className="py-4 space-y-4">
-          <div className="grid grid-cols-3 gap-4 text-sm text-center">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm text-center">
             <div>
               <p className="text-gray-500">Due Date</p>
               {assignment.myExtension ? (

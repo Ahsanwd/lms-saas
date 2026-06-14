@@ -92,32 +92,32 @@ export default function AssignmentsPage() {
   );
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Assignments</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Assignments</h1>
           <p className="text-sm text-gray-500 mt-0.5">
             {isStudent ? 'Your course assignments' : 'Manage assignments across your courses'}
           </p>
         </div>
         {isManager && (
-          <Link href="/assignments/create">
-            <Button>+ New Assignment</Button>
+          <Link href="/assignments/create" className="flex-shrink-0">
+            <Button size="sm">+ New</Button>
           </Link>
         )}
       </div>
 
       {/* Filters */}
       <Card>
-        <CardContent className="py-4">
-          <div className="flex flex-wrap gap-3">
+        <CardContent className="py-3 px-4">
+          <div className="flex flex-wrap gap-2">
             <input
               type="text"
               placeholder="Search assignments..."
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 w-64"
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 flex-1 min-w-[160px]"
             />
             {isManager && (
               <select
@@ -154,89 +154,131 @@ export default function AssignmentsPage() {
           </CardContent>
         </Card>
       ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle>{total} assignment{total !== 1 ? 's' : ''}</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="px-4 py-3 text-left font-medium text-gray-600">Title</th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-600">Course</th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-600">Due Date</th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-600">Marks</th>
-                    {isManager && (
-                      <>
-                        <th className="px-4 py-3 text-left font-medium text-gray-600">Status</th>
-                        <th className="px-4 py-3 text-left font-medium text-gray-600">Submissions</th>
-                      </>
-                    )}
-                    {isStudent && (
-                      <th className="px-4 py-3 text-left font-medium text-gray-600">My Status</th>
-                    )}
-                    <th className="px-4 py-3" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {assignments.map((a) => {
-                    const course    = typeof a.courseId === 'string' ? null : a.courseId;
-                    const mySub   = mySubmissions?.[a._id];
-                    const overdue = a.dueDate && new Date(a.dueDate) < new Date();
-
-                    return (
-                      <tr key={a._id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-4 py-3">
-                          <p className="font-medium text-gray-900">{a.title}</p>
-                          {a.description && (
-                            <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{a.description}</p>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-gray-600">{course?.title ?? '—'}</td>
-                        <td className="px-4 py-3">{formatDue(a.dueDate)}</td>
-                        <td className="px-4 py-3 text-gray-700">
-                          {/* For graded students show their score alongside total */}
+        <>
+          {/* ── Mobile card list (hidden on sm+) ── */}
+          <div className="sm:hidden space-y-3">
+            {assignments.map((a) => {
+              const course  = typeof a.courseId === 'string' ? null : a.courseId;
+              const mySub   = mySubmissions?.[a._id];
+              const overdue = a.dueDate && new Date(a.dueDate) < new Date();
+              return (
+                <Link key={a._id} href={`/assignments/${a._id}`}>
+                  <Card className="hover:shadow-md transition-shadow">
+                    <CardContent className="p-4 space-y-2.5">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-gray-900 text-sm leading-snug">{a.title}</p>
+                          {course && <p className="text-xs text-gray-500 mt-0.5">{course.title}</p>}
+                        </div>
+                        {isManager
+                          ? assignmentStatusBadge(a.status)
+                          : (!mySub && overdue && !a.allowLateSubmission
+                              ? <Badge variant="danger">Overdue</Badge>
+                              : submissionStatusBadge(mySub?.status))
+                        }
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-gray-500 flex-wrap gap-2">
+                        <span>Due: {formatDue(a.dueDate)}</span>
+                        <span className="font-medium">
                           {isStudent && mySub?.status === 'graded' && mySub.marks !== null
-                            ? <span className="font-semibold text-primary-700">{mySub.marks}/{a.totalMarks}</span>
-                            : <span>{a.totalMarks} pts</span>
-                          }
-                        </td>
+                            ? <span className="text-primary-700">{mySub.marks}/{a.totalMarks} pts</span>
+                            : `${a.totalMarks} pts`}
+                        </span>
+                      </div>
+                      {isManager && (
+                        <p className="text-xs text-gray-400">
+                          {a.submissionCount} submitted · {a.gradedCount} graded
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                </Link>
+              );
+            })}
+          </div>
+
+          {/* ── Desktop table (hidden below sm) ── */}
+          <div className="hidden sm:block">
+            <Card>
+              <CardHeader>
+                <CardTitle>{total} assignment{total !== 1 ? 's' : ''}</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="px-4 py-3 text-left font-medium text-gray-600">Title</th>
+                        <th className="px-4 py-3 text-left font-medium text-gray-600">Course</th>
+                        <th className="px-4 py-3 text-left font-medium text-gray-600">Due Date</th>
+                        <th className="px-4 py-3 text-left font-medium text-gray-600">Marks</th>
                         {isManager && (
                           <>
-                            <td className="px-4 py-3">{assignmentStatusBadge(a.status)}</td>
-                            <td className="px-4 py-3 text-gray-600">
-                              {a.submissionCount} submitted · {a.gradedCount} graded
-                            </td>
+                            <th className="px-4 py-3 text-left font-medium text-gray-600">Status</th>
+                            <th className="px-4 py-3 text-left font-medium text-gray-600">Submissions</th>
                           </>
                         )}
                         {isStudent && (
-                          <td className="px-4 py-3">
-                            {/* Show overdue badge if past due and no submission */}
-                            {!mySub && overdue && !a.allowLateSubmission
-                              ? <Badge variant="danger">Overdue</Badge>
-                              : submissionStatusBadge(mySub?.status)
-                            }
-                          </td>
+                          <th className="px-4 py-3 text-left font-medium text-gray-600">My Status</th>
                         )}
-                        <td className="px-4 py-3 text-right">
-                          <Link href={`/assignments/${a._id}`}>
-                            <Button variant="ghost" size="sm">View</Button>
-                          </Link>
-                        </td>
+                        <th className="px-4 py-3" />
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {assignments.map((a) => {
+                        const course  = typeof a.courseId === 'string' ? null : a.courseId;
+                        const mySub   = mySubmissions?.[a._id];
+                        const overdue = a.dueDate && new Date(a.dueDate) < new Date();
+                        return (
+                          <tr key={a._id} className="hover:bg-gray-50 transition-colors">
+                            <td className="px-4 py-3">
+                              <p className="font-medium text-gray-900">{a.title}</p>
+                              {a.description && (
+                                <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{a.description}</p>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-gray-600">{course?.title ?? '—'}</td>
+                            <td className="px-4 py-3">{formatDue(a.dueDate)}</td>
+                            <td className="px-4 py-3 text-gray-700">
+                              {isStudent && mySub?.status === 'graded' && mySub.marks !== null
+                                ? <span className="font-semibold text-primary-700">{mySub.marks}/{a.totalMarks}</span>
+                                : <span>{a.totalMarks} pts</span>}
+                            </td>
+                            {isManager && (
+                              <>
+                                <td className="px-4 py-3">{assignmentStatusBadge(a.status)}</td>
+                                <td className="px-4 py-3 text-gray-600">
+                                  {a.submissionCount} submitted · {a.gradedCount} graded
+                                </td>
+                              </>
+                            )}
+                            {isStudent && (
+                              <td className="px-4 py-3">
+                                {!mySub && overdue && !a.allowLateSubmission
+                                  ? <Badge variant="danger">Overdue</Badge>
+                                  : submissionStatusBadge(mySub?.status)}
+                              </td>
+                            )}
+                            <td className="px-4 py-3 text-right">
+                              <Link href={`/assignments/${a._id}`}>
+                                <Button variant="ghost" size="sm">View</Button>
+                              </Link>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </>
       )}
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="text-sm text-gray-500">
             Page {page} of {totalPages} · {total} total
           </p>
