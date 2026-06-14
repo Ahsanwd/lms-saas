@@ -319,9 +319,9 @@ function ManagementTabs({ stats }: { stats: any }) {
         {active === 'communication' && (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
             <SectionCard
-              href="/forum"
+              href="/courses"
               title="Forum"
-              description="Course discussion boards where students and instructors can post and reply."
+              description="Course discussion boards — open any course to view or moderate its forum threads."
               accent="bg-teal-100 text-teal-700"
               icon={
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -461,7 +461,7 @@ function ManagementTabs({ stats }: { stats: any }) {
               }
             />
             <SectionCard
-              href="/refund-requests"
+              href="/refunds"
               title="Refund Requests"
               description="Review and process student refund requests for courses and plans."
               accent="bg-red-100 text-red-700"
