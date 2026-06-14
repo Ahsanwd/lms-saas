@@ -2227,8 +2227,8 @@ function GradeModal({
             return (
               <div key={q._id} className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${q.type === 'essay' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
-                    {q.type === 'essay' ? 'Essay' : 'Short Answer'}
+                  <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-red-100 text-red-700">
+                    Essay
                   </span>
                 </div>
                 <p className="text-sm font-medium text-gray-900">{q.text}</p>

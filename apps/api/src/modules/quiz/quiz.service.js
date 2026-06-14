@@ -365,11 +365,20 @@ async function gradeEssayAnswers(tenantId, attemptId, grades, user) {
   if (!['pending_manual', 'manually_graded'].includes(attempt.status))
     throw new AppError('Attempt is not pending manual grading', 400);
 
+  // Resolve which submitted grades belong to essay questions only
+  const gradedIds = grades.map(g => g.questionId);
+  const gradedQuestions = await questionRepo.findManyByIdsForGrading(tenantId, gradedIds);
+  const essayIds = new Set(
+    gradedQuestions.filter(q => q.type === 'essay').map(q => q._id.toString())
+  );
+
   // grades = [{ questionId, pointsAwarded, feedback }]
   let totalScore = 0;
   const updatedAnswers = attempt.answers.map(answer => {
-    const grade = grades.find(g => g.questionId === answer.questionId.toString());
-    if (grade) {
+    const qid = answer.questionId.toString();
+    const grade = grades.find(g => g.questionId === qid);
+    // Guard: only apply manual grade if question is confirmed essay type
+    if (grade && essayIds.has(qid)) {
       return {
         ...answer.toObject(),
         pointsAwarded: grade.pointsAwarded,
