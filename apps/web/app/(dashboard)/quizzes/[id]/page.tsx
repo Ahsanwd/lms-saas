@@ -2176,30 +2176,47 @@ function AttemptDetailModal({ quizId, attemptId, onClose }: {
 function GradeModal({
   quizId,
   attempt,
-  quiz,
   onClose,
   onGraded,
 }: {
   quizId: string;
-  attempt: AttemptSummary & { answers?: Array<{ questionId: string; text?: string; maxPoints: number; earned?: number }> };
-  quiz: QuizDetail;
+  attempt: AttemptSummary;
   onClose: () => void;
   onGraded: () => void;
 }) {
-  const manualQuestions = quiz.questions
-    .filter(q => q.questionId.type === 'essay')
-    .map(q => q.questionId);
+  // Fetch full attempt so we can read the student's actual essay text and
+  // know exactly which answers are essay type — don't rely on quiz definition.
+  const { data: detail, isLoading } = useQuery<DetailAttempt>({
+    queryKey: ['attempt-detail', attempt._id],
+    queryFn: async () => {
+      const { data } = await api.get(`/quizzes/${quizId}/attempts/${attempt._id}`);
+      return data.data.attempt as DetailAttempt;
+    },
+  });
 
-  const [grades, setGrades] = useState<Record<string, string>>(() =>
-    Object.fromEntries(manualQuestions.map(q => [q._id, '0']))
-  );
+  const essayAnswers = (detail?.answers ?? []).filter(a => a.questionId?.type === 'essay');
+
+  const [grades, setGrades] = useState<Record<string, string>>({});
   const [error, setError] = useState('');
+
+  // Pre-fill grades once detail loads (supports re-grading with existing points)
+  useEffect(() => {
+    if (essayAnswers.length > 0 && Object.keys(grades).length === 0) {
+      setGrades(Object.fromEntries(
+        essayAnswers.map(a => [a.questionId._id, String(a.pointsAwarded ?? 0)])
+      ));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [essayAnswers.length]);
+
+  const allGraded = essayAnswers.length > 0 &&
+    essayAnswers.every(a => grades[a.questionId._id] !== '' && grades[a.questionId._id] !== undefined);
 
   const mutation = useMutation({
     mutationFn: () => {
-      const gradesArr = Object.entries(grades).map(([questionId, pts]) => ({
-        questionId,
-        pointsAwarded: parseFloat(pts) || 0,
+      const gradesArr = essayAnswers.map(a => ({
+        questionId: a.questionId._id,
+        pointsAwarded: parseFloat(grades[a.questionId._id] ?? '0') || 0,
       }));
       return api.patch(`/quizzes/${quizId}/attempts/${attempt._id}/grade`, { grades: gradesArr });
     },
@@ -2212,7 +2229,14 @@ function GradeModal({
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40">
       <div className="bg-white rounded-t-2xl sm:rounded-xl shadow-xl w-full sm:max-w-lg sm:mx-4 max-h-[85vh] flex flex-col">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
-          <h3 className="font-semibold text-gray-900">Grade Written Answers</h3>
+          <div>
+            <h3 className="font-semibold text-gray-900">Grade Essay Answers</h3>
+            {!isLoading && essayAnswers.length > 0 && (
+              <p className="text-xs text-gray-500 mt-0.5">
+                {essayAnswers.length} essay question{essayAnswers.length > 1 ? 's' : ''} — grade all before saving
+              </p>
+            )}
+          </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -2220,43 +2244,72 @@ function GradeModal({
           </button>
         </div>
 
-        <div className="overflow-y-auto flex-1 px-5 py-4 space-y-5">
+        <div className="overflow-y-auto flex-1 px-5 py-4 space-y-6">
           {error && <Alert variant="error">{error}</Alert>}
-          {manualQuestions.map(q => {
-            const submitted = attempt.answers?.find(a => a.questionId === q._id);
-            return (
-              <div key={q._id} className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-red-100 text-red-700">
-                    Essay
-                  </span>
+
+          {isLoading ? (
+            <div className="flex justify-center py-10"><Spinner /></div>
+          ) : essayAnswers.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-8">No essay questions found in this attempt.</p>
+          ) : (
+            essayAnswers.map((ans, idx) => {
+              const q = ans.questionId;
+              const val = grades[q._id] ?? '';
+              const pts = parseFloat(val) || 0;
+              return (
+                <div key={q._id} className="space-y-2 pb-5 border-b border-gray-100 last:border-0 last:pb-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-red-100 text-red-700">
+                      Essay {essayAnswers.length > 1 ? `${idx + 1}/${essayAnswers.length}` : ''}
+                    </span>
+                    <span className="text-xs text-gray-400">{q.points} pt{q.points !== 1 ? 's' : ''} max</span>
+                  </div>
+                  <p className="text-sm font-medium text-gray-900">{q.text}</p>
+                  <div className="bg-gray-50 rounded-lg px-3 py-2.5 text-sm text-gray-700 whitespace-pre-wrap min-h-[60px]">
+                    {ans.textAnswer?.trim()
+                      ? ans.textAnswer
+                      : <span className="text-gray-400 italic">No answer provided</span>
+                    }
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <label className="text-sm font-medium text-gray-700">Points awarded:</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={q.points}
+                      value={val}
+                      onChange={(e) => setGrades(prev => ({ ...prev, [q._id]: e.target.value }))}
+                      className="w-20 px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      placeholder="0"
+                    />
+                    <span className="text-sm text-gray-400">/ {q.points}</span>
+                    {val !== '' && (
+                      <span className={`text-xs font-medium ${pts >= q.points ? 'text-green-600' : pts > 0 ? 'text-amber-600' : 'text-red-500'}`}>
+                        {pts >= q.points ? 'Full marks' : pts > 0 ? 'Partial' : 'Zero'}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <p className="text-sm font-medium text-gray-900">{q.text}</p>
-                <div className="bg-gray-50 rounded-lg px-3 py-2.5 text-sm text-gray-700 whitespace-pre-wrap min-h-12">
-                  {submitted?.text ?? <span className="text-gray-400 italic">No answer provided</span>}
-                </div>
-                <div className="flex items-center gap-2">
-                  <label className="text-sm text-gray-600">Points:</label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={q.points}
-                    value={grades[q._id] ?? '0'}
-                    onChange={(e) => setGrades(prev => ({ ...prev, [q._id]: e.target.value }))}
-                    className="w-20 px-2 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
-                  <span className="text-sm text-gray-400">/ {q.points}</span>
-                </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
 
-        <div className="px-5 py-4 border-t border-gray-100 flex justify-end gap-2 flex-shrink-0">
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button loading={mutation.isPending} onClick={() => mutation.mutate()}>
-            Submit Grades
-          </Button>
+        <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0">
+          {!isLoading && essayAnswers.length > 1 && !allGraded && (
+            <p className="text-xs text-amber-600 mb-3 flex items-center gap-1">
+              <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Please grade all {essayAnswers.length} essay questions before saving.
+            </p>
+          )}
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={onClose}>Cancel</Button>
+            <Button loading={mutation.isPending} disabled={isLoading || essayAnswers.length === 0} onClick={() => mutation.mutate()}>
+              Save Grades
+            </Button>
+          </div>
         </div>
       </div>
     </div>
@@ -2454,8 +2507,7 @@ function AttemptsTab({ quizId, quiz }: { quizId: string; quiz: QuizDetail }) {
       {gradingAttempt && (
         <GradeModal
           quizId={quizId}
-          attempt={gradingAttempt as never}
-          quiz={quiz}
+          attempt={gradingAttempt}
           onClose={() => setGradingAttempt(null)}
           onGraded={() => qc.invalidateQueries({ queryKey: ['quiz-attempts', quizId] })}
         />
