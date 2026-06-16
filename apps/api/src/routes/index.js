@@ -7,6 +7,9 @@ router.use('/admin/tenants',   require('../modules/tenant/admin.tenant.routes'))
 router.use('/admin/billing',   require('../modules/billing/admin.billing.routes'));
 router.use('/admin/dashboard', require('../modules/dashboard/admin.dashboard.routes'));
 
+// Secure file serving — token contains tenantId, no resolveTenant needed
+router.use('/files', require('../modules/secureFile/secureFile.routes'));
+
 // New org signup — creates tenant + admin user, no existing tenant needed
 router.post('/auth/register-tenant', registerTenant);
 router.get('/auth/check-subdomain',  checkSubdomain);

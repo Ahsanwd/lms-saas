@@ -65,7 +65,7 @@ const lessonSchema = new mongoose.Schema(
       embedCode: { type: String, default: null }, // raw HTML for 'embed' / SoundCloud widget
     },
 
-    // For type = 'file' (includes PDF)
+    // For type = 'file' (includes PDF, Word, Excel, PowerPoint, Text)
     file: {
       url:       { type: String, default: null },
       name:      { type: String, default: null },
@@ -76,7 +76,10 @@ const lessonSchema = new mongoose.Schema(
         enum: ['local', 's3', 'external', 'gdrive', 'dropbox', 'onedrive', 'embed'],
         default: 'local',
       },
-      embedCode: { type: String, default: null },
+      embedCode:     { type: String, default: null },
+      // Converted HTML for Word/Excel (populated async after upload)
+      convertedHtml: { type: String, default: null },
+      isConverted:   { type: Boolean, default: false },
     },
 
     // For type = 'live'

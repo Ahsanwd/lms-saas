@@ -21,17 +21,40 @@ const ALLOWED_TYPES = {
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     'application/vnd.ms-excel',
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
     'application/zip',
     'text/plain',
     'image/jpeg', 'image/png', 'image/webp',
   ],
 };
 
+// Per-MIME-type size caps applied AFTER multer accepts the file.
+// The global multer limit is set to 100 MB (largest type); finer limits
+// are enforced in the course service so we can delete + return a clear error.
+const PER_TYPE_MAX_SIZE = {
+  'application/pdf':                                                                    50  * 1024 * 1024,
+  'application/msword':                                                                 25  * 1024 * 1024,
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document':           25  * 1024 * 1024,
+  'application/vnd.ms-excel':                                                           25  * 1024 * 1024,
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':                 25  * 1024 * 1024,
+  'application/vnd.ms-powerpoint':                                                      100 * 1024 * 1024,
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation':         100 * 1024 * 1024,
+  'text/plain':                                                                          5  * 1024 * 1024,
+  'image/jpeg':                                                                         10  * 1024 * 1024,
+  'image/png':                                                                          10  * 1024 * 1024,
+  'image/webp':                                                                         10  * 1024 * 1024,
+};
+
+function getPerTypeLimit(mimetype) {
+  return PER_TYPE_MAX_SIZE[mimetype] ?? (50 * 1024 * 1024);
+}
+
 const MAX_SIZE = {
-  thumbnail:  5   * 1024 * 1024,        // 5 MB
-  video:      2   * 1024 * 1024 * 1024, // 2 GB
-  attachment: 50  * 1024 * 1024,        // 50 MB
-  chat:       10  * 1024 * 1024,        // 10 MB
+  thumbnail:  5   * 1024 * 1024,
+  video:      2   * 1024 * 1024 * 1024,
+  attachment: 100 * 1024 * 1024, // global ceiling; per-type limits enforced in service
+  chat:       10  * 1024 * 1024,
 };
 
 // ── Build S3Client (lazy singleton) ──────────────────────────────────────────
@@ -229,5 +252,7 @@ module.exports = {
   deleteFile,
   getFileSizeBytes,
   generatePresignedUploadUrl,
+  getPerTypeLimit,
+  USE_S3,
   UPLOAD_ROOT,
 };

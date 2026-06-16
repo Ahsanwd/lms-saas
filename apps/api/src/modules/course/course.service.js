@@ -8,6 +8,7 @@ const progressRepo = require('../../database/repositories/progress.repository');
 const userRepo = require('../../database/repositories/user.repository');
 const { getPublicUrl, deleteFile, getFileSizeBytes } = require('../../services/storage/storage.service');
 const AppError = require('../../utils/AppError');
+const logger   = require('../../utils/logger');
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function generateCertificateId() {
@@ -488,8 +489,17 @@ async function uploadLessonFile(tenantId, courseId, lessonId, file, user) {
 
   const lesson = await lessonRepo.findById(tenantId, lessonId);
   if (!lesson) throw new AppError('Lesson not found', 404);
+
+  // Per-type size limit (multer global ceiling is 100 MB; we enforce finer limits here)
+  const { getPerTypeLimit, USE_S3 } = require('../../services/storage/storage.service');
+  const typeLimit = getPerTypeLimit(file.mimetype);
+  if (file.size > typeLimit) {
+    deleteFile(getPublicUrl(file.path));
+    const mb = Math.round(typeLimit / 1024 / 1024);
+    throw new AppError(`File too large. Maximum for this file type is ${mb} MB`, 400);
+  }
+
   if (lesson.file?.url) {
-    // sizeBytes is stored on upload; fall back to stat if missing
     const oldSize = lesson.file.sizeBytes || getFileSizeBytes(lesson.file.url);
     deleteFile(lesson.file.url);
     if (oldSize > 0) setImmediate(() => {
@@ -500,12 +510,35 @@ async function uploadLessonFile(tenantId, courseId, lessonId, file, user) {
 
   const url = getPublicUrl(file.path);
   const updated = await lessonRepo.updateById(tenantId, lessonId, {
-    'file.url': url,
-    'file.name': file.originalname,
-    'file.mimeType': file.mimetype,
-    'file.sizeBytes': file.size,
+    'file.url':           url,
+    'file.name':          file.originalname,
+    'file.mimeType':      file.mimetype,
+    'file.sizeBytes':     file.size,
+    'file.provider':      USE_S3 ? 's3' : 'local',
+    'file.convertedHtml': null,
+    'file.isConverted':   false,
     updatedBy: user.sub,
   });
+
+  // Convert Word/Excel to HTML asynchronously (non-blocking)
+  const { isConvertible, convertToHtml, readFileBuffer } = require('../../services/fileConversion/fileConversion.service');
+  if (isConvertible(file.mimetype)) {
+    setImmediate(async () => {
+      try {
+        const buffer = await readFileBuffer(url, USE_S3 ? null : file.path);
+        const html   = await convertToHtml(buffer, file.mimetype);
+        if (html) {
+          await lessonRepo.updateById(tenantId, lessonId, {
+            'file.convertedHtml': html,
+            'file.isConverted':   true,
+          });
+        }
+      } catch (err) {
+        logger.error(`File conversion failed for lesson ${lessonId}: ${err.message}`);
+      }
+    });
+  }
+
   await recalcCourseCounters(tenantId, courseId);
   return updated;
 }

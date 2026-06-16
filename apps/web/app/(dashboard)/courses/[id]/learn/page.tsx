@@ -3,11 +3,15 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import dynamic from 'next/dynamic';
 import api from '@/lib/api';
 import { Button, Spinner } from '@/components/ui';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth.store';
 import type { Course, Section, Lesson } from '@/types';
+
+const SecurePdfViewer = dynamic(() => import('@/components/viewer/SecurePdfViewer'), { ssr: false });
+const SecureDocViewer = dynamic(() => import('@/components/viewer/SecureDocViewer'), { ssr: false });
 
 interface LessonProgress { lessonId: string; status: 'completed' | 'in_progress' }
 interface CourseProgressData {
@@ -1416,6 +1420,169 @@ function LiveLessonContent({ lesson }: { lesson: Lesson }) {
   );
 }
 
+// ── Secure File Lesson ────────────────────────────────────────────────────────
+const PDF_TYPES  = ['application/pdf'];
+const DOC_TYPES  = [
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/plain',
+];
+const PPT_TYPES  = [
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+];
+
+interface FileTokenData {
+  token: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  isConverted: boolean;
+  convertedHtml: string | null;
+}
+
+function SecureFileLesson({ lesson }: { lesson: Lesson }) {
+  const { user } = useAuthStore();
+  const apiBase  = process.env.NEXT_PUBLIC_API_URL ?? '';
+
+  const { data, isLoading, isError, refetch } = useQuery<FileTokenData>({
+    queryKey: ['file-token', lesson._id],
+    queryFn:  async () => {
+      const res = await api.get(`/files/token?lessonId=${lesson._id}`);
+      return res.data.data;
+    },
+    staleTime: 4 * 60 * 1000, // token lives 5 min — refetch after 4 min
+    refetchInterval: 4 * 60 * 1000,
+    retry: false,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-3">
+        <div className="w-8 h-8 border-2 border-primary-200 border-t-primary-600 rounded-full animate-spin" />
+        <p className="text-sm text-gray-500">Preparing secure viewer…</p>
+      </div>
+    );
+  }
+
+  if (isError || !data) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center bg-red-50 rounded-2xl border border-red-100">
+        <p className="text-red-600 font-medium">Could not load file</p>
+        <p className="text-gray-400 text-sm mt-1">You may not have access or the file was removed.</p>
+        <button onClick={() => refetch()} className="mt-3 text-sm text-primary-600 hover:underline">Retry</button>
+      </div>
+    );
+  }
+
+  // Handle embed code (rare — admin pasted raw HTML embed)
+  if (lesson.file?.embedCode) {
+    return (
+      <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-sm bg-gray-100" style={{ height: '70vh' }}
+        dangerouslySetInnerHTML={{ __html: lesson.file.embedCode }} />
+    );
+  }
+
+  const mime     = data.mimeType ?? lesson.file?.mimeType ?? '';
+  const serveUrl = `${apiBase}/files/serve/${data.token}`;
+  const sizeKB   = data.sizeBytes ? Math.round(data.sizeBytes / 1024) : null;
+  const sizeLabel = sizeKB === null ? '' : sizeKB < 1024 ? `${sizeKB} KB` : `${(sizeKB / 1024).toFixed(1)} MB`;
+  const ext      = data.fileName?.split('.').pop()?.toUpperCase() ?? 'FILE';
+  const name     = user?.name ?? user?.email ?? 'Student';
+  const email    = user?.email ?? '';
+
+  // ── PDF ──
+  if (PDF_TYPES.includes(mime) || data.fileName?.toLowerCase().endsWith('.pdf')) {
+    return (
+      <div className="space-y-3">
+        <SecurePdfViewer
+          serveUrl={serveUrl}
+          fileName={data.fileName}
+          studentName={name}
+          studentEmail={email}
+        />
+        <p className="text-xs text-gray-400 text-center">
+          🔒 This document is protected. Downloading and copying are disabled.
+        </p>
+      </div>
+    );
+  }
+
+  // ── Word / Excel / Text — converted HTML viewer ──
+  if (DOC_TYPES.includes(mime)) {
+    if (data.isConverted && data.convertedHtml) {
+      return (
+        <div className="space-y-3">
+          <SecureDocViewer
+            html={data.convertedHtml}
+            fileName={data.fileName}
+            mimeType={mime}
+            studentName={name}
+            studentEmail={email}
+          />
+          <p className="text-xs text-gray-400 text-center">
+            🔒 This document is protected. Copying and downloading are disabled.
+          </p>
+        </div>
+      );
+    }
+    // Conversion still in progress (should resolve within seconds)
+    return (
+      <div className="flex flex-col items-center justify-center py-16 gap-3 bg-amber-50 rounded-2xl border border-amber-100">
+        <div className="w-8 h-8 border-2 border-amber-300 border-t-amber-600 rounded-full animate-spin" />
+        <p className="text-sm text-amber-700 font-medium">Document is being processed…</p>
+        <p className="text-xs text-amber-600">This takes a few seconds. Refresh the page shortly.</p>
+      </div>
+    );
+  }
+
+  // ── PowerPoint or other ── secure download only ──
+  const isPpt  = PPT_TYPES.includes(mime);
+  const label  = isPpt ? 'Open Presentation' : 'Download File';
+  const bgColor = isPpt ? 'bg-orange-600 hover:bg-orange-700' : 'bg-blue-600 hover:bg-blue-700';
+
+  return (
+    <div className="bg-gradient-to-br from-slate-50 to-gray-100 border border-gray-200 rounded-2xl p-8">
+      <div className="max-w-sm mx-auto flex flex-col items-center text-center gap-4">
+        <div className="relative">
+          <div className="w-20 h-20 bg-white border border-gray-200 rounded-2xl flex items-center justify-center shadow-sm">
+            <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <span className={`absolute -bottom-1 -right-1 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md uppercase ${isPpt ? 'bg-orange-600' : 'bg-blue-600'}`}>
+            {ext}
+          </span>
+        </div>
+        <div>
+          <p className="font-semibold text-gray-800 text-sm">{data.fileName}</p>
+          {sizeLabel && <p className="text-xs text-gray-400 mt-0.5">{sizeLabel}</p>}
+        </div>
+        <a
+          href={serveUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`inline-flex items-center gap-2 px-5 py-2.5 ${bgColor} text-white rounded-xl text-sm font-medium transition-colors shadow-sm`}
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+          </svg>
+          {label}
+        </a>
+        <div className="flex items-center gap-1.5 text-xs text-gray-400">
+          <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+          </svg>
+          Secured · Link expires in 5 minutes
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Lesson Content ────────────────────────────────────────────────────────────
 function LessonContent({ lesson }: { lesson: Lesson }) {
   if (lesson.dripLockedUntil) return <DripLockOverlay lesson={lesson} />;
@@ -1461,101 +1628,7 @@ function LessonContent({ lesson }: { lesson: Lesson }) {
   }
 
   if (lesson.type === 'file') {
-    if (lesson.file?.embedCode) {
-      return (
-        <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-sm bg-gray-100" style={{ height: '70vh' }}
-          dangerouslySetInnerHTML={{ __html: lesson.file.embedCode }} />
-      );
-    }
-    if (lesson.file?.url) {
-      const sizeKB = lesson.file.sizeBytes ? Math.round(lesson.file.sizeBytes / 1024) : null;
-      const sizeLabel = sizeKB === null ? null : sizeKB < 1024 ? `${sizeKB} KB` : `${(sizeKB / 1024).toFixed(1)} MB`;
-      const ext = lesson.file.name?.split('.').pop()?.toUpperCase() ?? 'FILE';
-      const isPdf = lesson.file.mimeType === 'application/pdf' || lesson.file.name?.toLowerCase().endsWith('.pdf');
-      const provider = lesson.file.provider;
-
-      // Build cloud embed URL for Google Drive / Dropbox / OneDrive
-      let cloudEmbedUrl: string | null = null;
-      if (provider === 'gdrive' || lesson.file.url.includes('drive.google.com')) {
-        const m = lesson.file.url.match(/\/d\/([a-zA-Z0-9_-]+)/);
-        if (m) cloudEmbedUrl = `https://drive.google.com/file/d/${m[1]}/preview`;
-      } else if (provider === 'dropbox' || lesson.file.url.includes('dropbox.com')) {
-        cloudEmbedUrl = lesson.file.url.replace('www.dropbox.com', 'dl.dropboxusercontent.com').replace('?dl=0', '?raw=1');
-      } else if (provider === 'onedrive' || lesson.file.url.includes('onedrive.live.com') || lesson.file.url.includes('sharepoint.com')) {
-        cloudEmbedUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(lesson.file.url)}`;
-      }
-      // Note: 1drv.ms short URLs block iframe embedding — shown as open button below
-
-      return (
-        <div className="space-y-4">
-          {/* Cloud file embed viewer */}
-          {cloudEmbedUrl && (
-            <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-sm bg-gray-100">
-              <div className="flex items-center gap-2 px-4 py-2.5 bg-white border-b border-gray-200">
-                <span className="text-xs font-bold text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded uppercase">{provider ?? 'FILE'}</span>
-                <span className="text-sm text-gray-700 font-medium truncate flex-1">{lesson.file.name || lesson.title}</span>
-              </div>
-              <iframe src={cloudEmbedUrl} className="w-full" style={{ height: '70vh' }} title={lesson.title} allow="autoplay" />
-            </div>
-          )}
-          {/* PDF inline viewer (uploaded files) */}
-          {!cloudEmbedUrl && isPdf && (
-            <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-sm bg-gray-100">
-              <div className="flex items-center gap-2 px-4 py-2.5 bg-white border-b border-gray-200">
-                <span className="text-xs font-bold text-red-600 bg-red-50 border border-red-100 px-2 py-0.5 rounded">PDF</span>
-                <span className="text-sm text-gray-700 font-medium truncate flex-1">{lesson.file.name}</span>
-                {sizeLabel && <span className="text-xs text-gray-400 flex-shrink-0">{sizeLabel}</span>}
-              </div>
-              <iframe
-                src={`${lesson.file.url}#toolbar=1&navpanes=0`}
-                className="w-full"
-                style={{ height: '70vh' }}
-                title={lesson.file.name ?? undefined}
-              />
-            </div>
-          )}
-          {/* Download card (always shown) */}
-          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl p-6">
-            <div className="flex items-center gap-4">
-              <div className="relative flex-shrink-0">
-                <div className="w-14 h-14 bg-white border border-blue-200 rounded-xl flex items-center justify-center shadow-sm">
-                  <svg className="w-7 h-7 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                      d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                <span className="absolute -bottom-1 -right-1 bg-blue-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md uppercase tracking-wide">
-                  {ext}
-                </span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-gray-800 text-sm truncate">{lesson.file.name}</p>
-                {sizeLabel && <p className="text-xs text-gray-500 mt-0.5">{sizeLabel}</p>}
-              </div>
-              <a
-                href={lesson.file.url} target="_blank" rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm flex-shrink-0"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                </svg>
-                {(provider === 'onedrive' || lesson.file.url?.includes('1drv.ms')) ? 'Open in OneDrive' : (provider === 'gdrive' || lesson.file.url?.includes('drive.google.com')) ? 'Open in Drive' : 'Download'}
-              </a>
-            </div>
-          </div>
-        </div>
-      );
-    }
-    return (
-      <div className="bg-gray-50 border border-dashed border-gray-200 rounded-2xl flex flex-col items-center justify-center py-16 text-center">
-        <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mb-3">
-          <svg className="w-7 h-7 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-        </div>
-        <p className="text-gray-500 font-medium">No file uploaded yet</p>
-      </div>
-    );
+    return <SecureFileLesson lesson={lesson} />;
   }
 
   if (lesson.type === 'live') {
