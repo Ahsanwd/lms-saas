@@ -44,13 +44,28 @@ async function convertToHtml(buffer, mimetype) {
   return null;
 }
 
-// Read buffer from local disk or R2/CDN URL
-async function readFileBuffer(fileUrl, localPath) {
+// Read buffer from local disk, or directly from R2 via AWS SDK (no public URL needed)
+async function readFileBuffer(fileUrl, localPath, s3Key) {
   if (localPath) {
     const fs = require('fs');
     return fs.readFileSync(localPath);
   }
-  // R2 or external URL — fetch via HTTP
+  // R2: use SDK directly so public bucket access is not required
+  if (s3Key) {
+    const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
+    const config = require('../../config');
+    const s3cfg  = config.storage.s3;
+    const s3 = new S3Client({
+      region:      s3cfg.region || 'auto',
+      endpoint:    s3cfg.endpoint,
+      credentials: { accessKeyId: s3cfg.accessKeyId, secretAccessKey: s3cfg.secretAccessKey },
+    });
+    const res = await s3.send(new GetObjectCommand({ Bucket: s3cfg.bucket, Key: s3Key }));
+    const chunks = [];
+    for await (const chunk of res.Body) chunks.push(chunk);
+    return Buffer.concat(chunks);
+  }
+  // Fallback: plain HTTP fetch (external URLs)
   const https = require('https');
   const http  = require('http');
   return new Promise((resolve, reject) => {

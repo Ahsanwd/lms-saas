@@ -525,7 +525,7 @@ async function uploadLessonFile(tenantId, courseId, lessonId, file, user) {
   if (isConvertible(file.mimetype)) {
     setImmediate(async () => {
       try {
-        const buffer = await readFileBuffer(url, USE_S3 ? null : file.path);
+        const buffer = await readFileBuffer(url, USE_S3 ? null : file.path, USE_S3 ? file.key : null);
         const html   = await convertToHtml(buffer, file.mimetype);
         if (html) {
           await lessonRepo.updateById(tenantId, lessonId, {
