@@ -456,6 +456,23 @@ async function uploadLessonVideo(tenantId, courseId, lessonId, file, user) {
   return updated;
 }
 
+async function confirmCfStreamVideo(tenantId, courseId, lessonId, videoUid, user) {
+  const course = await courseRepo.findById(tenantId, courseId);
+  if (!course) throw new AppError('Course not found', 404);
+  if (!canEditCourse(course, user)) throw new AppError('Forbidden', 403);
+
+  const lesson = await lessonRepo.findById(tenantId, lessonId);
+  if (!lesson) throw new AppError('Lesson not found', 404);
+
+  const updated = await lessonRepo.updateById(tenantId, lessonId, {
+    'video.url':      videoUid,
+    'video.provider': 'cloudflare',
+    updatedBy: user.sub,
+  });
+  await recalcCourseCounters(tenantId, courseId);
+  return updated;
+}
+
 async function uploadLessonAudio(tenantId, courseId, lessonId, file, user) {
   const course = await courseRepo.findById(tenantId, courseId);
   if (!course) throw new AppError('Course not found', 404);
@@ -1342,6 +1359,7 @@ module.exports = {
   addLessonAttachment, removeLessonAttachment, deleteLesson, reorderLessons,
   getLessonQuiz, createLessonQuiz, detachLessonQuiz,
   presignVideoUpload,
+  confirmCfStreamVideo,
   importScorm,
   enroll, dropEnrollment, listEnrolledStudents, getMyEnrollments, getMyCertificates,
   adminEnrollUser, adminUnenrollUser, extendAccess, bulkEnrollCsv,

@@ -437,6 +437,91 @@ async function detachLessonQuiz(req, res, next) {
 }
 
 // ── SCORM Import ──────────────────────────────────────────────────────────────
+// ── Cloudflare Stream BYOK ────────────────────────────────────────────────────
+async function cfStreamUploadUrl(req, res, next) {
+  try {
+    const { tenantId } = req.tenant;
+    const { lessonId } = req.params;
+    const Tenant = require('../../database/models/Tenant.model');
+    const tenant = await Tenant.findById(tenantId)
+      .select('+cloudflareStream.apiTokenEnc cloudflareStream').lean();
+    const cf = tenant?.cloudflareStream;
+    if (!cf?.enabled || !cf.accountId || !cf.apiTokenEnc)
+      return R.error(res, 'Cloudflare Stream is not configured for this tenant', 400);
+
+    const cfSvc = require('../../services/cloudflareStream/cloudflareStream.service');
+    const apiToken = cfSvc.decrypt(cf.apiTokenEnc);
+    const { uploadUrl, videoUid } = await cfSvc.createDirectUpload(cf.accountId, apiToken, {
+      meta: { lessonId },
+    });
+    R.success(res, { uploadUrl, videoUid });
+  } catch (err) { next(err); }
+}
+
+async function cfStreamConfirm(req, res, next) {
+  try {
+    const { tenantId } = req.tenant;
+    const { id: courseId, lessonId } = req.params;
+    const { videoUid } = req.body;
+    if (!videoUid) return R.error(res, 'videoUid required', 400);
+
+    const lesson = await courseService.confirmCfStreamVideo(tenantId, courseId, lessonId, videoUid, req.user);
+    R.success(res, { video: lesson.video }, 'Video saved');
+  } catch (err) { next(err); }
+}
+
+async function cfStreamStatus(req, res, next) {
+  try {
+    const { tenantId } = req.tenant;
+    const { videoUid } = req.query;
+    if (!videoUid) return R.error(res, 'videoUid required', 400);
+
+    const Tenant = require('../../database/models/Tenant.model');
+    const tenant = await Tenant.findById(tenantId)
+      .select('+cloudflareStream.apiTokenEnc cloudflareStream').lean();
+    const cf = tenant?.cloudflareStream;
+    if (!cf?.enabled) return R.error(res, 'Cloudflare Stream not configured', 400);
+
+    const cfSvc = require('../../services/cloudflareStream/cloudflareStream.service');
+    const apiToken = cfSvc.decrypt(cf.apiTokenEnc);
+    const status = await cfSvc.getVideoStatus(cf.accountId, apiToken, videoUid);
+    R.success(res, status);
+  } catch (err) { next(err); }
+}
+
+async function cfStreamToken(req, res, next) {
+  try {
+    const { tenantId } = req.tenant;
+    const { id: courseId, lessonId } = req.params;
+
+    const Lesson      = require('../../database/models/Lesson.model');
+    const Enrollment  = require('../../database/models/Enrollment.model');
+
+    const lesson = await Lesson.findOne({ _id: lessonId, tenantId, deletedAt: null }).lean();
+    if (!lesson?.video?.url) return R.error(res, 'Lesson or video not found', 404);
+    if (lesson.video.provider !== 'cloudflare') return R.error(res, 'Not a Cloudflare Stream video', 400);
+
+    // Students must be enrolled
+    if (req.user.role === 'student') {
+      const enrolled = await Enrollment.findOne({
+        tenantId, courseId: lesson.courseId, userId: req.user.sub, status: 'active',
+      }).lean();
+      if (!enrolled) return R.error(res, 'Not enrolled in this course', 403);
+    }
+
+    const Tenant = require('../../database/models/Tenant.model');
+    const tenant = await Tenant.findById(tenantId)
+      .select('+cloudflareStream.apiTokenEnc +cloudflareStream.signingKeyEnc cloudflareStream').lean();
+    const cf = tenant?.cloudflareStream;
+    if (!cf?.enabled || !cf.signingKeyId || !cf.signingKeyEnc)
+      return R.error(res, 'Cloudflare Stream signing key not configured', 400);
+
+    const cfSvc = require('../../services/cloudflareStream/cloudflareStream.service');
+    const token = cfSvc.generateSignedToken(lesson.video.url, cf.signingKeyId, cf.signingKeyEnc);
+    R.success(res, { token });
+  } catch (err) { next(err); }
+}
+
 async function importScorm(req, res, next) {
   try {
     if (!req.file) return R.error(res, 'SCORM .zip file required', 400);
@@ -457,6 +542,7 @@ module.exports = {
   getLessonQuiz, createLessonQuiz, detachLessonQuiz,
   presignVideoUpload,
   importScorm,
+  cfStreamUploadUrl, cfStreamConfirm, cfStreamStatus, cfStreamToken,
   enroll, dropEnrollment, listStudents, myEnrollments, myCertificates,
   adminEnroll, adminUnenroll, extendAccess, bulkEnrollCsv,
   saveVideoPosition, getLessonProgress,

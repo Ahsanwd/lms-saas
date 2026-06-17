@@ -1389,6 +1389,142 @@ function FeatureFlagsSection() {
   );
 }
 
+// ─── Admin: Cloudflare Stream BYOK ───────────────────────────────────────────
+function CloudflareStreamSection() {
+  const [accountId,    setAccountId]    = useState('');
+  const [apiToken,     setApiToken]     = useState('');
+  const [signingKeyId, setSigningKeyId] = useState('');
+  const [signingKeyPem,setSigningKeyPem]= useState('');
+  const [showForm,     setShowForm]     = useState(false);
+  const [banner, setBanner] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
+
+  const { data, isLoading, refetch } = useQuery<{ connected: boolean; accountId: string | null; signingKeyId: string | null }>({
+    queryKey: ['cf-stream-settings'],
+    queryFn: () => api.get('/tenant/cloudflare-stream').then(r => r.data.data),
+    staleTime: 30_000,
+  });
+
+  const saveMut = useMutation({
+    mutationFn: () => api.post('/tenant/cloudflare-stream', { accountId, apiToken, signingKeyId, signingKeyPem }),
+    onSuccess: () => {
+      setBanner({ type: 'success', msg: 'Cloudflare Stream connected successfully!' });
+      setShowForm(false);
+      setApiToken('');
+      setSigningKeyPem('');
+      refetch();
+    },
+    onError: (err: any) => setBanner({ type: 'error', msg: err?.response?.data?.message || 'Failed to connect. Check your credentials.' }),
+  });
+
+  const disconnectMut = useMutation({
+    mutationFn: () => api.delete('/tenant/cloudflare-stream'),
+    onSuccess: () => { setBanner({ type: 'success', msg: 'Cloudflare Stream disconnected.' }); refetch(); },
+    onError: () => setBanner({ type: 'error', msg: 'Failed to disconnect.' }),
+  });
+
+  const testMut = useMutation({
+    mutationFn: () => api.post('/tenant/cloudflare-stream/test'),
+    onSuccess: () => setBanner({ type: 'success', msg: 'Connection test successful!' }),
+    onError: (err: any) => setBanner({ type: 'error', msg: err?.response?.data?.message || 'Connection test failed.' }),
+  });
+
+  const CFIcon = (
+    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M16.66 7.94C16 5.17 13.58 3 10.67 3 7.4 3 4.73 5.67 4.73 9c0 .28.02.56.06.83C3.19 10.22 2 11.52 2 13.09 2 14.7 3.3 16 4.91 16h11.27c1.57 0 2.82-1.25 2.82-2.82 0-1.43-1.07-2.6-2.47-2.83.04-.21.07-.41.07-.63 0-1.08-.44-2.05-1.14-2.78z"/>
+    </svg>
+  );
+
+  return (
+    <Section icon={CFIcon} title="Cloudflare Stream" desc="Use your own Cloudflare Stream account for secure HLS video hosting. Students pay Cloudflare directly — no extra cost to you.">
+      {banner && (
+        <div className={cn('flex items-start gap-3 rounded-xl px-4 py-3 text-sm',
+          banner.type === 'success' ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700')}>
+          <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            {banner.type === 'success'
+              ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/>
+              : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>}
+          </svg>
+          <span className="flex-1">{banner.msg}</span>
+          <button onClick={() => setBanner(null)} className="text-current opacity-50 hover:opacity-100">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+      )}
+
+      {isLoading ? (
+        <div className="flex items-center gap-2 text-sm text-gray-400 py-1"><Spinner size="sm" /> Checking…</div>
+      ) : data?.connected ? (
+        <div className="space-y-4">
+          <div className="flex items-center gap-4 p-4 bg-orange-50 rounded-xl border border-orange-100">
+            <div className="w-10 h-10 rounded-xl bg-orange-500 flex items-center justify-center flex-shrink-0">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-orange-900">Cloudflare Stream Connected</p>
+              <p className="text-xs text-orange-600 truncate font-mono">{data.accountId}</p>
+            </div>
+            <span className="flex-shrink-0 text-xs bg-green-100 text-green-700 border border-green-200 font-semibold px-2.5 py-1 rounded-full">Active</span>
+          </div>
+          <p className="text-xs text-gray-400">Instructors can now upload videos directly to your Cloudflare Stream account. Videos are served with signed URLs — only enrolled students can watch.</p>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => testMut.mutate()} loading={testMut.isPending}>Test Connection</Button>
+            <Button variant="outline" size="sm" onClick={() => disconnectMut.mutate()} loading={disconnectMut.isPending}>Disconnect</Button>
+          </div>
+        </div>
+      ) : showForm ? (
+        <div className="space-y-4">
+          <div className="rounded-xl bg-blue-50 border border-blue-200 px-4 py-3 text-xs text-blue-800 space-y-1">
+            <p className="font-semibold">Setup steps</p>
+            <ol className="list-decimal ml-4 space-y-1 text-blue-700">
+              <li>Log in to <strong>Cloudflare Dashboard</strong> → select your account → <strong>Stream</strong></li>
+              <li>Find your <strong>Account ID</strong> in the right sidebar on the Stream overview page</li>
+              <li>Go to <strong>My Profile → API Tokens → Create Token</strong> → use the "Edit Cloudflare Stream" template</li>
+              <li>Go to <strong>Stream → Keys → Create Signing Key</strong> → copy the <strong>Key ID</strong> and <strong>PEM</strong></li>
+            </ol>
+          </div>
+          <div>
+            <label className={labelCls}>Account ID</label>
+            <input value={accountId} onChange={e => setAccountId(e.target.value)} placeholder="e.g. 01a7362d577a6c3019a474fd6f485823" className={inputCls} />
+          </div>
+          <div>
+            <label className={labelCls}>API Token</label>
+            <input type="password" value={apiToken} onChange={e => setApiToken(e.target.value)} placeholder="Cloudflare API token with Stream permissions" className={inputCls} />
+          </div>
+          <div>
+            <label className={labelCls}>Signing Key ID</label>
+            <input value={signingKeyId} onChange={e => setSigningKeyId(e.target.value)} placeholder="e.g. 6b9b4e5c5890dd8bcf8f836..." className={inputCls} />
+          </div>
+          <div>
+            <label className={labelCls}>Signing Key (PEM)</label>
+            <textarea rows={5} value={signingKeyPem} onChange={e => setSigningKeyPem(e.target.value)}
+              placeholder={'-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----'}
+              className={`${inputCls} font-mono text-xs resize-none`} />
+            <p className="text-xs text-gray-400 mt-1">Paste the full PEM private key from Cloudflare Stream → Keys → your signing key</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button onClick={() => saveMut.mutate()} loading={saveMut.isPending}
+              disabled={!accountId || !apiToken || !signingKeyId || !signingKeyPem}>
+              Connect & Verify
+            </Button>
+            <button type="button" onClick={() => setShowForm(false)} className="text-sm text-gray-500 hover:text-gray-700 px-3">Cancel</button>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+            <svg className="w-5 h-5 text-gray-300 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <div>
+              <p className="text-sm font-semibold text-gray-700">Cloudflare Stream not connected</p>
+              <p className="text-xs text-gray-400 mt-0.5">Connect your own Cloudflare Stream account. Instructors can then upload videos that are served securely with signed URLs. You pay Cloudflare directly (~$5/1000 min stored).</p>
+            </div>
+          </div>
+          <Button onClick={() => setShowForm(true)}>Connect Cloudflare Stream</Button>
+        </div>
+      )}
+    </Section>
+  );
+}
+
 function AdminSettings() {
   const qc = useQueryClient();
   const [saved, setSaved] = useState(false);
@@ -1774,6 +1910,7 @@ function AdminSettings() {
       <PasswordPolicySection />
       <FeatureFlagsSection />
       <StripeConnectSection />
+      <CloudflareStreamSection />
       <ZoomSection />
       <AuthAuditLogSection />
     </div>

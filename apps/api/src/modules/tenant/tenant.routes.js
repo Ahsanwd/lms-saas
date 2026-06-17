@@ -31,4 +31,10 @@ router.get( '/email-settings',      requireRole('tenant_admin'), ctrl.getEmailSe
 router.put( '/email-settings',      requireRole('tenant_admin'), ctrl.saveEmailSettings);
 router.post('/email-settings/test', requireRole('tenant_admin'), ctrl.testEmailSmtp);
 
+// Cloudflare Stream BYOK (tenant admin only)
+router.get(   '/cloudflare-stream',      requireRole('tenant_admin'), ctrl.getCfStreamSettings);
+router.post(  '/cloudflare-stream',      requireRole('tenant_admin'), ctrl.saveCfStreamSettings);
+router.delete('/cloudflare-stream',      requireRole('tenant_admin'), ctrl.disconnectCfStream);
+router.post(  '/cloudflare-stream/test', requireRole('tenant_admin'), ctrl.testCfStreamConnection);
+
 module.exports = router;

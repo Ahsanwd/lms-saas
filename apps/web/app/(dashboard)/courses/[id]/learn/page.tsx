@@ -810,6 +810,48 @@ function fmtTime(s: number) {
   return `${m}:${String(sec).padStart(2, '0')}`;
 }
 
+// ── Cloudflare Stream Player (signed token) ───────────────────────────────────
+function CfStreamPlayer({ lesson, courseId, watermark, watermarkText }: {
+  lesson: Lesson; courseId: string; watermark: boolean | null; watermarkText?: string | null;
+}) {
+  const { data, isLoading, isError } = useQuery<{ token: string }>({
+    queryKey: ['cf-stream-token', lesson._id],
+    queryFn: async () => {
+      const { data } = await api.get(`/courses/${courseId}/lessons/${lesson._id}/cloudflare-stream/token`);
+      return data.data;
+    },
+    staleTime: 50 * 60 * 1000, // token is valid 1h; refresh at 50min
+    retry: 1,
+  });
+
+  if (isLoading) return (
+    <div className="bg-black rounded-2xl aspect-video flex items-center justify-center">
+      <div className="flex flex-col items-center gap-3">
+        <Spinner size="lg" />
+        <p className="text-sm text-gray-400">Loading secure player…</p>
+      </div>
+    </div>
+  );
+
+  if (isError || !data?.token) return (
+    <div className="bg-black rounded-2xl aspect-video flex items-center justify-center">
+      <p className="text-sm text-red-400">Could not load video. Please refresh.</p>
+    </div>
+  );
+
+  const src = `https://cloudflarestream.com/${data.token}/iframe?autoplay=false&muted=false`;
+  return (
+    <div className="space-y-2">
+      <div className="relative aspect-video w-full rounded-2xl overflow-hidden bg-black shadow-xl">
+        <iframe src={src} className="w-full h-full" allowFullScreen
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+          referrerPolicy="strict-origin-when-cross-origin" />
+        {watermark && watermarkText && <WatermarkOverlay text={watermarkText} />}
+      </div>
+    </div>
+  );
+}
+
 // ── Premium Video Player ───────────────────────────────────────────────────────
 function VideoPlayer({ lesson, courseId }: { lesson: Lesson; courseId: string }) {
   const vid = lesson.video;
@@ -894,14 +936,17 @@ function VideoPlayer({ lesson, courseId }: { lesson: Lesson; courseId: string })
     );
   }
 
+  // ── Cloudflare Stream — signed token playback ──
+  if (vid.provider === 'cloudflare') {
+    return <CfStreamPlayer lesson={lesson} courseId={courseId} watermark={watermark} watermarkText={settings?.watermarkText} />;
+  }
+
   // ── YouTube / Vimeo iframe ──
   if (vid.provider === 'youtube' || vid.provider === 'vimeo') {
     let src = vid.url ?? '';
     if (vid.provider === 'youtube') {
       const id = parseYouTubeId(src);
       const origin = typeof window !== 'undefined' ? window.location.origin : '';
-      // rel=0: no related videos, modestbranding=1: minimal YouTube branding
-      // origin: tells YouTube this embed belongs to our domain (security)
       src = `https://www.youtube.com/embed/${id}?rel=0&modestbranding=1&enablejsapi=1${origin ? `&origin=${encodeURIComponent(origin)}` : ''}`;
     } else {
       const id = parseVimeoId(src);

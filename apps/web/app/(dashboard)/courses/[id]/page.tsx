@@ -32,6 +32,144 @@ function fmtDuration(s: number) {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
+// ─── Cloudflare Stream Uploader ───────────────────────────────────────────────
+
+interface CfStreamUploaderProps {
+  courseId: string;
+  lessonId: string;
+  existingUid: string | null;
+  onConfirmed: (videoUid: string) => void;
+}
+
+function CfStreamUploader({ courseId, lessonId, existingUid, onConfirmed }: CfStreamUploaderProps) {
+  const [file,       setFile]       = useState<File | null>(null);
+  const [uploading,  setUploading]  = useState(false);
+  const [progress,   setProgress]   = useState(0);
+  const [status,     setStatus]     = useState<'idle' | 'uploading' | 'processing' | 'ready' | 'error'>('idle');
+  const [videoUid,   setVideoUid]   = useState(existingUid ?? '');
+  const [errorMsg,   setErrorMsg]   = useState('');
+  const fileRef = useRef<HTMLInputElement>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
+
+  async function handleUpload(selectedFile: File) {
+    if (!lessonId) { setErrorMsg('Save the lesson first before uploading to Cloudflare Stream'); return; }
+    setFile(selectedFile);
+    setStatus('uploading');
+    setProgress(0);
+    setErrorMsg('');
+
+    try {
+      // 1. Get direct upload URL from our API
+      const urlRes = await api.post(`/courses/${courseId}/lessons/${lessonId}/cloudflare-stream/upload-url`);
+      const { uploadUrl, videoUid: uid } = urlRes.data.data;
+
+      // 2. Upload directly to Cloudflare Stream via TUS PATCH (no server memory used)
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('PATCH', uploadUrl);
+        xhr.setRequestHeader('Content-Type', 'application/offset+octet-stream');
+        xhr.setRequestHeader('Upload-Offset', '0');
+        xhr.setRequestHeader('Tus-Resumable', '1.0.0');
+        xhr.upload.onprogress = (e) => { if (e.lengthComputable) setProgress(Math.round(e.loaded / e.total * 100)); };
+        xhr.onload  = () => (xhr.status === 204 || xhr.status === 200) ? resolve() : reject(new Error(`Upload error ${xhr.status}`));
+        xhr.onerror = () => reject(new Error('Network error during upload'));
+        xhr.send(selectedFile);
+      });
+
+      // 3. Save video UID to lesson
+      await api.post(`/courses/${courseId}/lessons/${lessonId}/cloudflare-stream/confirm`, { videoUid: uid });
+      setVideoUid(uid);
+      onConfirmed(uid);
+
+      // 4. Poll for processing status
+      setStatus('processing');
+      pollRef.current = setInterval(async () => {
+        try {
+          const st = await api.get(`/courses/${courseId}/lessons/${lessonId}/cloudflare-stream/status?videoUid=${uid}`);
+          if (st.data.data.readyToStream) {
+            setStatus('ready');
+            if (pollRef.current) clearInterval(pollRef.current);
+          }
+        } catch { /* keep polling */ }
+      }, 5000);
+    } catch (err: any) {
+      setStatus('error');
+      setErrorMsg(err?.response?.data?.message || err?.message || 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <input ref={fileRef} type="file" accept="video/*" className="hidden"
+        onChange={e => { const f = e.target.files?.[0]; if (f) handleUpload(f); }} />
+
+      {status === 'idle' && (
+        <button type="button" onClick={() => fileRef.current?.click()}
+          className="w-full rounded-2xl border-2 border-dashed border-orange-200 bg-orange-50/30 hover:border-orange-400 hover:bg-orange-50 py-8 text-center transition-all">
+          <div className="flex flex-col items-center gap-2">
+            <div className="w-12 h-12 rounded-2xl bg-orange-100 flex items-center justify-center mb-1">
+              <svg className="w-6 h-6 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+            </div>
+            <p className="text-sm font-semibold text-gray-700">Click to upload to Cloudflare Stream</p>
+            <p className="text-xs text-gray-400">Video uploads directly to Cloudflare — no size limit, HLS adaptive quality</p>
+          </div>
+        </button>
+      )}
+
+      {(status === 'uploading' || status === 'processing') && (
+        <div className="rounded-2xl border border-orange-200 bg-orange-50 p-5 space-y-3">
+          <div className="flex items-center gap-3">
+            <Spinner size="sm" />
+            <p className="text-sm font-semibold text-orange-800">
+              {status === 'uploading' ? `Uploading to Cloudflare… ${progress}%` : 'Cloudflare is processing your video…'}
+            </p>
+          </div>
+          {status === 'uploading' && (
+            <div className="w-full bg-orange-100 rounded-full h-2">
+              <div className="bg-orange-500 h-2 rounded-full transition-all duration-300" style={{ width: `${progress}%` }} />
+            </div>
+          )}
+          {status === 'processing' && (
+            <p className="text-xs text-orange-600">This usually takes 1–5 minutes. You can save the lesson now — it will be ready when students open it.</p>
+          )}
+        </div>
+      )}
+
+      {status === 'ready' && (
+        <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 flex items-center gap-3">
+          <svg className="w-5 h-5 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-green-800">Video ready on Cloudflare Stream</p>
+            <p className="text-xs text-green-600 font-mono">{videoUid}</p>
+          </div>
+          <button type="button" onClick={() => { setStatus('idle'); setFile(null); setVideoUid(''); }}
+            className="text-xs text-green-600 hover:text-green-800 underline">Replace</button>
+        </div>
+      )}
+
+      {status === 'error' && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 space-y-2">
+          <p className="text-sm font-semibold text-red-700">Upload failed</p>
+          <p className="text-xs text-red-600">{errorMsg}</p>
+          <button type="button" onClick={() => { setStatus('idle'); setFile(null); setErrorMsg(''); }}
+            className="text-xs text-red-600 hover:text-red-800 underline">Try again</button>
+        </div>
+      )}
+
+      {existingUid && status === 'idle' && (
+        <p className="text-xs text-green-600 flex items-center gap-1">
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg>
+          Video uploaded (UID: {existingUid}) — click above to replace
+        </p>
+      )}
+    </div>
+  );
+}
+
 // ─── Lesson Modal ─────────────────────────────────────────────────────────────
 
 interface LessonModalProps {
@@ -42,14 +180,15 @@ interface LessonModalProps {
   onSaved: () => void;
 }
 
-type VideoSource = 'youtube' | 'vimeo' | 'upload' | 'bunny' | 'cloudflare' | 'external' | 'embed';
+type VideoSource = 'youtube' | 'vimeo' | 'cloudflare' | 'upload' | 'bunny' | 'external' | 'embed';
 type AudioSource = 'upload' | 'external' | 'soundcloud' | 'spotify' | 'embed';
 type FileSource  = 'upload' | 'external' | 'gdrive' | 'dropbox' | 'onedrive' | 'embed';
 
 function inferVideoSource(lesson: LessonModalProps['lesson']): VideoSource {
   if (!lesson?.video) return 'youtube';
   const p = lesson.video.provider;
-  if (p === 'vimeo') return 'vimeo';
+  if (p === 'vimeo')      return 'vimeo';
+  if (p === 'cloudflare') return 'cloudflare';
   return 'youtube';
 }
 
@@ -134,6 +273,14 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
   const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isEdit = !!lesson;
+
+  const { data: cfStreamSettings } = useQuery<{ connected: boolean; accountId: string | null }>({
+    queryKey: ['cf-stream-settings'],
+    queryFn: () => api.get('/tenant/cloudflare-stream').then(r => r.data.data),
+    staleTime: 5 * 60_000,
+    enabled: type === 'video',
+  });
+  const cfEnabled = cfStreamSettings?.connected ?? false;
 
   const { data: zoomStatus } = useQuery<{ connected: boolean; email?: string }>({
     queryKey: ['zoom-status'],
@@ -405,19 +552,20 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
               </div>
             )}
 
-            {/* ── Video source — YouTube & Vimeo only ── */}
+            {/* ── Video source ── */}
             {type === 'video' && (
               <div className="space-y-4">
                 {/* Source selector */}
                 <div>
                   <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Video Source</label>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     {([
-                      { s: 'youtube' as VideoSource, label: 'YouTube' },
-                      { s: 'vimeo'   as VideoSource, label: 'Vimeo'   },
+                      { s: 'youtube'   as VideoSource, label: 'YouTube' },
+                      { s: 'vimeo'     as VideoSource, label: 'Vimeo'   },
+                      ...(cfEnabled ? [{ s: 'cloudflare' as VideoSource, label: '☁ Cloudflare Stream' }] : []),
                     ]).map(({ s, label }) => (
                       <button key={s} type="button" onClick={() => setVideoSource(s)}
-                        className={cn('px-5 py-1.5 rounded-full text-xs font-semibold border transition-all',
+                        className={cn('px-4 py-1.5 rounded-full text-xs font-semibold border transition-all',
                           videoSource === s
                             ? 'bg-primary-600 text-white border-primary-600 shadow-sm'
                             : 'bg-white text-gray-500 border-gray-200 hover:border-primary-300 hover:text-primary-600')}>
@@ -427,7 +575,18 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
                   </div>
                 </div>
 
-                {/* URL input */}
+                {/* Cloudflare Stream upload zone */}
+                {videoSource === 'cloudflare' && (
+                  <CfStreamUploader
+                    courseId={courseId}
+                    lessonId={lesson?._id ?? ''}
+                    existingUid={lesson?.video?.provider === 'cloudflare' ? lesson.video.url ?? null : null}
+                    onConfirmed={(uid) => { setVideoUrl(uid); }}
+                  />
+                )}
+
+                {/* URL input (YouTube / Vimeo) */}
+                {videoSource !== 'cloudflare' && (
                 <div className="space-y-3">
                   <div>
                     <label className="block text-xs font-semibold text-gray-500 mb-1.5">
@@ -476,6 +635,7 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
                       className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 bg-gray-50" />
                   </div>
                 </div>
+                )} {/* end YouTube/Vimeo URL block */}
 
                 {/* Protection — watermark only (download/speed controls don't apply to YouTube/Vimeo) */}
                 <div className="rounded-2xl border border-gray-100 bg-gray-50 overflow-hidden">

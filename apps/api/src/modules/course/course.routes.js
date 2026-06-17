@@ -306,6 +306,12 @@ router.delete('/:id/lessons/:lessonId/attachments/:attachmentId',
   ctrl.removeAttachment
 );
 
+// ── Cloudflare Stream BYOK ────────────────────────────────────────────────────
+router.post(  '/:id/lessons/:lessonId/cloudflare-stream/upload-url', requirePermission('course:update'), ctrl.cfStreamUploadUrl);
+router.post(  '/:id/lessons/:lessonId/cloudflare-stream/confirm',    requirePermission('course:update'), ctrl.cfStreamConfirm);
+router.get(   '/:id/lessons/:lessonId/cloudflare-stream/status',     requirePermission('course:update'), ctrl.cfStreamStatus);
+router.get(   '/:id/lessons/:lessonId/cloudflare-stream/token',      requirePermission('course:read'),   ctrl.cfStreamToken);
+
 // ── Enrollment ────────────────────────────────────────────────────────────────
 router.post('/:id/enroll', requirePermission('enrollment:create'), ctrl.enroll);
 router.delete('/:id/enroll', ctrl.dropEnrollment); // auth already required; service scopes to req.user.sub
