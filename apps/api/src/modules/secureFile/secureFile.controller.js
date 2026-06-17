@@ -96,18 +96,30 @@ async function serveFile(req, res, next) {
     const USE_S3 = config.storage?.driver === 's3';
 
     if (USE_S3) {
-      // Proxy file through API server — never exposes R2 URL to the browser
-      const url = lesson.file.url;
-      const https = require('https');
-      const http  = require('http');
-      const mod   = url.startsWith('https') ? https : http;
-      mod.get(url, (upstream) => {
-        if (upstream.statusCode !== 200) {
-          return next(new AppError('File could not be retrieved', 502));
-        }
+      // Stream directly from R2 via AWS SDK — no public CDN access required
+      try {
+        const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
+        const s3cfg = config.storage.s3;
+        const s3 = new S3Client({
+          region: s3cfg.region || 'auto',
+          endpoint: s3cfg.endpoint,
+          credentials: { accessKeyId: s3cfg.accessKeyId, secretAccessKey: s3cfg.secretAccessKey },
+        });
+
+        // Extract the object key from the stored URL
+        const cdnBase = (s3cfg.cdnUrl || `${s3cfg.endpoint}/${s3cfg.bucket}`).replace(/\/$/, '');
+        const key = lesson.file.url.startsWith(cdnBase)
+          ? lesson.file.url.slice(cdnBase.length + 1)
+          : lesson.file.url.replace(/^https?:\/\/[^/]+\//, '');
+
+        const cmd = new GetObjectCommand({ Bucket: s3cfg.bucket, Key: key });
+        const s3Res = await s3.send(cmd);
+
         if (lesson.file.sizeBytes) res.setHeader('Content-Length', lesson.file.sizeBytes);
-        upstream.pipe(res);
-      }).on('error', next);
+        s3Res.Body.pipe(res);
+      } catch (err) {
+        return next(new AppError('File could not be retrieved from storage', 502));
+      }
     } else {
       // Local disk — resolve path from public URL
       const apiBase = (config.app?.apiUrl || '').replace(/\/$/, '');
