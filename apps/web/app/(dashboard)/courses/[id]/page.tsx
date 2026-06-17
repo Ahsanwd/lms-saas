@@ -883,18 +883,26 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
                   { checked: isPreview,        onChange: setIsPreview,        label: 'Free Preview',      desc: 'Accessible without enrollment' },
                   { checked: discussionEnabled,onChange: setDiscussionEnabled,label: 'Enable Discussion',  desc: 'Allow Q&A for this lesson' },
                 ].map(({ checked, onChange, label, desc }) => (
-                  <label key={label} className="flex items-center gap-4 px-4 py-3 cursor-pointer hover:bg-gray-50/50 transition-colors">
+                  <div key={label} className="flex items-center gap-4 px-4 py-3 cursor-pointer hover:bg-gray-50/50 transition-colors"
+                    onClick={() => onChange(!checked)}>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-gray-800">{label}</p>
                       <p className="text-xs text-gray-400">{desc}</p>
                     </div>
-                    <div className={cn('relative flex-shrink-0 rounded-full transition-colors cursor-pointer')}
-                      style={{ width: '40px', height: '22px', background: checked ? 'var(--color-primary-500, #e11d48)' : '#e5e7eb' }}>
-                      <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} className="sr-only" />
-                      <div className={cn('absolute rounded-full bg-white shadow transition-transform')}
-                        style={{ width: '18px', height: '18px', top: '2px', left: checked ? '20px' : '2px' }} />
-                    </div>
-                  </label>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={checked}
+                      onClick={e => { e.stopPropagation(); onChange(!checked); }}
+                      className={cn('relative flex-shrink-0 rounded-full transition-colors duration-200 flex-none',
+                        checked ? 'bg-orange-500' : 'bg-gray-200')}
+                      style={{ width: '40px', height: '22px' }}>
+                      <span
+                        className="absolute rounded-full bg-white shadow-sm transition-transform duration-200"
+                        style={{ width: '18px', height: '18px', top: '2px', left: '2px',
+                          transform: checked ? 'translateX(18px)' : 'translateX(0)' }} />
+                    </button>
+                  </div>
                 ))}
               </div>
             </div>
