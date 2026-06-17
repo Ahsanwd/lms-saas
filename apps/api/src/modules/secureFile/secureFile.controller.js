@@ -85,13 +85,15 @@ async function serveFile(req, res, next) {
     const safeName = encodeURIComponent(lesson.file.name || 'file');
 
     // Security headers — no caching, no download, no embedding outside our origin
-    res.setHeader('Cache-Control',             'no-store, no-cache, must-revalidate, private');
-    res.setHeader('Pragma',                    'no-cache');
-    res.setHeader('X-Content-Type-Options',    'nosniff');
-    res.setHeader('X-Frame-Options',           'SAMEORIGIN');
-    res.setHeader('Content-Security-Policy',   "default-src 'none'");
-    res.setHeader('Content-Disposition',       `inline; filename="${safeName}"`);
-    res.setHeader('Content-Type',              mime);
+    res.setHeader('Cache-Control',                  'no-store, no-cache, must-revalidate, private');
+    res.setHeader('Pragma',                         'no-cache');
+    res.setHeader('X-Content-Type-Options',         'nosniff');
+    res.setHeader('X-Frame-Options',                'SAMEORIGIN');
+    res.setHeader('Content-Security-Policy',        "default-src 'none'");
+    res.setHeader('Content-Disposition',            `inline; filename="${safeName}"`);
+    res.setHeader('Content-Type',                   mime);
+    // Allow cross-origin loading (Vercel frontend ↔ Render API are different origins)
+    res.setHeader('Cross-Origin-Resource-Policy',   'cross-origin');
 
     const USE_S3 = config.storage?.driver === 's3';
 
