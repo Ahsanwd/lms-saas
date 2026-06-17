@@ -1445,7 +1445,7 @@ interface FileTokenData {
 
 function SecureFileLesson({ lesson }: { lesson: Lesson }) {
   const { user } = useAuthStore();
-  const apiBase  = process.env.NEXT_PUBLIC_API_URL ?? '';
+  const apiBase  = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '') + '/api';
 
   const { data, isLoading, isError, refetch } = useQuery<FileTokenData>({
     queryKey: ['file-token', lesson._id],
