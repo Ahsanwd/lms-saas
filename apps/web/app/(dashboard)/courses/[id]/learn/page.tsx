@@ -793,7 +793,8 @@ function QuizLesson({ lessonId }: { lessonId: string }) {
 // ── Video helpers ─────────────────────────────────────────────────────────────
 function parseYouTubeId(url: string): string {
   if (!url) return '';
-  const m = url.match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{11})/);
+  // Handles: watch?v=, youtu.be/, embed/, shorts/
+  const m = url.match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([A-Za-z0-9_-]{11})/);
   return m ? m[1] : url.trim();
 }
 function parseVimeoId(url: string): string {
@@ -893,30 +894,28 @@ function VideoPlayer({ lesson, courseId }: { lesson: Lesson; courseId: string })
     );
   }
 
-  // ── iframe-based providers ──
-  if (vid.provider === 'youtube' || vid.provider === 'vimeo' || vid.provider === 'bunny' || vid.provider === 'cloudflare') {
+  // ── YouTube / Vimeo iframe ──
+  if (vid.provider === 'youtube' || vid.provider === 'vimeo') {
     let src = vid.url ?? '';
     if (vid.provider === 'youtube') {
       const id = parseYouTubeId(src);
-      src = `https://www.youtube.com/embed/${id}?rel=0&modestbranding=1`;
-    } else if (vid.provider === 'vimeo') {
+      const origin = typeof window !== 'undefined' ? window.location.origin : '';
+      // rel=0: no related videos, modestbranding=1: minimal YouTube branding
+      // origin: tells YouTube this embed belongs to our domain (security)
+      src = `https://www.youtube.com/embed/${id}?rel=0&modestbranding=1&enablejsapi=1${origin ? `&origin=${encodeURIComponent(origin)}` : ''}`;
+    } else {
       const id = parseVimeoId(src);
-      src = `https://player.vimeo.com/video/${id}?title=0&byline=0&portrait=0`;
+      src = `https://player.vimeo.com/video/${id}?title=0&byline=0&portrait=0&dnt=1`;
     }
-    // Bunny and Cloudflare — use URL as-is (already an iframe src)
 
     return (
       <div className="space-y-2">
         <div className="relative aspect-video w-full rounded-2xl overflow-hidden bg-black shadow-xl">
           <iframe src={src} className="w-full h-full" allowFullScreen
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen" />
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+            referrerPolicy="strict-origin-when-cross-origin" />
           {watermark && <WatermarkOverlay text={settings!.watermarkText!} />}
         </div>
-        {allowSpeed && (
-          <div className="flex justify-end px-1">
-            <p className="text-xs text-gray-400 italic">Speed control available on supported players only</p>
-          </div>
-        )}
         {vid.durationSeconds > 0 && (
           <p className="text-xs text-gray-400 text-right px-1">{fmtTime(vid.durationSeconds)}</p>
         )}

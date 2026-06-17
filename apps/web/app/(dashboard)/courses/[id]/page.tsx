@@ -445,8 +445,29 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
                       </span>
                     </div>
-                    <p className="text-xs text-gray-400 mt-1.5">Paste the full URL or just the video ID</p>
                   </div>
+
+                  {/* Unlisted guidance */}
+                  {videoSource === 'youtube' && (
+                    <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 flex gap-3">
+                      <span className="text-amber-500 text-base flex-shrink-0 mt-0.5">⚠️</span>
+                      <div className="text-xs text-amber-800 space-y-1">
+                        <p className="font-semibold">Set your YouTube video to Unlisted</p>
+                        <p className="text-amber-700">Go to YouTube Studio → your video → Visibility → <strong>Unlisted</strong>. This prevents the video from appearing in search or on your channel while still allowing it to be embedded here.</p>
+                        <p className="text-amber-700">Do not use <strong>Private</strong> — private videos won't play for students.</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {videoSource === 'vimeo' && (
+                    <div className="rounded-xl bg-blue-50 border border-blue-200 px-4 py-3 flex gap-3">
+                      <span className="text-blue-500 text-base flex-shrink-0 mt-0.5">ℹ️</span>
+                      <div className="text-xs text-blue-800 space-y-1">
+                        <p className="font-semibold">Recommended Vimeo privacy settings</p>
+                        <p className="text-blue-700">Set the video to <strong>Hide from Vimeo</strong> (unlisted). For best security, use <strong>Vimeo Pro</strong> and enable domain-level privacy to restrict playback to this site only.</p>
+                      </div>
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-xs font-semibold text-gray-500 mb-1.5">Duration <span className="font-normal text-gray-400">(seconds, optional)</span></label>
@@ -456,35 +477,30 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
                   </div>
                 </div>
 
-                {/* Protection & Controls */}
+                {/* Protection — watermark only (download/speed controls don't apply to YouTube/Vimeo) */}
                 <div className="rounded-2xl border border-gray-100 bg-gray-50 overflow-hidden">
                   <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
                     <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-                    <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Controls & Protection</span>
+                    <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Protection</span>
                   </div>
                   <div className="divide-y divide-gray-100">
-                    {[
-                      { checked: allowSpeedControl, onChange: setAllowSpeedControl, title: 'Playback speed', desc: '0.5× to 2× speed selector', icon: '⚡' },
-                      { checked: disableDownload,   onChange: setDisableDownload,   title: 'Disable download', desc: 'Block download button & right-click', icon: '🔒' },
-                      { checked: watermarkEnabled,  onChange: setWatermarkEnabled,  title: 'Watermark overlay', desc: 'Show text watermark on video', icon: '💧' },
-                    ].map(({ checked, onChange, title, desc, icon }) => (
-                      <label key={title} className="flex items-center gap-4 px-4 py-3.5 cursor-pointer hover:bg-white transition-colors">
-                        <span className="text-lg flex-shrink-0">{icon}</span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-gray-800">{title}</p>
-                          <p className="text-xs text-gray-400">{desc}</p>
-                        </div>
-                        {/* Toggle switch */}
-                        <div className={cn('relative w-10 h-5.5 rounded-full transition-colors flex-shrink-0 cursor-pointer',
-                          checked ? 'bg-primary-500' : 'bg-gray-200')}
-                          style={{ height: '22px', width: '40px' }}>
-                          <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} className="sr-only" />
-                          <div className={cn('absolute top-0.5 w-4.5 h-4.5 rounded-full bg-white shadow transition-transform',
-                            checked ? 'translate-x-[18px]' : 'translate-x-0.5')}
-                            style={{ width: '18px', height: '18px', top: '2px' }} />
-                        </div>
-                      </label>
-                    ))}
+                    <div className="flex items-center gap-4 px-4 py-3.5 cursor-pointer hover:bg-white transition-colors"
+                      onClick={() => setWatermarkEnabled(!watermarkEnabled)}>
+                      <span className="text-lg flex-shrink-0">💧</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-800">Watermark overlay</p>
+                        <p className="text-xs text-gray-400">Show your branding text over the video player</p>
+                      </div>
+                      <button type="button" role="switch" aria-checked={watermarkEnabled}
+                        onClick={e => { e.stopPropagation(); setWatermarkEnabled(!watermarkEnabled); }}
+                        className={cn('relative flex-shrink-0 rounded-full transition-colors duration-200',
+                          watermarkEnabled ? 'bg-orange-500' : 'bg-gray-200')}
+                        style={{ width: '40px', height: '22px' }}>
+                        <span className="absolute rounded-full bg-white shadow-sm transition-transform duration-200"
+                          style={{ width: '18px', height: '18px', top: '2px', left: '2px',
+                            transform: watermarkEnabled ? 'translateX(18px)' : 'translateX(0)' }} />
+                      </button>
+                    </div>
                     {watermarkEnabled && (
                       <div className="px-4 py-3 bg-blue-50/50">
                         <input type="text" value={watermarkText} onChange={e => setWatermarkText(e.target.value)}
@@ -492,6 +508,9 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
                           className="w-full px-3 py-2 text-sm border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white" />
                       </div>
                     )}
+                    <div className="px-4 py-3">
+                      <p className="text-xs text-gray-400">Speed control and download blocking are managed by the YouTube / Vimeo player directly.</p>
+                    </div>
                   </div>
                 </div>
               </div>
