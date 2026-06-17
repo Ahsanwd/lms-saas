@@ -1,6 +1,11 @@
 require('dotenv').config();
 // Override DNS to bypass broken local DNS proxy (127.0.0.1 not responding)
 require('dns').setServers(['8.8.8.8', '8.8.4.4']);
+
+// Prevent Redis/queue connection errors from crashing the process
+process.on('unhandledRejection', (reason) => {
+  require('./utils/logger').error('Unhandled Promise Rejection', { reason: String(reason) });
+});
 const http        = require('http');
 const express     = require('express');
 const helmet      = require('helmet');
@@ -22,7 +27,7 @@ require('./jobs/membership.renewal.job');
 require('./jobs/queue').membershipRenewalQueue().add(
   { type: 'daily-cron' },
   { repeat: { cron: '0 0 * * *' }, jobId: 'membership-renewal-cron', removeOnComplete: true }
-);
+).catch(() => {});
 
 // ── Announcement scheduled-publish job processor ──────────────────────────────
 require('./jobs/announcement.scheduler.job');
@@ -38,14 +43,14 @@ require('./jobs/tenantExpiry.job');
 require('./jobs/queue').tenantExpiryQueue().add(
   { type: 'daily-cron' },
   { repeat: { cron: '5 0 * * *' }, jobId: 'tenant-expiry-cron', removeOnComplete: true }
-);
+).catch(() => {});
 
 // ── Weekly analytics report — runs every Monday at 08:00 UTC ─────────────────
 require('./jobs/analyticsReport.job');
 require('./jobs/queue').analyticsReportQueue().add(
   { type: 'weekly-summary' },
   { repeat: { cron: '0 8 * * 1' }, jobId: 'analytics-weekly-report', removeOnComplete: true }
-);
+).catch(() => {});
 
 const app    = express();
 const server = http.createServer(app);
