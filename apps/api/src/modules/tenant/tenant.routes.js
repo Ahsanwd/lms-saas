@@ -7,7 +7,7 @@ const { upload } = require('../../services/storage/storage.service');
 // All tenant routes require authentication
 router.use(authenticate);
 
-router.get('/', requirePermission('settings:read'), ctrl.getMyTenant);
+router.get('/', ctrl.getMyTenant); // all authenticated users need basic tenant info (branding)
 router.patch('/settings', requirePermission('settings:manage'), ctrl.updateSettings);
 router.get('/plan', requirePermission('settings:read'), ctrl.getPlanInfo);
 router.get('/storage', requirePermission('settings:read'), ctrl.getStorageUsage)
