@@ -1433,6 +1433,7 @@ const PPT_TYPES  = [
   'application/vnd.ms-powerpoint',
   'application/vnd.openxmlformats-officedocument.presentationml.presentation',
 ];
+const IMG_TYPES  = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml'];
 
 interface FileTokenData {
   token: string;
@@ -1534,6 +1535,48 @@ function SecureFileLesson({ lesson }: { lesson: Lesson }) {
         <div className="w-8 h-8 border-2 border-amber-300 border-t-amber-600 rounded-full animate-spin" />
         <p className="text-sm text-amber-700 font-medium">Document is being processed…</p>
         <p className="text-xs text-amber-600">This takes a few seconds. Refresh the page shortly.</p>
+      </div>
+    );
+  }
+
+  // ── Image — inline secure viewer with watermark ──
+  if (IMG_TYPES.includes(mime) || (!mime && /\.(jpe?g|png|webp|gif|svg)$/i.test(data.fileName ?? ''))) {
+    return (
+      <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-xl select-none bg-gray-900"
+        style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
+        onContextMenu={e => e.preventDefault()}>
+        <div className="flex items-center gap-3 px-4 py-2.5 bg-gray-800 border-b border-gray-700">
+          <span className="text-xs font-bold bg-purple-600 text-white px-2 py-0.5 rounded uppercase flex-shrink-0">IMG</span>
+          <span className="text-xs text-gray-300 truncate flex-1">{data.fileName}</span>
+          <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-900/50 border border-emerald-700/50 rounded-lg flex-shrink-0">
+            <svg className="w-3 h-3 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+            <span className="text-[10px] text-emerald-400 font-semibold">Protected</span>
+          </div>
+        </div>
+        <div className="relative flex justify-center items-center p-4 bg-gray-800" style={{ minHeight: '60vh' }}>
+          {/* Tiled watermark */}
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-10 overflow-hidden">
+            {Array.from({ length: 30 }).map((_, i) => (
+              <div key={i} className="absolute whitespace-nowrap text-white font-semibold"
+                style={{
+                  fontSize: '13px', opacity: 0.08,
+                  top:  `${(i % 6) * 120 - 20}px`,
+                  left: `${Math.floor(i / 6) * 300 - 60}px`,
+                  transform: 'rotate(-20deg)', letterSpacing: '0.05em',
+                }}>
+                {name}  •  {email}
+              </div>
+            ))}
+          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={serveUrl} alt={data.fileName} className="relative z-0 max-w-full max-h-[65vh] object-contain rounded-lg shadow-2xl"
+            draggable={false} onContextMenu={e => e.preventDefault()} />
+        </div>
+        <div className="px-4 py-2 bg-gray-900 border-t border-gray-700 text-center">
+          <p className="text-xs text-gray-500">🔒 This image is protected. Right-click and downloading are disabled.</p>
+        </div>
       </div>
     );
   }
