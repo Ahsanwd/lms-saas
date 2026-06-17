@@ -42,20 +42,15 @@ interface LessonModalProps {
   onSaved: () => void;
 }
 
-type VideoSource = 'upload' | 'youtube' | 'vimeo' | 'bunny' | 'cloudflare' | 'external' | 'embed';
+type VideoSource = 'youtube' | 'vimeo' | 'upload' | 'bunny' | 'cloudflare' | 'external' | 'embed';
 type AudioSource = 'upload' | 'external' | 'soundcloud' | 'spotify' | 'embed';
 type FileSource  = 'upload' | 'external' | 'gdrive' | 'dropbox' | 'onedrive' | 'embed';
 
 function inferVideoSource(lesson: LessonModalProps['lesson']): VideoSource {
-  if (!lesson?.video) return 'upload';
+  if (!lesson?.video) return 'youtube';
   const p = lesson.video.provider;
-  if (p === 'youtube') return 'youtube';
   if (p === 'vimeo') return 'vimeo';
-  if (p === 'bunny') return 'bunny';
-  if (p === 'cloudflare') return 'cloudflare';
-  if (p === 'external') return 'external';
-  if (p === 'embed') return 'embed';
-  return 'upload';
+  return 'youtube';
 }
 
 function inferAudioSource(lesson: LessonModalProps['lesson']): AudioSource {
@@ -233,14 +228,9 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
       };
     }
     if (type === 'video') {
-      const providerMap: Record<VideoSource, string> = {
-        upload: 'local', youtube: 'youtube', vimeo: 'vimeo',
-        bunny: 'bunny', cloudflare: 'cloudflare', external: 'external', embed: 'embed',
-      };
       payload.video = {
-        provider: providerMap[videoSource],
-        url: videoSource !== 'upload' && videoSource !== 'embed' ? (videoUrl || null) : undefined,
-        embedCode: videoSource === 'embed' ? (videoEmbedCode || null) : undefined,
+        provider: videoSource,
+        url: videoUrl || null,
         durationSeconds: videoDuration ? Number(videoDuration) : undefined,
         settings: { watermarkEnabled, watermarkText: watermarkText || null, disableDownload, allowSpeedControl },
       };
@@ -415,24 +405,19 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
               </div>
             )}
 
-            {/* ── Video multi-source ── */}
+            {/* ── Video source — YouTube & Vimeo only ── */}
             {type === 'video' && (
               <div className="space-y-4">
                 {/* Source selector */}
                 <div>
                   <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Video Source</label>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex gap-2">
                     {([
-                      { s: 'upload' as VideoSource,     label: 'Upload',       color: 'blue' },
-                      { s: 'youtube' as VideoSource,    label: 'YouTube',      color: 'red' },
-                      { s: 'vimeo' as VideoSource,      label: 'Vimeo',        color: 'sky' },
-                      { s: 'bunny' as VideoSource,      label: 'Bunny Stream', color: 'orange' },
-                      { s: 'cloudflare' as VideoSource, label: 'Cloudflare',   color: 'amber' },
-                      { s: 'external' as VideoSource,   label: 'External URL', color: 'violet' },
-                      { s: 'embed' as VideoSource,      label: 'Embed Code',   color: 'gray' },
+                      { s: 'youtube' as VideoSource, label: 'YouTube' },
+                      { s: 'vimeo'   as VideoSource, label: 'Vimeo'   },
                     ]).map(({ s, label }) => (
-                      <button key={s} type="button" onClick={() => { setVideoSource(s); setSelectedFile(null); }}
-                        className={cn('px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all',
+                      <button key={s} type="button" onClick={() => setVideoSource(s)}
+                        className={cn('px-5 py-1.5 rounded-full text-xs font-semibold border transition-all',
                           videoSource === s
                             ? 'bg-primary-600 text-white border-primary-600 shadow-sm'
                             : 'bg-white text-gray-500 border-gray-200 hover:border-primary-300 hover:text-primary-600')}>
@@ -442,96 +427,34 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
                   </div>
                 </div>
 
-                {/* Upload zone */}
-                {videoSource === 'upload' && (
+                {/* URL input */}
+                <div className="space-y-3">
                   <div>
-                    <input ref={fileInputRef} type="file" accept="video/*" className="hidden"
-                      onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)} />
-                    <button type="button" onClick={() => fileInputRef.current?.click()}
-                      className={cn('w-full rounded-2xl border-2 border-dashed py-8 text-center transition-all',
-                        selectedFile ? 'border-primary-400 bg-primary-50' : 'border-gray-200 bg-gray-50 hover:border-primary-300 hover:bg-primary-50/30')}>
-                      {selectedFile ? (
-                        <div className="flex flex-col items-center gap-1">
-                          <div className="w-10 h-10 rounded-xl bg-primary-100 flex items-center justify-center mb-1">
-                            <svg className="w-5 h-5 text-primary-600" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                          </div>
-                          <p className="text-sm font-semibold text-primary-700">{selectedFile.name}</p>
-                          <p className="text-xs text-gray-400">{(selectedFile.size / 1024 / 1024).toFixed(1)} MB · click to change</p>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center gap-2">
-                          <div className="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center mb-1">
-                            <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                            </svg>
-                          </div>
-                          <p className="text-sm font-semibold text-gray-600">Drop video here or click to browse</p>
-                          <p className="text-xs text-gray-400">MP4, MOV, WebM, AVI — up to 2 GB</p>
-                        </div>
-                      )}
-                    </button>
-                    {isEdit && lesson?.video?.url && !selectedFile && (
-                      <p className="text-xs text-green-600 mt-2 flex items-center gap-1">
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg>
-                        Video uploaded — select to replace
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {/* URL / embed inputs */}
-                {videoSource !== 'upload' && (
-                  <div className="space-y-3">
-                    {videoSource === 'embed' ? (
-                      <div>
-                        <label className="block text-xs font-semibold text-gray-500 mb-1.5">Embed Code <span className="font-normal text-gray-400">(HTML)</span></label>
-                        <textarea rows={4} value={videoEmbedCode} onChange={e => setVideoEmbedCode(e.target.value)}
-                          placeholder={'<iframe src="..." allow="autoplay" allowfullscreen></iframe>'}
-                          className="w-full px-4 py-3 text-xs border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none font-mono bg-gray-900 text-green-400 placeholder-gray-600" />
-                        <p className="text-xs text-gray-400 mt-1.5">Paste raw iframe from any platform — Loom, Wistia, custom CDN, etc.</p>
-                      </div>
-                    ) : (
-                      <div>
-                        <label className="block text-xs font-semibold text-gray-500 mb-1.5">
-                          {videoSource === 'youtube' ? 'YouTube URL or Video ID'
-                            : videoSource === 'vimeo' ? 'Vimeo URL or Video ID'
-                            : videoSource === 'bunny' ? 'Bunny Stream Embed URL'
-                            : videoSource === 'cloudflare' ? 'Cloudflare Stream URL'
-                            : 'Direct Video URL'}
-                        </label>
-                        <div className="relative">
-                          <input type="text" value={videoUrl} onChange={e => setVideoUrl(e.target.value)}
-                            placeholder={
-                              videoSource === 'youtube' ? 'https://www.youtube.com/watch?v=...'
-                              : videoSource === 'vimeo' ? 'https://vimeo.com/123456789'
-                              : videoSource === 'bunny' ? 'https://iframe.mediadelivery.net/embed/LIBRARY/VIDEO_ID'
-                              : videoSource === 'cloudflare' ? 'https://customer-xxx.cloudflarestream.com/ID/iframe'
-                              : 'https://example.com/video.mp4'
-                            }
-                            className="w-full pl-4 pr-10 py-3 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 bg-gray-50" />
-                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
-                          </span>
-                        </div>
-                        <p className="text-xs text-gray-400 mt-1.5">
-                          {videoSource === 'bunny' ? 'Get from Bunny Stream → Video → Share → Embed URL'
-                            : videoSource === 'cloudflare' ? 'Copy the iframe src from Cloudflare Stream dashboard'
-                            : videoSource === 'external' ? 'Any public MP4, WebM, or HLS (.m3u8) URL'
-                            : 'Paste the full URL or just the video ID'}
-                        </p>
-                      </div>
-                    )}
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-semibold text-gray-500 mb-1.5">Duration <span className="font-normal text-gray-400">(seconds, optional)</span></label>
-                        <input type="number" min={0} value={videoDuration} onChange={e => setVideoDuration(e.target.value)}
-                          placeholder="e.g. 3600"
-                          className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 bg-gray-50" />
-                      </div>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1.5">
+                      {videoSource === 'youtube' ? 'YouTube URL or Video ID' : 'Vimeo URL or Video ID'}
+                    </label>
+                    <div className="relative">
+                      <input type="text" value={videoUrl} onChange={e => setVideoUrl(e.target.value)}
+                        placeholder={
+                          videoSource === 'youtube'
+                            ? 'https://www.youtube.com/watch?v=...'
+                            : 'https://vimeo.com/123456789'
+                        }
+                        className="w-full pl-4 pr-10 py-3 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 bg-gray-50" />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+                      </span>
                     </div>
+                    <p className="text-xs text-gray-400 mt-1.5">Paste the full URL or just the video ID</p>
                   </div>
-                )}
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1.5">Duration <span className="font-normal text-gray-400">(seconds, optional)</span></label>
+                    <input type="number" min={0} value={videoDuration} onChange={e => setVideoDuration(e.target.value)}
+                      placeholder="e.g. 3600"
+                      className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 bg-gray-50" />
+                  </div>
+                </div>
 
                 {/* Protection & Controls */}
                 <div className="rounded-2xl border border-gray-100 bg-gray-50 overflow-hidden">
