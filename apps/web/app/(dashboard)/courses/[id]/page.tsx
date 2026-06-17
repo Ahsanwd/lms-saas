@@ -688,110 +688,44 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
               </div>
             )}
 
-            {/* ── File / PDF multi-source ── */}
+            {/* ── File / PDF upload ── */}
             {type === 'file' && (
               <div className="space-y-4">
-                {/* Source selector */}
+                {/* Upload zone — PDF and Word only */}
                 <div>
-                  <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">File Source</label>
-                  <div className="flex flex-wrap gap-2">
-                    {([
-                      { s: 'upload'   as FileSource, label: 'Upload',        icon: '⬆' },
-                      { s: 'external' as FileSource, label: 'External URL',  icon: '🔗' },
-                      { s: 'gdrive'   as FileSource, label: 'Google Drive',  icon: '📁' },
-                      { s: 'dropbox'  as FileSource, label: 'Dropbox',       icon: '📦' },
-                      { s: 'onedrive' as FileSource, label: 'OneDrive',      icon: '☁' },
-                      { s: 'embed'    as FileSource, label: 'Embed / Viewer', icon: '‹›' },
-                    ]).map(({ s, label, icon }) => (
-                      <button key={s} type="button" onClick={() => { setFileSource(s); setSelectedFile(null); }}
-                        className={cn('flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all',
-                          fileSource === s
-                            ? 'bg-orange-500 text-white border-orange-500 shadow-sm'
-                            : 'bg-white text-gray-500 border-gray-200 hover:border-orange-300 hover:text-orange-600')}>
-                        <span>{icon}</span><span>{label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Upload zone */}
-                {fileSource === 'upload' && (
-                  <div>
-                    <input ref={fileInputRef} type="file" className="hidden"
-                      onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)} />
-                    <button type="button" onClick={() => fileInputRef.current?.click()}
-                      className={cn('w-full rounded-2xl border-2 border-dashed py-8 text-center transition-all',
-                        selectedFile ? 'border-orange-400 bg-orange-50' : 'border-gray-200 bg-gray-50 hover:border-orange-300 hover:bg-orange-50/30')}>
-                      <div className="flex flex-col items-center gap-2">
-                        {selectedFile ? (
-                          <>
-                            <div className="w-12 h-12 rounded-2xl bg-orange-100 flex items-center justify-center mb-1">
-                              <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
-                            </div>
-                            <p className="text-sm font-semibold text-orange-700">{selectedFile.name}</p>
-                            <p className="text-xs text-gray-400">{(selectedFile.size / 1024).toFixed(0)} KB · click to change</p>
-                          </>
-                        ) : (
-                          <>
-                            <div className="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center mb-1">
-                              <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
-                            </div>
-                            <p className="text-sm font-semibold text-gray-600">Drop file or click to browse</p>
-                            <p className="text-xs text-gray-400">PDF, DOCX, XLSX, ZIP, images — any format</p>
-                          </>
-                        )}
-                      </div>
-                    </button>
-                    {isEdit && lesson?.file?.url && !selectedFile && (
-                      <p className="text-xs text-green-600 mt-2 flex items-center gap-1">
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg>
-                        {lesson.file.name ?? 'File uploaded'} — select to replace
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {/* Embed Code */}
-                {fileSource === 'embed' && (
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 mb-1.5">Embed / Viewer Code <span className="font-normal text-gray-400">(HTML)</span></label>
-                    <textarea rows={4} value={fileEmbedCode} onChange={e => setFileEmbedCode(e.target.value)}
-                      placeholder={'<iframe src="https://docs.google.com/..." ...></iframe>'}
-                      className="w-full px-4 py-3 text-xs border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none font-mono bg-gray-900 text-green-400 placeholder-gray-600" />
-                    <p className="text-xs text-gray-400 mt-1.5">Paste Google Docs viewer, Scribd, SlideShare, or any iframe embed</p>
-                  </div>
-                )}
-
-                {/* URL-based sources */}
-                {(fileSource === 'external' || fileSource === 'gdrive' || fileSource === 'dropbox' || fileSource === 'onedrive') && (
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 mb-1.5">
-                      {fileSource === 'gdrive'   ? 'Google Drive Share Link'
-                        : fileSource === 'dropbox'  ? 'Dropbox Share Link'
-                        : fileSource === 'onedrive' ? 'OneDrive Share Link'
-                        : 'Direct File URL'}
-                    </label>
-                    <div className="relative">
-                      <input type="text" value={fileUrl} onChange={e => setFileUrl(e.target.value)}
-                        placeholder={
-                          fileSource === 'gdrive'   ? 'https://drive.google.com/file/d/...'
-                          : fileSource === 'dropbox'  ? 'https://www.dropbox.com/s/...'
-                          : fileSource === 'onedrive' ? 'https://1drv.ms/b/...'
-                          : 'https://example.com/document.pdf'
-                        }
-                        className="w-full pl-4 pr-10 py-3 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 bg-gray-50" />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300">
-                        {fileSource === 'gdrive' ? '📁' : fileSource === 'dropbox' ? '📦' : fileSource === 'onedrive' ? '☁' : '🔗'}
-                      </span>
+                  <input ref={fileInputRef} type="file" className="hidden"
+                    accept=".pdf,application/pdf,.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)} />
+                  <button type="button" onClick={() => fileInputRef.current?.click()}
+                    className={cn('w-full rounded-2xl border-2 border-dashed py-8 text-center transition-all',
+                      selectedFile ? 'border-orange-400 bg-orange-50' : 'border-gray-200 bg-gray-50 hover:border-orange-300 hover:bg-orange-50/30')}>
+                    <div className="flex flex-col items-center gap-2">
+                      {selectedFile ? (
+                        <>
+                          <div className="w-12 h-12 rounded-2xl bg-orange-100 flex items-center justify-center mb-1">
+                            <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                          </div>
+                          <p className="text-sm font-semibold text-orange-700">{selectedFile.name}</p>
+                          <p className="text-xs text-gray-400">{(selectedFile.size / 1024).toFixed(0)} KB · click to change</p>
+                        </>
+                      ) : (
+                        <>
+                          <div className="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center mb-1">
+                            <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                          </div>
+                          <p className="text-sm font-semibold text-gray-600">Click to upload PDF or Word document</p>
+                          <p className="text-xs text-gray-400">Supported: PDF (.pdf) · Word (.doc, .docx) — Max 50 MB</p>
+                        </>
+                      )}
                     </div>
-                    <p className="text-xs text-gray-400 mt-1.5">
-                      {fileSource === 'gdrive'   ? 'Set sharing to "Anyone with the link can view" in Google Drive'
-                        : fileSource === 'dropbox'  ? 'Use a Dropbox "Copy link" shared URL'
-                        : fileSource === 'onedrive' ? 'Use the "Share" → "Copy link" URL from OneDrive'
-                        : 'Any publicly accessible file URL (PDF, DOCX, ZIP, etc.)'}
+                  </button>
+                  {isEdit && lesson?.file?.url && !selectedFile && (
+                    <p className="text-xs text-green-600 mt-2 flex items-center gap-1">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg>
+                      {lesson.file.name ?? 'File uploaded'} — click above to replace
                     </p>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             )}
 
