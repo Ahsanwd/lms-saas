@@ -283,10 +283,11 @@ router.post('/:id/lessons/:lessonId/video',
 router.post('/:id/lessons/:lessonId/audio',
   requirePermission('course:update'),
   guardStorageLimit(),
-  upload('attachment').single('audio'),
+  upload('audio').single('audio'),
   trackUpload(),
   ctrl.uploadAudio
 );
+router.get('/:id/lessons/:lessonId/audio-token', requirePermission('course:read'), ctrl.audioToken);
 router.post('/:id/lessons/:lessonId/file',
   requirePermission('course:update'),
   guardStorageLimit(),

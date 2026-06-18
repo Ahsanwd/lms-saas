@@ -522,6 +522,37 @@ async function cfStreamToken(req, res, next) {
   } catch (err) { next(err); }
 }
 
+// ── Audio Signed-URL Token (R2 enrollment-gated playback) ────────────────────
+async function audioToken(req, res, next) {
+  try {
+    const { tenantId }            = req.tenant;
+    const { id: courseId, lessonId } = req.params;
+
+    const Lesson     = require('../../database/models/Lesson.model');
+    const Enrollment = require('../../database/models/Enrollment.model');
+
+    const lesson = await Lesson.findOne({ _id: lessonId, tenantId, deletedAt: null }).lean();
+    if (!lesson?.audio?.url) return R.error(res, 'Lesson audio not found', 404);
+
+    // Only local/R2-hosted audio gets signed — external URLs pass through
+    if (lesson.audio.provider !== 'local' && lesson.audio.provider !== 's3') {
+      return R.success(res, { signedUrl: lesson.audio.url, signed: false });
+    }
+
+    // Students must be enrolled
+    if (req.user.role === 'student') {
+      const enrolled = await Enrollment.findOne({
+        tenantId, courseId, userId: req.user.sub, status: 'active',
+      }).lean();
+      if (!enrolled) return R.error(res, 'Not enrolled in this course', 403);
+    }
+
+    const { generatePresignedGetUrl } = require('../../services/storage/storage.service');
+    const signedUrl = await generatePresignedGetUrl(lesson.audio.url, 7200); // 2-hour window
+    R.success(res, { signedUrl, signed: true, expiresIn: 7200 });
+  } catch (err) { next(err); }
+}
+
 async function importScorm(req, res, next) {
   try {
     if (!req.file) return R.error(res, 'SCORM .zip file required', 400);
@@ -540,6 +571,7 @@ module.exports = {
   getLessons, createLesson, updateLesson, uploadVideo, uploadAudio, uploadFile, addAttachment,
   removeAttachment, deleteLesson, reorderLessons,
   getLessonQuiz, createLessonQuiz, detachLessonQuiz,
+  audioToken,
   presignVideoUpload,
   importScorm,
   cfStreamUploadUrl, cfStreamConfirm, cfStreamStatus, cfStreamToken,

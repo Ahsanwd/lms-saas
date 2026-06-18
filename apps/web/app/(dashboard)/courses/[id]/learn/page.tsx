@@ -1043,8 +1043,21 @@ function WatermarkOverlay({ text }: { text: string }) {
 }
 
 // ── Audio Player ─────────────────────────────────────────────────────────────
-function AudioPlayer({ lesson }: { lesson: Lesson }) {
+function AudioPlayer({ lesson, courseId }: { lesson: Lesson; courseId: string }) {
   const au = lesson.audio;
+
+  // Fetch a signed R2 URL for locally-hosted audio (enrollment-gated, 2h window)
+  const isHosted = au?.provider === 'local' || au?.provider === 's3';
+  const { data: tokenData, isLoading: tokenLoading, isError: tokenError } = useQuery<{ signedUrl: string }>({
+    queryKey: ['audio-token', lesson._id],
+    queryFn: async () => {
+      const { data } = await api.get(`/courses/${courseId}/lessons/${lesson._id}/audio-token`);
+      return data.data;
+    },
+    enabled: !!au && isHosted,
+    staleTime: 50 * 60 * 1000, // refresh well before 2h expiry
+    retry: 1,
+  });
 
   const empty = (
     <div className="bg-gray-50 border border-dashed border-gray-200 rounded-2xl flex flex-col items-center justify-center py-16 text-center">
@@ -1143,27 +1156,48 @@ function AudioPlayer({ lesson }: { lesson: Lesson }) {
     );
   }
 
-  // ── Self-hosted / External URL — native HTML5 player ──
-  if ((au.provider === 'local' || au.provider === 's3' || au.provider === 'external') && au.url) {
+  // ── Self-hosted (R2/local) — signed URL, enrollment-gated ──
+  if ((au.provider === 'local' || au.provider === 's3') && au.url) {
+    if (tokenLoading) return (
+      <div className="rounded-2xl overflow-hidden border border-purple-100 shadow-sm">
+        <Header />
+        <div className="bg-white px-6 py-8 flex items-center justify-center gap-3 text-sm text-gray-400">
+          <Spinner size="sm" /> Loading audio…
+        </div>
+      </div>
+    );
+    if (tokenError || !tokenData?.signedUrl) return (
+      <div className="rounded-2xl overflow-hidden border border-red-100 shadow-sm">
+        <Header />
+        <div className="bg-white px-6 py-6 text-center text-sm text-red-500">
+          Could not load audio. Please refresh the page.
+        </div>
+      </div>
+    );
     return (
       <div className="rounded-2xl overflow-hidden border border-purple-100 shadow-sm">
         <Header />
-        <div className="bg-white px-6 py-5 space-y-3">
+        <div className="bg-white px-6 py-5">
           <audio
-            src={au.url}
+            key={tokenData.signedUrl}
+            src={tokenData.signedUrl}
             controls
+            controlsList="nodownload"
             className="w-full"
             style={{ accentColor: '#7c3aed' }}
           />
-          <div className="flex justify-end">
-            <a href={au.url} download target="_blank" rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-xs text-purple-600 hover:text-purple-800 font-medium transition-colors">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-              </svg>
-              Download audio
-            </a>
-          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── External URL — native HTML5 player (no signing, not our file) ──
+  if (au.provider === 'external' && au.url) {
+    return (
+      <div className="rounded-2xl overflow-hidden border border-purple-100 shadow-sm">
+        <Header />
+        <div className="bg-white px-6 py-5">
+          <audio src={au.url} controls className="w-full" style={{ accentColor: '#7c3aed' }} />
         </div>
       </div>
     );
@@ -1711,7 +1745,7 @@ function LessonContent({ lesson }: { lesson: Lesson }) {
   }
 
   if (lesson.type === 'audio') {
-    return <AudioPlayer lesson={lesson} />;
+    return <AudioPlayer lesson={lesson} courseId={lesson.courseId} />;
   }
 
   if (lesson.type === 'file') {

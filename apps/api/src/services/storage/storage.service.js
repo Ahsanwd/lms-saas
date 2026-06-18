@@ -9,8 +9,9 @@ const UPLOAD_ROOT = path.resolve(config.storage.localPath || './uploads');
 const USE_S3      = config.storage.driver === 's3';
 
 const ALLOWED_TYPES = {
-  thumbnail: ['image/jpeg', 'image/png', 'image/webp'],
-  video:     ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime'],
+  thumbnail:  ['image/jpeg', 'image/png', 'image/webp'],
+  video:      ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime'],
+  audio:      ['audio/mpeg', 'audio/mp4', 'audio/ogg', 'audio/wav', 'audio/webm', 'audio/aac', 'audio/flac', 'audio/x-m4a'],
   chat: [
     'image/jpeg', 'image/png', 'image/webp', 'image/gif',
     'application/pdf',
@@ -46,6 +47,7 @@ function getPerTypeLimit(mimetype) {
 const MAX_SIZE = {
   thumbnail:  5   * 1024 * 1024,
   video:      2   * 1024 * 1024 * 1024,
+  audio:      500 * 1024 * 1024,
   attachment: 100 * 1024 * 1024, // global ceiling; per-type limits enforced in service
   chat:       10  * 1024 * 1024,
 };
@@ -216,6 +218,31 @@ function getFileSizeBytes(fileRef) {
   } catch { return 0; }
 }
 
+// ── Extract R2 key from a stored URL ─────────────────────────────────────────
+
+function extractR2Key(url) {
+  if (!url) return null;
+  const s3  = config.storage.s3;
+  const base = s3.cdnUrl || `${s3.endpoint}/${s3.bucket}`;
+  if (!url.startsWith(base)) return null;
+  return url.slice(base.length + 1);
+}
+
+// ── Presigned GET URL (time-limited read access for enrolled students) ────────
+
+async function generatePresignedGetUrl(url, expiresIn = 7200) {
+  if (!USE_S3) return url; // local dev: just return the URL as-is
+  const key = extractR2Key(url);
+  if (!key) return url;    // external URL — return as-is
+  const { GetObjectCommand } = require('@aws-sdk/client-s3');
+  const { getSignedUrl }     = require('@aws-sdk/s3-request-presigner');
+  return getSignedUrl(
+    getS3Client(),
+    new GetObjectCommand({ Bucket: config.storage.s3.bucket, Key: key }),
+    { expiresIn },
+  );
+}
+
 // ── Presigned upload URL (large video direct-to-R2 from browser) ──────────────
 
 async function generatePresignedUploadUrl(key, mimetype, expiresIn = 3600) {
@@ -245,6 +272,7 @@ module.exports = {
   deleteFile,
   getFileSizeBytes,
   generatePresignedUploadUrl,
+  generatePresignedGetUrl,
   getPerTypeLimit,
   USE_S3,
   UPLOAD_ROOT,
