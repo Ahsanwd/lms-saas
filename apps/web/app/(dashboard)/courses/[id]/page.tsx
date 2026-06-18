@@ -709,59 +709,127 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
                   </div>
                 </div>
 
-                {/* Security guide — shown below selector, changes per source */}
+                {/* Security + How-to guide — changes per source */}
                 {audioSource === 'upload' && (
-                  <div className="flex items-start gap-3 rounded-xl bg-green-50 border border-green-200 px-4 py-3">
-                    <svg className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
-                    </svg>
-                    <div>
-                      <p className="text-xs font-bold text-green-800">Secure &amp; Enrollment-Gated</p>
-                      <p className="text-xs text-green-700 mt-0.5 leading-relaxed">Audio is stored on your private server. Students receive a temporary signed link (expires in 2 hours) — it cannot be shared or downloaded. Only enrolled students can access it.</p>
+                  <div className="rounded-xl bg-green-50 border border-green-200 overflow-hidden">
+                    <div className="flex items-start gap-3 px-4 py-3">
+                      <svg className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                      </svg>
+                      <div>
+                        <p className="text-xs font-bold text-green-800">🔒 Secure &amp; Enrollment-Gated — Recommended</p>
+                        <p className="text-xs text-green-700 mt-0.5 leading-relaxed">Audio is stored on your private server. Students get a signed link that expires in 2 hours — it cannot be shared, forwarded, or downloaded. Only enrolled students can access it.</p>
+                      </div>
+                    </div>
+                    <div className="border-t border-green-200 bg-green-100/50 px-4 py-3">
+                      <p className="text-[11px] font-bold text-green-800 uppercase tracking-wide mb-2">How to use</p>
+                      <ol className="space-y-1.5 text-xs text-green-800">
+                        <li className="flex gap-2"><span className="font-bold flex-shrink-0">1.</span><span>Record your lecture using any tool — <strong>Audacity</strong> (free), GarageBand, Zoom recording, or your phone's voice recorder.</span></li>
+                        <li className="flex gap-2"><span className="font-bold flex-shrink-0">2.</span><span>Export as <strong>MP3</strong> for the smallest file size, or <strong>WAV / M4A</strong> for higher quality.</span></li>
+                        <li className="flex gap-2"><span className="font-bold flex-shrink-0">3.</span><span>Click the upload zone below (or drag your file in). Supported: MP3, WAV, M4A, OGG, FLAC — up to 500 MB.</span></li>
+                        <li className="flex gap-2"><span className="font-bold flex-shrink-0">4.</span><span>Click <strong>Save Lesson</strong> — the file uploads automatically and is stored securely.</span></li>
+                        <li className="flex gap-2"><span className="font-bold flex-shrink-0">5.</span><span>Students will be served a private time-limited streaming link — no download button is shown.</span></li>
+                      </ol>
                     </div>
                   </div>
                 )}
+
                 {audioSource === 'external' && (
-                  <div className="flex items-start gap-3 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3">
-                    <svg className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-                    </svg>
-                    <div>
-                      <p className="text-xs font-bold text-amber-800">Public — No Enrollment Check</p>
-                      <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">This URL is publicly accessible. Anyone who finds the link can play the audio — the LMS cannot restrict it. Only use this for free/preview content. For paid courses, use <strong>Upload</strong> instead.</p>
+                  <div className="rounded-xl bg-amber-50 border border-amber-200 overflow-hidden">
+                    <div className="flex items-start gap-3 px-4 py-3">
+                      <svg className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                      </svg>
+                      <div>
+                        <p className="text-xs font-bold text-amber-800">⚠ Public — No Enrollment Check</p>
+                        <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">This URL is publicly accessible. Anyone who finds the link can play the audio — the LMS cannot restrict it. Only use this for free or preview content. For paid courses use <strong>Upload</strong> instead.</p>
+                      </div>
+                    </div>
+                    <div className="border-t border-amber-200 bg-amber-100/50 px-4 py-3">
+                      <p className="text-[11px] font-bold text-amber-800 uppercase tracking-wide mb-2">How to use</p>
+                      <ol className="space-y-1.5 text-xs text-amber-900">
+                        <li className="flex gap-2"><span className="font-bold flex-shrink-0">1.</span><span>Host your audio file on any public server or CDN — your own hosting, AWS S3, Cloudflare R2, Google Drive, or Dropbox.</span></li>
+                        <li className="flex gap-2"><span className="font-bold flex-shrink-0">2.</span><span>Get a <strong>direct file link</strong> that ends with the audio extension (e.g. <code className="bg-amber-200 px-1 rounded">https://mysite.com/lecture.mp3</code>) — not a webpage link.</span></li>
+                        <li className="flex gap-2"><span className="font-bold flex-shrink-0">3.</span><span>Test the URL in a new browser tab — if it plays or downloads directly, it will work here.</span></li>
+                        <li className="flex gap-2"><span className="font-bold flex-shrink-0">4.</span><span>Paste the URL in the field below and save.</span></li>
+                      </ol>
+                      <div className="mt-2.5 space-y-1 text-xs text-amber-800">
+                        <p className="font-semibold">Platform tips:</p>
+                        <p>• <strong>Google Drive:</strong> Share → "Anyone with link" → change <code className="bg-amber-200 px-1 rounded">open?id=</code> to <code className="bg-amber-200 px-1 rounded">uc?export=download&id=</code></p>
+                        <p>• <strong>Dropbox:</strong> Change <code className="bg-amber-200 px-1 rounded">?dl=0</code> to <code className="bg-amber-200 px-1 rounded">?dl=1</code> at the end of the link</p>
+                      </div>
                     </div>
                   </div>
                 )}
+
                 {audioSource === 'soundcloud' && (
-                  <div className="flex items-start gap-3 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3">
-                    <svg className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-                    </svg>
-                    <div>
-                      <p className="text-xs font-bold text-amber-800">Public — SoundCloud Controls Access</p>
-                      <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">SoundCloud embeds are publicly accessible. Anyone can find and play the track directly on SoundCloud — the LMS cannot add an enrollment gate. Best suited for free or preview content only.</p>
+                  <div className="rounded-xl bg-amber-50 border border-amber-200 overflow-hidden">
+                    <div className="flex items-start gap-3 px-4 py-3">
+                      <svg className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                      </svg>
+                      <div>
+                        <p className="text-xs font-bold text-amber-800">⚠ Public — SoundCloud Controls Access</p>
+                        <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">SoundCloud embeds are publicly accessible. Anyone can find and play the track directly on SoundCloud — the LMS cannot add an enrollment gate. Best for free or preview content only.</p>
+                      </div>
+                    </div>
+                    <div className="border-t border-amber-200 bg-amber-100/50 px-4 py-3">
+                      <p className="text-[11px] font-bold text-amber-800 uppercase tracking-wide mb-2">How to use</p>
+                      <ol className="space-y-1.5 text-xs text-amber-900">
+                        <li className="flex gap-2"><span className="font-bold flex-shrink-0">1.</span><span>Go to <strong>soundcloud.com</strong> and log in. Upload your track via the Upload button at the top.</span></li>
+                        <li className="flex gap-2"><span className="font-bold flex-shrink-0">2.</span><span>In the track settings, set visibility to <strong>Public</strong> (not Private or Secret Link).</span></li>
+                        <li className="flex gap-2"><span className="font-bold flex-shrink-0">3.</span><span>Open the published track page and copy the URL from the browser address bar.</span></li>
+                        <li className="flex gap-2"><span className="font-bold flex-shrink-0">4.</span><span>Example URL format: <code className="bg-amber-200 px-1 rounded">https://soundcloud.com/yourname/track-name</code></span></li>
+                        <li className="flex gap-2"><span className="font-bold flex-shrink-0">5.</span><span>Paste the URL in the field below and save.</span></li>
+                      </ol>
                     </div>
                   </div>
                 )}
+
                 {audioSource === 'spotify' && (
-                  <div className="flex items-start gap-3 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3">
-                    <svg className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-                    </svg>
-                    <div>
-                      <p className="text-xs font-bold text-amber-800">Limited Playback — Spotify Account Required</p>
-                      <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">Spotify embeds play only a <strong>30-second preview</strong> for non-Spotify users. Full playback requires the student to have an active Spotify account and be logged in. Not suitable for paid course content — use <strong>Upload</strong> for full control.</p>
+                  <div className="rounded-xl bg-amber-50 border border-amber-200 overflow-hidden">
+                    <div className="flex items-start gap-3 px-4 py-3">
+                      <svg className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                      </svg>
+                      <div>
+                        <p className="text-xs font-bold text-amber-800">⚠ Limited Playback — Spotify Account Required</p>
+                        <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">Spotify embeds play only a <strong>30-second preview</strong> for users without a Spotify account. Full playback requires the student to be logged in to Spotify. Not suitable for paid course content.</p>
+                      </div>
+                    </div>
+                    <div className="border-t border-amber-200 bg-amber-100/50 px-4 py-3">
+                      <p className="text-[11px] font-bold text-amber-800 uppercase tracking-wide mb-2">How to use</p>
+                      <ol className="space-y-1.5 text-xs text-amber-900">
+                        <li className="flex gap-2"><span className="font-bold flex-shrink-0">1.</span><span>The track or episode must already be published on Spotify (via Spotify for Podcasters, DistroKid, or a podcast host).</span></li>
+                        <li className="flex gap-2"><span className="font-bold flex-shrink-0">2.</span><span>Find the track/episode on Spotify. Click the <strong>three dots (…)</strong> → <strong>Share</strong> → <strong>Copy Song Link</strong> (or Copy Episode Link).</span></li>
+                        <li className="flex gap-2"><span className="font-bold flex-shrink-0">3.</span><span>The link format looks like: <code className="bg-amber-200 px-1 rounded">https://open.spotify.com/track/...</code> or <code className="bg-amber-200 px-1 rounded">/episode/...</code></span></li>
+                        <li className="flex gap-2"><span className="font-bold flex-shrink-0">4.</span><span>Paste it in the field below and save.</span></li>
+                      </ol>
+                      <p className="mt-2 text-xs text-amber-800 font-medium">💡 Best used for publicly available podcast episodes or music — not for exclusive course content.</p>
                     </div>
                   </div>
                 )}
+
                 {audioSource === 'embed' && (
-                  <div className="flex items-start gap-3 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3">
-                    <svg className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-                    </svg>
-                    <div>
-                      <p className="text-xs font-bold text-amber-800">Public — Third-Party Controls Access</p>
-                      <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">Embed codes load content directly from a third-party platform. The LMS cannot enforce enrollment gating — access control is entirely up to that platform. Suitable for publicly shareable content only.</p>
+                  <div className="rounded-xl bg-amber-50 border border-amber-200 overflow-hidden">
+                    <div className="flex items-start gap-3 px-4 py-3">
+                      <svg className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                      </svg>
+                      <div>
+                        <p className="text-xs font-bold text-amber-800">⚠ Public — Third-Party Controls Access</p>
+                        <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">Embed codes load content from a third-party platform. The LMS cannot enforce enrollment gating — access depends entirely on that platform. Only use for publicly shareable content.</p>
+                      </div>
+                    </div>
+                    <div className="border-t border-amber-200 bg-amber-100/50 px-4 py-3">
+                      <p className="text-[11px] font-bold text-amber-800 uppercase tracking-wide mb-2">How to use</p>
+                      <ol className="space-y-1.5 text-xs text-amber-900">
+                        <li className="flex gap-2"><span className="font-bold flex-shrink-0">1.</span><span>Go to your podcast or audio hosting platform: <strong>Buzzsprout</strong>, <strong>Podbean</strong>, <strong>Transistor</strong>, <strong>Spreaker</strong>, <strong>Acast</strong>, <strong>Libsyn</strong>, etc.</span></li>
+                        <li className="flex gap-2"><span className="font-bold flex-shrink-0">2.</span><span>Open the episode or track you want to embed.</span></li>
+                        <li className="flex gap-2"><span className="font-bold flex-shrink-0">3.</span><span>Find the <strong>Share</strong> or <strong>Embed</strong> option (usually a <code className="bg-amber-200 px-1 rounded">&lt;/&gt;</code> icon).</span></li>
+                        <li className="flex gap-2"><span className="font-bold flex-shrink-0">4.</span><span>Copy the full <code className="bg-amber-200 px-1 rounded">&lt;iframe ...&gt;&lt;/iframe&gt;</code> embed code.</span></li>
+                        <li className="flex gap-2"><span className="font-bold flex-shrink-0">5.</span><span>Paste it in the text area below. Only use embed code from trusted platforms — raw HTML is rendered as-is.</span></li>
+                      </ol>
                     </div>
                   </div>
                 )}
