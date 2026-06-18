@@ -96,13 +96,14 @@ async function deleteVideo(accountId, apiToken, videoUid) {
 }
 
 // Generate a signed playback token (RS256 JWT) so only enrolled students can watch
+// CF Stream requires: kid in JWT *header*, sub=videoUid in payload
 function generateSignedToken(videoUid, signingKeyId, signingKeyEnc) {
   const pem = decrypt(signingKeyEnc);
   if (!pem) throw new Error('Cloudflare Stream signing key not configured');
   return jwt.sign(
-    { sub: videoUid, kid: signingKeyId },
+    { sub: videoUid },
     pem,
-    { algorithm: 'RS256', expiresIn: '1h' }
+    { algorithm: 'RS256', expiresIn: '1h', keyid: signingKeyId }
   );
 }
 

@@ -839,7 +839,7 @@ function CfStreamPlayer({ lesson, courseId, watermark, watermarkText }: {
     </div>
   );
 
-  const src = `https://cloudflarestream.com/${data.token}/iframe?autoplay=false&muted=false`;
+  const src = `https://iframe.videodelivery.net/${data.token}/iframe?autoplay=false&muted=false`;
   return (
     <div className="space-y-2">
       <div className="relative aspect-video w-full rounded-2xl overflow-hidden bg-black shadow-xl">
