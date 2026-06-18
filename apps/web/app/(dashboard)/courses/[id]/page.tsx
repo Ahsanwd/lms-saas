@@ -685,12 +685,12 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
                   <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Audio Source</label>
                   <div className="flex flex-wrap gap-2">
                     {([
-                      { s: 'upload' as AudioSource,     label: 'Upload',       icon: '⬆' },
-                      { s: 'external' as AudioSource,   label: 'External URL', icon: '🔗' },
-                      { s: 'soundcloud' as AudioSource, label: 'SoundCloud',   icon: '☁' },
-                      { s: 'spotify' as AudioSource,    label: 'Spotify',      icon: '🎧' },
-                      { s: 'embed' as AudioSource,      label: 'Embed Code',   icon: '‹›' },
-                    ]).map(({ s, label, icon }) => (
+                      { s: 'upload' as AudioSource,     label: 'Upload',       icon: '⬆', secure: true  },
+                      { s: 'external' as AudioSource,   label: 'External URL', icon: '🔗', secure: false },
+                      { s: 'soundcloud' as AudioSource, label: 'SoundCloud',   icon: '☁',  secure: false },
+                      { s: 'spotify' as AudioSource,    label: 'Spotify',      icon: '🎧', secure: false },
+                      { s: 'embed' as AudioSource,      label: 'Embed Code',   icon: '‹›', secure: false },
+                    ]).map(({ s, label, icon, secure }) => (
                       <button key={s} type="button" onClick={() => { setAudioSource(s); setSelectedFile(null); }}
                         className={cn('flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all',
                           audioSource === s
@@ -698,10 +698,73 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
                             : 'bg-white text-gray-500 border-gray-200 hover:border-purple-300 hover:text-purple-600')}>
                         <span>{icon}</span>
                         <span>{label}</span>
+                        <span className={cn('text-[9px] font-bold px-1.5 py-0.5 rounded-full ml-0.5',
+                          audioSource === s
+                            ? 'bg-white/20 text-white'
+                            : secure ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700')}>
+                          {secure ? '🔒' : '⚠'}
+                        </span>
                       </button>
                     ))}
                   </div>
                 </div>
+
+                {/* Security guide — shown below selector, changes per source */}
+                {audioSource === 'upload' && (
+                  <div className="flex items-start gap-3 rounded-xl bg-green-50 border border-green-200 px-4 py-3">
+                    <svg className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                    </svg>
+                    <div>
+                      <p className="text-xs font-bold text-green-800">Secure &amp; Enrollment-Gated</p>
+                      <p className="text-xs text-green-700 mt-0.5 leading-relaxed">Audio is stored on your private server. Students receive a temporary signed link (expires in 2 hours) — it cannot be shared or downloaded. Only enrolled students can access it.</p>
+                    </div>
+                  </div>
+                )}
+                {audioSource === 'external' && (
+                  <div className="flex items-start gap-3 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3">
+                    <svg className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                    </svg>
+                    <div>
+                      <p className="text-xs font-bold text-amber-800">Public — No Enrollment Check</p>
+                      <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">This URL is publicly accessible. Anyone who finds the link can play the audio — the LMS cannot restrict it. Only use this for free/preview content. For paid courses, use <strong>Upload</strong> instead.</p>
+                    </div>
+                  </div>
+                )}
+                {audioSource === 'soundcloud' && (
+                  <div className="flex items-start gap-3 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3">
+                    <svg className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                    </svg>
+                    <div>
+                      <p className="text-xs font-bold text-amber-800">Public — SoundCloud Controls Access</p>
+                      <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">SoundCloud embeds are publicly accessible. Anyone can find and play the track directly on SoundCloud — the LMS cannot add an enrollment gate. Best suited for free or preview content only.</p>
+                    </div>
+                  </div>
+                )}
+                {audioSource === 'spotify' && (
+                  <div className="flex items-start gap-3 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3">
+                    <svg className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                    </svg>
+                    <div>
+                      <p className="text-xs font-bold text-amber-800">Limited Playback — Spotify Account Required</p>
+                      <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">Spotify embeds play only a <strong>30-second preview</strong> for non-Spotify users. Full playback requires the student to have an active Spotify account and be logged in. Not suitable for paid course content — use <strong>Upload</strong> for full control.</p>
+                    </div>
+                  </div>
+                )}
+                {audioSource === 'embed' && (
+                  <div className="flex items-start gap-3 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3">
+                    <svg className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                    </svg>
+                    <div>
+                      <p className="text-xs font-bold text-amber-800">Public — Third-Party Controls Access</p>
+                      <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">Embed codes load content directly from a third-party platform. The LMS cannot enforce enrollment gating — access control is entirely up to that platform. Suitable for publicly shareable content only.</p>
+                    </div>
+                  </div>
+                )}
 
                 {/* Upload zone */}
                 {audioSource === 'upload' && (
