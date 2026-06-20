@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { getStripePromise } from '@/lib/stripe';
 import { PayPalScriptProvider, PayPalButtons, usePayPalScriptReducer } from '@paypal/react-paypal-js';
+import { MarkdownContent } from '@/components/ui/MarkdownContent';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -218,6 +219,7 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
   const [title, setTitle] = useState(lesson?.title ?? '');
   const [type, setType] = useState<LessonType>(lesson?.type ?? 'text');
   const [content, setContent] = useState(lesson?.content ?? '');
+  const [textEditorMode, setTextEditorMode] = useState<'write' | 'preview'>('write');
   const [isPreview, setIsPreview] = useState(lesson?.isPreview ?? false);
   const [isPublished, setIsPublished] = useState(lesson?.isPublished ?? false);
   const [discussionEnabled, setDiscussionEnabled] = useState(lesson?.discussionEnabled ?? false);
@@ -477,71 +479,155 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
             {/* ── Text content ── */}
             {type === 'text' && (
               <div className="rounded-2xl border border-indigo-100 overflow-hidden shadow-sm">
-                {/* Toolbar */}
+                {/* Top bar: Write/Preview tabs + toolbar */}
                 <div className="flex items-center gap-1 px-3 py-2 bg-indigo-50 border-b border-indigo-100">
-                  {[
-                    { label: 'B',  title: 'Bold',        style: 'font-bold text-sm' },
-                    { label: 'I',  title: 'Italic',       style: 'italic text-sm' },
-                    { label: 'U',  title: 'Underline',    style: 'underline text-sm' },
-                  ].map(({ label, title, style }) => (
-                    <button key={label} type="button" title={title}
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        const ta = document.getElementById('lesson-text-editor') as HTMLTextAreaElement;
-                        if (!ta) return;
-                        const { selectionStart: s, selectionEnd: e2, value: v } = ta;
-                        const wrap: Record<string, string> = { B: '**', I: '_', U: '__' };
-                        const m = wrap[label];
-                        const newVal = v.slice(0, s) + m + v.slice(s, e2) + m + v.slice(e2);
-                        setContent(newVal);
-                        setTimeout(() => { ta.setSelectionRange(s + m.length, e2 + m.length); ta.focus(); }, 0);
-                      }}
-                      className={cn('w-7 h-7 rounded-lg flex items-center justify-center text-indigo-600 hover:bg-indigo-100 transition-colors', style)}>
-                      {label}
+                  {/* Write / Preview tabs */}
+                  <div className="flex items-center gap-0.5 mr-2">
+                    <button type="button"
+                      onClick={() => setTextEditorMode('write')}
+                      className={cn('px-3 h-7 rounded-lg text-xs font-semibold transition-all',
+                        textEditorMode === 'write'
+                          ? 'bg-indigo-600 text-white shadow-sm'
+                          : 'text-indigo-500 hover:bg-indigo-100')}>
+                      Write
                     </button>
-                  ))}
+                    <button type="button"
+                      onClick={() => setTextEditorMode('preview')}
+                      className={cn('px-3 h-7 rounded-lg text-xs font-semibold transition-all',
+                        textEditorMode === 'preview'
+                          ? 'bg-indigo-600 text-white shadow-sm'
+                          : 'text-indigo-500 hover:bg-indigo-100')}>
+                      Preview
+                    </button>
+                  </div>
                   <div className="w-px h-4 bg-indigo-200 mx-1" />
-                  {[
-                    { label: 'H1', title: 'Heading 1', prefix: '# ' },
-                    { label: 'H2', title: 'Heading 2', prefix: '## ' },
-                    { label: '• ', title: 'Bullet list', prefix: '- ' },
-                    { label: '1.', title: 'Numbered list', prefix: '1. ' },
-                  ].map(({ label, title, prefix }) => (
-                    <button key={label} type="button" title={title}
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        const ta = document.getElementById('lesson-text-editor') as HTMLTextAreaElement;
-                        if (!ta) return;
-                        const { selectionStart: s, value: v } = ta;
-                        const lineStart = v.lastIndexOf('\n', s - 1) + 1;
-                        const newVal = v.slice(0, lineStart) + prefix + v.slice(lineStart);
-                        setContent(newVal);
-                        setTimeout(() => { ta.setSelectionRange(s + prefix.length, s + prefix.length); ta.focus(); }, 0);
-                      }}
-                      className="px-2 h-7 rounded-lg flex items-center justify-center text-xs font-bold text-indigo-600 hover:bg-indigo-100 transition-colors">
-                      {label}
-                    </button>
-                  ))}
+
+                  {/* Formatting toolbar — only visible in Write mode */}
+                  {textEditorMode === 'write' && (
+                    <>
+                      {[
+                        { label: 'B', title: 'Bold (Ctrl+B)',      style: 'font-bold text-sm',   wrap: '**' },
+                        { label: 'I', title: 'Italic (Ctrl+I)',    style: 'italic text-sm',       wrap: '_'  },
+                        { label: 'U', title: 'Underline',          style: 'underline text-sm',    wrap: '__' },
+                      ].map(({ label, title, style, wrap }) => (
+                        <button key={label} type="button" title={title}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            const ta = document.getElementById('lesson-text-editor') as HTMLTextAreaElement;
+                            if (!ta) return;
+                            const { selectionStart: s, selectionEnd: e2, value: v } = ta;
+                            const selected = v.slice(s, e2);
+                            // Toggle: if already wrapped, unwrap; otherwise wrap
+                            const already = selected.startsWith(wrap) && selected.endsWith(wrap) && selected.length > wrap.length * 2;
+                            const newSelected = already ? selected.slice(wrap.length, selected.length - wrap.length) : wrap + selected + wrap;
+                            const newVal = v.slice(0, s) + newSelected + v.slice(e2);
+                            setContent(newVal);
+                            setTimeout(() => {
+                              ta.setSelectionRange(
+                                already ? s : s + wrap.length,
+                                already ? s + newSelected.length : s + wrap.length + selected.length
+                              );
+                              ta.focus();
+                            }, 0);
+                          }}
+                          className={cn('w-7 h-7 rounded-lg flex items-center justify-center text-indigo-600 hover:bg-indigo-100 transition-colors', style)}>
+                          {label}
+                        </button>
+                      ))}
+                      <div className="w-px h-4 bg-indigo-200 mx-1" />
+                      {[
+                        { label: 'H1', title: 'Heading 1', prefix: '# '  },
+                        { label: 'H2', title: 'Heading 2', prefix: '## ' },
+                        { label: '•',  title: 'Bullet list',   prefix: '- '  },
+                        { label: '1.', title: 'Numbered list', prefix: '1. ' },
+                        { label: '❝',  title: 'Blockquote',    prefix: '> '  },
+                        { label: '<>', title: 'Inline code',   prefix: '`', suffix: '`' },
+                      ].map(({ label, title, prefix, suffix }) => (
+                        <button key={label} type="button" title={title}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            const ta = document.getElementById('lesson-text-editor') as HTMLTextAreaElement;
+                            if (!ta) return;
+                            const { selectionStart: s, selectionEnd: e2, value: v } = ta;
+                            const selected = v.slice(s, e2);
+                            let newVal: string;
+                            let newCursorStart: number;
+                            let newCursorEnd: number;
+                            if (suffix) {
+                              // inline wrap (code)
+                              newVal = v.slice(0, s) + prefix + selected + suffix + v.slice(e2);
+                              newCursorStart = s + prefix.length;
+                              newCursorEnd = s + prefix.length + selected.length;
+                            } else {
+                              // line prefix
+                              const lineStart = v.lastIndexOf('\n', s - 1) + 1;
+                              const currentLine = v.slice(lineStart, e2);
+                              const alreadyHas = currentLine.startsWith(prefix);
+                              if (alreadyHas) {
+                                newVal = v.slice(0, lineStart) + v.slice(lineStart + prefix.length);
+                                newCursorStart = Math.max(s - prefix.length, lineStart);
+                                newCursorEnd = Math.max(e2 - prefix.length, lineStart);
+                              } else {
+                                newVal = v.slice(0, lineStart) + prefix + v.slice(lineStart);
+                                newCursorStart = s + prefix.length;
+                                newCursorEnd = e2 + prefix.length;
+                              }
+                            }
+                            setContent(newVal);
+                            setTimeout(() => { ta.setSelectionRange(newCursorStart, newCursorEnd); ta.focus(); }, 0);
+                          }}
+                          className="px-2 h-7 rounded-lg flex items-center justify-center text-xs font-bold text-indigo-600 hover:bg-indigo-100 transition-colors">
+                          {label}
+                        </button>
+                      ))}
+                    </>
+                  )}
                   <div className="flex-1" />
-                  <span className="text-[10px] text-indigo-400 font-medium">Markdown supported</span>
+                  <span className="text-[10px] text-indigo-400 font-medium">Markdown</span>
                 </div>
 
-                {/* Editor */}
-                <textarea
-                  id="lesson-text-editor"
-                  rows={10}
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  placeholder={"Start writing your lesson...\n\nUse **bold**, _italic_, # Heading, - bullet lists, etc."}
-                  className="w-full px-5 py-4 text-sm text-gray-800 bg-white focus:outline-none resize-none leading-7 placeholder-gray-300"
-                  style={{ fontFamily: 'Georgia, serif', fontSize: '14px' }}
-                />
+                {/* Write mode: textarea */}
+                {textEditorMode === 'write' && (
+                  <textarea
+                    id="lesson-text-editor"
+                    rows={12}
+                    value={content}
+                    onChange={(e) => setContent(e.target.value)}
+                    onKeyDown={(e) => {
+                      // Tab inserts 2 spaces instead of moving focus
+                      if (e.key === 'Tab') {
+                        e.preventDefault();
+                        const ta = e.currentTarget;
+                        const { selectionStart: s, selectionEnd: e2, value: v } = ta;
+                        const newVal = v.slice(0, s) + '  ' + v.slice(e2);
+                        setContent(newVal);
+                        setTimeout(() => { ta.setSelectionRange(s + 2, s + 2); }, 0);
+                      }
+                    }}
+                    placeholder={"Start writing your lesson...\n\nUse **bold**, _italic_, # Heading 1, ## Heading 2\n- bullet list item\n1. numbered list item\n> blockquote"}
+                    className="w-full px-5 py-4 text-sm text-gray-800 bg-white focus:outline-none resize-none leading-7 placeholder-gray-300"
+                    style={{ fontFamily: 'Georgia, serif', fontSize: '14px', minHeight: '280px' }}
+                  />
+                )}
+
+                {/* Preview mode: rendered markdown */}
+                {textEditorMode === 'preview' && (
+                  <div className="px-6 py-5 min-h-[280px] bg-white">
+                    {content.trim() ? (
+                      <MarkdownContent content={content} />
+                    ) : (
+                      <p className="text-gray-300 italic text-sm">Nothing to preview yet — switch to Write and add some content.</p>
+                    )}
+                  </div>
+                )}
 
                 {/* Footer */}
                 <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-t border-gray-100">
-                  <span className="text-[10px] text-gray-400">{content.length} characters · {content.split(/\s+/).filter(Boolean).length} words</span>
+                  <span className="text-[10px] text-gray-400">
+                    {content.length} characters · {content.split(/\s+/).filter(Boolean).length} words
+                  </span>
                   {content.length > 0 && (
-                    <button type="button" onClick={() => setContent('')}
+                    <button type="button" onClick={() => { setContent(''); setTextEditorMode('write'); }}
                       className="text-[10px] text-gray-400 hover:text-red-400 transition-colors">
                       Clear
                     </button>

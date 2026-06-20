@@ -9,6 +9,7 @@ import { Button, Spinner } from '@/components/ui';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth.store';
 import type { Course, Section, Lesson } from '@/types';
+import { MarkdownContent } from '@/components/ui/MarkdownContent';
 
 const SecurePdfViewer = dynamic(() => import('@/components/viewer/SecurePdfViewer'), { ssr: false });
 const SecureDocViewer = dynamic(() => import('@/components/viewer/SecureDocViewer'), { ssr: false });
@@ -1729,12 +1730,7 @@ function LessonContent({ lesson }: { lesson: Lesson }) {
           <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Lesson Content</span>
         </div>
         <div className="px-6 py-6">
-          <div
-            className="text-gray-700 text-sm leading-8 whitespace-pre-wrap break-words"
-            style={{ fontFamily: 'Georgia, serif', fontSize: '15px', lineHeight: '1.9' }}
-          >
-            {lesson.content}
-          </div>
+          <MarkdownContent content={lesson.content} />
         </div>
       </div>
     );
