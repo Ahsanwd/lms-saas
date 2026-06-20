@@ -220,6 +220,12 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
   const [type, setType] = useState<LessonType>(lesson?.type ?? 'text');
   const [content, setContent] = useState(lesson?.content ?? '');
   const [textEditorMode, setTextEditorMode] = useState<'write' | 'preview'>('write');
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [imageTab, setImageTab] = useState<'upload' | 'url'>('upload');
+  const [imageUrl, setImageUrl] = useState('');
+  const [imageAlt, setImageAlt] = useState('');
+  const [imageUploading, setImageUploading] = useState(false);
+  const imageFileRef = useRef<HTMLInputElement>(null);
   const [isPreview, setIsPreview] = useState(lesson?.isPreview ?? false);
   const [isPublished, setIsPublished] = useState(lesson?.isPublished ?? false);
   const [discussionEnabled, setDiscussionEnabled] = useState(lesson?.discussionEnabled ?? false);
@@ -580,11 +586,140 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
                           {label}
                         </button>
                       ))}
+                      <div className="w-px h-4 bg-indigo-200 mx-1" />
+                      {/* Image upload button */}
+                      <button type="button" title="Insert image"
+                        onMouseDown={(e) => { e.preventDefault(); setShowImageModal(v => !v); setImageTab('upload'); setImageUrl(''); setImageAlt(''); }}
+                        className={cn('px-2 h-7 rounded-lg flex items-center justify-center text-indigo-600 hover:bg-indigo-100 transition-colors',
+                          showImageModal && 'bg-indigo-100')}>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                      </button>
                     </>
                   )}
                   <div className="flex-1" />
                   <span className="text-[10px] text-indigo-400 font-medium">Markdown</span>
                 </div>
+
+                {/* ── Image insert panel ── */}
+                {showImageModal && textEditorMode === 'write' && (
+                  <div className="border-b border-indigo-100 bg-indigo-50/60 px-4 py-3">
+                    {/* Tabs */}
+                    <div className="flex gap-1 mb-3">
+                      {(['upload', 'url'] as const).map(t => (
+                        <button key={t} type="button"
+                          onClick={() => setImageTab(t)}
+                          className={cn('px-3 py-1 rounded-lg text-xs font-semibold transition-all capitalize',
+                            imageTab === t ? 'bg-indigo-600 text-white' : 'text-indigo-500 hover:bg-indigo-100')}>
+                          {t === 'upload' ? 'Upload File' : 'Paste URL'}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Alt text */}
+                    <input
+                      type="text"
+                      placeholder="Alt text (optional)"
+                      value={imageAlt}
+                      onChange={e => setImageAlt(e.target.value)}
+                      className="w-full mb-2 px-3 py-1.5 text-xs rounded-lg border border-indigo-200 focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-white"
+                    />
+
+                    {imageTab === 'upload' && (
+                      <div className="flex items-center gap-2">
+                        <input ref={imageFileRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            setImageUploading(true);
+                            try {
+                              const fd = new FormData();
+                              fd.append('image', file);
+                              const res = await api.post(`/courses/${courseId}/content-images`, fd, {
+                                headers: { 'Content-Type': 'multipart/form-data' },
+                              });
+                              const url = res.data?.data?.url ?? '';
+                              if (!url) throw new Error('No URL returned');
+                              const alt = imageAlt || file.name.replace(/\.[^.]+$/, '');
+                              const markdown = `![${alt}](${url})`;
+                              const ta = document.getElementById('lesson-text-editor') as HTMLTextAreaElement;
+                              if (ta) {
+                                const { selectionStart: s, value: v } = ta;
+                                const newVal = v.slice(0, s) + markdown + v.slice(s);
+                                setContent(newVal);
+                                setTimeout(() => { ta.setSelectionRange(s + markdown.length, s + markdown.length); ta.focus(); }, 0);
+                              } else {
+                                setContent(c => c + '\n' + markdown + '\n');
+                              }
+                              setShowImageModal(false);
+                              toast.success('Image uploaded');
+                            } catch (err: any) {
+                              toast.error(err?.response?.data?.message ?? 'Upload failed');
+                            } finally {
+                              setImageUploading(false);
+                              if (imageFileRef.current) imageFileRef.current.value = '';
+                            }
+                          }}
+                        />
+                        <button type="button"
+                          onClick={() => imageFileRef.current?.click()}
+                          disabled={imageUploading}
+                          className="flex items-center gap-1.5 px-4 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-semibold hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+                          {imageUploading ? (
+                            <><svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg> Uploading…</>
+                          ) : (
+                            <><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg> Choose Image</>
+                          )}
+                        </button>
+                        <span className="text-[10px] text-gray-400">JPG, PNG, WebP, GIF · max 10 MB</span>
+                      </div>
+                    )}
+
+                    {imageTab === 'url' && (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="url"
+                          placeholder="https://example.com/image.jpg"
+                          value={imageUrl}
+                          onChange={e => setImageUrl(e.target.value)}
+                          className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-indigo-200 focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-white"
+                          onKeyDown={e => {
+                            if (e.key === 'Enter' && imageUrl.trim()) {
+                              const alt = imageAlt || 'image';
+                              const markdown = `![${alt}](${imageUrl.trim()})`;
+                              const ta = document.getElementById('lesson-text-editor') as HTMLTextAreaElement;
+                              if (ta) {
+                                const { selectionStart: s, value: v } = ta;
+                                setContent(v.slice(0, s) + markdown + v.slice(s));
+                              } else { setContent(c => c + '\n' + markdown + '\n'); }
+                              setShowImageModal(false);
+                            }
+                          }}
+                        />
+                        <button type="button"
+                          disabled={!imageUrl.trim()}
+                          onClick={() => {
+                            const alt = imageAlt || 'image';
+                            const markdown = `![${alt}](${imageUrl.trim()})`;
+                            const ta = document.getElementById('lesson-text-editor') as HTMLTextAreaElement;
+                            if (ta) {
+                              const { selectionStart: s, value: v } = ta;
+                              const newVal = v.slice(0, s) + markdown + v.slice(s);
+                              setContent(newVal);
+                              setTimeout(() => { ta.setSelectionRange(s + markdown.length, s + markdown.length); ta.focus(); }, 0);
+                            } else {
+                              setContent(c => c + '\n' + markdown + '\n');
+                            }
+                            setShowImageModal(false);
+                          }}
+                          className="px-4 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-semibold hover:bg-indigo-700 disabled:opacity-40 transition-colors">
+                          Insert
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Write mode: textarea */}
                 {textEditorMode === 'write' && (

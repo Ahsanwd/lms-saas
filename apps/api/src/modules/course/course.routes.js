@@ -247,6 +247,14 @@ router.post('/:id/thumbnail',
   trackUpload(),
   ctrl.uploadThumbnail
 );
+
+router.post('/:id/content-images',
+  requirePermission('course:update'),
+  guardStorageLimit(),
+  upload('content-image').single('image'),
+  trackUpload(),
+  ctrl.uploadContentImage
+);
 router.patch('/:id/publish', requirePermission('course:manage'), ctrl.publishCourse);
 router.patch('/:id/archive', requirePermission('course:manage'), ctrl.archiveCourse);
 router.post('/:id/clone',   requirePermission('course:create'),  guardCourseLimit(), ctrl.cloneCourse);

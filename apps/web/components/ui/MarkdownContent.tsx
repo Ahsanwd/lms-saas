@@ -93,6 +93,20 @@ export function MarkdownContent({ content, className }: MarkdownContentProps) {
               {children}
             </a>
           ),
+          img: ({ src, alt }) => (
+            <span className="block my-4">
+              <img
+                src={src}
+                alt={alt ?? ''}
+                className="max-w-full rounded-xl border border-gray-200 shadow-sm"
+                style={{ maxHeight: '480px', objectFit: 'contain' }}
+                loading="lazy"
+              />
+              {alt && (
+                <span className="block text-center text-xs text-gray-400 mt-1.5 italic">{alt}</span>
+              )}
+            </span>
+          ),
           hr: () => <hr className="my-6 border-gray-200" />,
           table: ({ children }) => (
             <div className="overflow-x-auto mb-4">

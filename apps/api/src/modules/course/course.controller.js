@@ -84,6 +84,15 @@ async function uploadThumbnail(req, res, next) {
   } catch (err) { next(err); }
 }
 
+async function uploadContentImage(req, res, next) {
+  try {
+    if (!req.file) return R.error(res, 'Image file required', 400);
+    const { getPublicUrl } = require('../../services/storage/storage.service');
+    const url = getPublicUrl(req.file.path);
+    R.success(res, { url }, 'Image uploaded');
+  } catch (err) { next(err); }
+}
+
 async function publishCourse(req, res, next) {
   try {
     const course = await courseService.publishCourse(req.tenant.tenantId, req.params.id, req.user);
@@ -565,7 +574,7 @@ async function importScorm(req, res, next) {
 
 module.exports = {
   listCategories, createCategory, updateCategory, deleteCategory,
-  listCourses, getCourse, createCourse, updateCourse, uploadThumbnail,
+  listCourses, getCourse, createCourse, updateCourse, uploadThumbnail, uploadContentImage,
   publishCourse, archiveCourse, deleteCourse, cloneCourse,
   getSections, createSection, updateSection, deleteSection, reorderSections,
   getLessons, createLesson, updateLesson, uploadVideo, uploadAudio, uploadFile, addAttachment,

@@ -9,9 +9,10 @@ const UPLOAD_ROOT = path.resolve(config.storage.localPath || './uploads');
 const USE_S3      = config.storage.driver === 's3';
 
 const ALLOWED_TYPES = {
-  thumbnail:  ['image/jpeg', 'image/png', 'image/webp'],
-  video:      ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime'],
-  audio:      ['audio/mpeg', 'audio/mp4', 'audio/ogg', 'audio/wav', 'audio/webm', 'audio/aac', 'audio/flac', 'audio/x-m4a'],
+  thumbnail:      ['image/jpeg', 'image/png', 'image/webp'],
+  'content-image':['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
+  video:          ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime'],
+  audio:          ['audio/mpeg', 'audio/mp4', 'audio/ogg', 'audio/wav', 'audio/webm', 'audio/aac', 'audio/flac', 'audio/x-m4a'],
   chat: [
     'image/jpeg', 'image/png', 'image/webp', 'image/gif',
     'application/pdf',
@@ -45,11 +46,12 @@ function getPerTypeLimit(mimetype) {
 }
 
 const MAX_SIZE = {
-  thumbnail:  5   * 1024 * 1024,
-  video:      2   * 1024 * 1024 * 1024,
-  audio:      500 * 1024 * 1024,
-  attachment: 100 * 1024 * 1024, // global ceiling; per-type limits enforced in service
-  chat:       10  * 1024 * 1024,
+  thumbnail:        5   * 1024 * 1024,
+  'content-image':  10  * 1024 * 1024,
+  video:            2   * 1024 * 1024 * 1024,
+  audio:            500 * 1024 * 1024,
+  attachment:       100 * 1024 * 1024,
+  chat:             10  * 1024 * 1024,
 };
 
 // ── Build S3Client (lazy singleton) ──────────────────────────────────────────
