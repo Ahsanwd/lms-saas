@@ -89,8 +89,9 @@ class R2StorageEngine {
   }
 
   _handleFile(req, file, cb) {
-    const ext = path.extname(file.originalname).toLowerCase();
-    const key = `${this.category}s/${uuidv4()}${ext}`;
+    const ext      = path.extname(file.originalname).toLowerCase();
+    const tenantId = req.user?.tenantId || 'shared';
+    const key      = `${this.category}s/${tenantId}/${uuidv4()}${ext}`;
 
     // Collect stream into buffer
     const chunks = [];

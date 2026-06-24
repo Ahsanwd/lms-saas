@@ -37,4 +37,10 @@ router.post(  '/cloudflare-stream',      requireRole('tenant_admin'), ctrl.saveC
 router.delete('/cloudflare-stream',      requireRole('tenant_admin'), ctrl.disconnectCfStream);
 router.post(  '/cloudflare-stream/test', requireRole('tenant_admin'), ctrl.testCfStreamConnection);
 
+// Bunny.net Stream BYOK (tenant admin only)
+router.get(   '/bunny-stream',      requireRole('tenant_admin'), ctrl.getBunnyStreamSettings);
+router.post(  '/bunny-stream',      requireRole('tenant_admin'), ctrl.saveBunnyStreamSettings);
+router.delete('/bunny-stream',      requireRole('tenant_admin'), ctrl.disconnectBunnyStream);
+router.post(  '/bunny-stream/test', requireRole('tenant_admin'), ctrl.testBunnyStreamConnection);
+
 module.exports = router;

@@ -92,6 +92,15 @@ const tenantSchema = new mongoose.Schema(
       signingKeyEnc:{ type: String,  default: null, select: false }, // AES-256 encrypted PEM
     },
 
+    // Per-tenant Bunny.net Stream integration
+    bunnyStream: {
+      enabled:         { type: Boolean, default: false },
+      libraryId:       { type: String,  default: null },
+      apiKeyEnc:       { type: String,  default: null, select: false }, // AES-256 encrypted
+      cdnHostname:     { type: String,  default: null },
+      tokenAuthKeyEnc: { type: String,  default: null, select: false }, // AES-256 encrypted, optional
+    },
+
     contactEmail: { type: String, required: true, lowercase: true },
     storageUsedBytes: { type: Number, default: 0 },
 

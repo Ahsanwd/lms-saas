@@ -213,6 +213,82 @@ async function testCfStreamConnection(req, res, next) {
   } catch (err) { next(err); }
 }
 
+// ── Bunny.net Stream BYOK ─────────────────────────────────────────────────────
+async function getBunnyStreamSettings(req, res, next) {
+  try {
+    const Tenant = require('../../database/models/Tenant.model');
+    const tenant = await Tenant.findById(req.tenant.tenantId).select('bunnyStream').lean();
+    const b = tenant?.bunnyStream || {};
+    R.success(res, {
+      enabled:     b.enabled     ?? false,
+      libraryId:   b.libraryId   ?? null,
+      cdnHostname: b.cdnHostname ?? null,
+      connected:   !!(b.enabled && b.libraryId),
+    });
+  } catch (err) { next(err); }
+}
+
+async function saveBunnyStreamSettings(req, res, next) {
+  try {
+    const { libraryId, apiKey, cdnHostname, tokenAuthKey } = req.body;
+    if (!libraryId || !apiKey)
+      return R.error(res, 'libraryId and apiKey are required', 400);
+
+    const bunnySvc = require('../../services/bunnyStream/bunnyStream.service');
+    const { encrypt } = bunnySvc;
+
+    try {
+      await bunnySvc.testConnection(String(libraryId).trim(), apiKey.trim());
+    } catch {
+      return R.error(res, 'Invalid Bunny.net credentials — could not connect to Bunny.net API', 400);
+    }
+
+    const update = {
+      'bunnyStream.enabled':      true,
+      'bunnyStream.libraryId':    String(libraryId).trim(),
+      'bunnyStream.apiKeyEnc':    encrypt(apiKey.trim()),
+      'bunnyStream.cdnHostname':  cdnHostname?.trim() || null,
+    };
+    if (tokenAuthKey) update['bunnyStream.tokenAuthKeyEnc'] = encrypt(tokenAuthKey.trim());
+
+    const Tenant = require('../../database/models/Tenant.model');
+    await Tenant.updateOne({ _id: req.tenant.tenantId }, { $set: update });
+    R.success(res, { connected: true }, 'Bunny.net Stream connected successfully');
+  } catch (err) { next(err); }
+}
+
+async function disconnectBunnyStream(req, res, next) {
+  try {
+    const Tenant = require('../../database/models/Tenant.model');
+    await Tenant.updateOne({ _id: req.tenant.tenantId }, {
+      $set: {
+        'bunnyStream.enabled':         false,
+        'bunnyStream.libraryId':       null,
+        'bunnyStream.apiKeyEnc':       null,
+        'bunnyStream.cdnHostname':     null,
+        'bunnyStream.tokenAuthKeyEnc': null,
+      },
+    });
+    R.success(res, { connected: false }, 'Bunny.net Stream disconnected');
+  } catch (err) { next(err); }
+}
+
+async function testBunnyStreamConnection(req, res, next) {
+  try {
+    const Tenant = require('../../database/models/Tenant.model');
+    const tenant = await Tenant.findById(req.tenant.tenantId)
+      .select('+bunnyStream.apiKeyEnc bunnyStream').lean();
+    const b = tenant?.bunnyStream;
+    if (!b?.enabled || !b.libraryId || !b.apiKeyEnc)
+      return R.error(res, 'Bunny.net Stream not configured', 400);
+
+    const bunnySvc = require('../../services/bunnyStream/bunnyStream.service');
+    const apiKey = bunnySvc.decrypt(b.apiKeyEnc);
+    await bunnySvc.testConnection(b.libraryId, apiKey);
+    R.success(res, { ok: true }, 'Connection successful');
+  } catch (err) { next(err); }
+}
+
 module.exports = {
   getMyTenant,
   updateSettings,
@@ -235,4 +311,8 @@ module.exports = {
   saveCfStreamSettings,
   disconnectCfStream,
   testCfStreamConnection,
+  getBunnyStreamSettings,
+  saveBunnyStreamSettings,
+  disconnectBunnyStream,
+  testBunnyStreamConnection,
 };
