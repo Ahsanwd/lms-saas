@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api';
+import api, { getAccessToken, getTenantSubdomain } from '@/lib/api';
 import { Button, Badge, Spinner, Alert, Card } from '@/components/ui';
 import { useAuthStore } from '@/stores/auth.store';
 import { AxiosError } from 'axios';
@@ -201,31 +201,61 @@ function R2VideoUploader({ courseId, lessonId, existingUrl, onUploaded }: R2Vide
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function handleUpload(file: File) {
-    if (!lessonId) { setErrorMsg('Save the lesson first, then upload the video'); return; }
+    if (!lessonId) {
+      setStatus('error');
+      setErrorMsg('Save the lesson first, then upload the video');
+      return;
+    }
     setFileName(file.name);
     setStatus('uploading');
     setProgress(0);
     setErrorMsg('');
-    try {
-      const formData = new FormData();
-      formData.append('video', file);
-      const res = await api.post(
-        `/courses/${courseId}/lessons/${lessonId}/video`,
-        formData,
-        {
-          headers: { 'Content-Type': undefined }, // let browser set multipart boundary
-          onUploadProgress: (e) => {
-            if (e.total) setProgress(Math.round(e.loaded / e.total * 100));
-          },
+
+    const formData = new FormData();
+    formData.append('video', file);
+    const apiBase = process.env.NEXT_PUBLIC_API_URL ?? '';
+    const url = `${apiBase}/api/courses/${courseId}/lessons/${lessonId}/video`;
+
+    await new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', url);
+      // Set auth headers manually — do NOT set Content-Type (browser adds boundary)
+      const token = getAccessToken();
+      if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      const subdomain = getTenantSubdomain();
+      if (subdomain) xhr.setRequestHeader('X-Tenant-Subdomain', subdomain);
+
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) setProgress(Math.round(e.loaded / e.total * 100));
+      };
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const body = JSON.parse(xhr.responseText);
+            const videoUrl = body?.data?.video?.url ?? '';
+            onUploaded(videoUrl);
+            setStatus('done');
+            resolve();
+          } catch {
+            reject(new Error('Invalid server response'));
+          }
+        } else {
+          try {
+            const body = JSON.parse(xhr.responseText);
+            reject(new Error(body?.message || `Server error ${xhr.status}`));
+          } catch {
+            reject(new Error(`Upload failed (${xhr.status})`));
+          }
         }
-      );
-      const videoUrl = res.data?.data?.video?.url ?? '';
-      onUploaded(videoUrl);
-      setStatus('done');
-    } catch (err: any) {
+      };
+      xhr.onerror = () => reject(new Error('Network error — check your connection'));
+      xhr.ontimeout = () => reject(new Error('Upload timed out — try a smaller file'));
+      xhr.timeout = 30 * 60 * 1000; // 30 min timeout for large videos
+      xhr.send(formData);
+    }).catch((err: any) => {
       setStatus('error');
-      setErrorMsg(err?.response?.data?.message || err?.message || 'Upload failed');
-    }
+      setErrorMsg(err?.message || 'Upload failed');
+    });
   }
 
   return (
