@@ -184,6 +184,121 @@ function CfStreamUploader({ courseId, lessonId, existingUid, onConfirmed }: CfSt
   );
 }
 
+// ─── R2 Direct Video Uploader ─────────────────────────────────────────────────
+
+interface R2VideoUploaderProps {
+  courseId: string;
+  lessonId: string;
+  existingUrl: string | null;
+  onUploaded: (url: string) => void;
+}
+
+function R2VideoUploader({ courseId, lessonId, existingUrl, onUploaded }: R2VideoUploaderProps) {
+  const [status,    setStatus]   = useState<'idle' | 'uploading' | 'done' | 'error'>('idle');
+  const [progress,  setProgress] = useState(0);
+  const [fileName,  setFileName] = useState('');
+  const [errorMsg,  setErrorMsg] = useState('');
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  async function handleUpload(file: File) {
+    if (!lessonId) { setErrorMsg('Save the lesson first before uploading a video'); return; }
+    setFileName(file.name);
+    setStatus('uploading');
+    setProgress(0);
+    setErrorMsg('');
+    try {
+      const presignRes = await api.post(`/courses/${courseId}/lessons/${lessonId}/video/presign`, {
+        filename: file.name, mimetype: file.type,
+      });
+      const { uploadUrl, publicUrl } = presignRes.data.data;
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('PUT', uploadUrl);
+        xhr.setRequestHeader('Content-Type', file.type);
+        xhr.upload.onprogress = (e) => { if (e.lengthComputable) setProgress(Math.round(e.loaded / e.total * 100)); };
+        xhr.onload  = () => (xhr.status >= 200 && xhr.status < 300) ? resolve() : reject(new Error(`Upload error ${xhr.status}`));
+        xhr.onerror = () => reject(new Error('Network error during upload'));
+        xhr.send(file);
+      });
+      onUploaded(publicUrl);
+      setStatus('done');
+    } catch (err: any) {
+      setStatus('error');
+      setErrorMsg(err?.response?.data?.message || err?.message || 'Upload failed');
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      <input ref={fileRef} type="file" accept="video/mp4,video/webm,video/ogg,video/quicktime" className="hidden"
+        onChange={e => { const f = e.target.files?.[0]; if (f) handleUpload(f); }} />
+
+      {status === 'idle' && (
+        <div className="space-y-2">
+          <button type="button" onClick={() => fileRef.current?.click()}
+            className="w-full rounded-2xl border-2 border-dashed border-primary-200 bg-primary-50/30 hover:border-primary-400 hover:bg-primary-50 py-8 text-center transition-all">
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-12 h-12 rounded-2xl bg-primary-100 flex items-center justify-center mb-1">
+                <svg className="w-6 h-6 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+              </div>
+              <p className="text-sm font-semibold text-gray-700">Click to upload video to R2</p>
+              <p className="text-xs text-gray-400">Uploads directly to Cloudflare R2 storage</p>
+            </div>
+          </button>
+          <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2.5 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+            <span className="text-gray-600 font-medium">Supported formats</span>
+            <span className="text-gray-500">MP4, WebM, MOV (QuickTime), OGG</span>
+            <span className="text-gray-600 font-medium">Max file size</span>
+            <span className="text-gray-500">2 GB</span>
+            <span className="text-gray-600 font-medium">Delivery</span>
+            <span className="text-gray-500">Served via Cloudflare CDN</span>
+          </div>
+          {existingUrl && (
+            <p className="text-xs text-green-600 flex items-center gap-1">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg>
+              Video already uploaded — click above to replace
+            </p>
+          )}
+        </div>
+      )}
+
+      {status === 'uploading' && (
+        <div className="rounded-2xl border border-primary-200 bg-primary-50 p-5 space-y-3">
+          <div className="flex items-center gap-3">
+            <Spinner size="sm" />
+            <p className="text-sm font-semibold text-primary-800">Uploading {fileName}… {progress}%</p>
+          </div>
+          <div className="w-full bg-primary-100 rounded-full h-2">
+            <div className="bg-primary-600 h-2 rounded-full transition-all duration-300" style={{ width: `${progress}%` }} />
+          </div>
+          <p className="text-xs text-primary-600">Do not close this window while uploading.</p>
+        </div>
+      )}
+
+      {status === 'done' && (
+        <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 flex items-center gap-3">
+          <svg className="w-5 h-5 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-green-800">Video uploaded successfully</p>
+            <p className="text-xs text-green-600">{fileName} — click Save to confirm</p>
+          </div>
+          <button type="button" onClick={() => { setStatus('idle'); setFileName(''); onUploaded(''); }}
+            className="text-xs text-green-600 hover:text-green-800 underline">Replace</button>
+        </div>
+      )}
+
+      {status === 'error' && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 space-y-2">
+          <p className="text-sm font-semibold text-red-700">Upload failed</p>
+          <p className="text-xs text-red-600">{errorMsg}</p>
+          <button type="button" onClick={() => { setStatus('idle'); setFileName(''); setErrorMsg(''); }}
+            className="text-xs text-red-600 hover:text-red-800 underline">Try again</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Lesson Modal ─────────────────────────────────────────────────────────────
 
 interface LessonModalProps {
@@ -199,11 +314,13 @@ type AudioSource = 'upload' | 'external' | 'soundcloud' | 'spotify' | 'embed';
 type FileSource  = 'upload' | 'external' | 'gdrive' | 'dropbox' | 'onedrive' | 'embed';
 
 function inferVideoSource(lesson: LessonModalProps['lesson']): VideoSource {
-  if (!lesson?.video) return 'youtube';
+  if (!lesson?.video) return 'upload';
   const p = lesson.video.provider;
-  if (p === 'vimeo')      return 'vimeo';
-  if (p === 'cloudflare') return 'cloudflare';
-  return 'youtube';
+  if (p === 'vimeo')                return 'vimeo';
+  if (p === 'cloudflare')           return 'cloudflare';
+  if (p === 'youtube')              return 'youtube';
+  if (p === 'local' || p === 's3') return 'upload';
+  return 'upload';
 }
 
 function inferAudioSource(lesson: LessonModalProps['lesson']): AudioSource {
@@ -396,8 +513,12 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
       };
     }
     if (type === 'video') {
+      const videoProviderMap: Record<VideoSource, string> = {
+        upload: 's3', youtube: 'youtube', vimeo: 'vimeo',
+        cloudflare: 'cloudflare', bunny: 'bunny', external: 'external', embed: 'embed',
+      };
       payload.video = {
-        provider: videoSource,
+        provider: videoProviderMap[videoSource] ?? videoSource,
         url: videoUrl || null,
         durationSeconds: videoDuration ? Number(videoDuration) : undefined,
         settings: { watermarkEnabled, watermarkText: watermarkText || null, disableDownload, allowSpeedControl },
@@ -794,8 +915,9 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {([
-                      { s: 'youtube'   as VideoSource, label: 'YouTube' },
-                      { s: 'vimeo'     as VideoSource, label: 'Vimeo'   },
+                      { s: 'upload'    as VideoSource, label: '⬆ Upload File' },
+                      { s: 'youtube'   as VideoSource, label: 'YouTube'       },
+                      { s: 'vimeo'     as VideoSource, label: 'Vimeo'         },
                       ...(cfEnabled ? [{ s: 'cloudflare' as VideoSource, label: '☁ Cloudflare Stream' }] : []),
                     ]).map(({ s, label }) => (
                       <button key={s} type="button" onClick={() => setVideoSource(s)}
@@ -815,15 +937,25 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
                       Upload limits &amp; supported formats
                     </p>
                     <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+                      <span className="text-blue-600 font-medium">⬆ Upload File</span>
+                      <span className="text-blue-700">Max <strong>2 GB</strong> · MP4, WebM, MOV, OGG · Served via Cloudflare CDN</span>
                       <span className="text-blue-600 font-medium">☁ Cloudflare Stream</span>
                       <span className="text-blue-700">No size limit · HLS adaptive streaming · MP4, MOV, WebM, MKV, AVI</span>
                       <span className="text-blue-600 font-medium">▶ YouTube / Vimeo</span>
                       <span className="text-blue-700">Paste video URL — no file upload needed</span>
-                      <span className="text-blue-600 font-medium">⬆ Direct R2 upload</span>
-                      <span className="text-blue-700">Max <strong>2 GB</strong> · MP4, WebM, MOV, OGG — use from lesson row</span>
                     </div>
                   </div>
                 </div>
+
+                {/* R2 direct upload zone */}
+                {videoSource === 'upload' && (
+                  <R2VideoUploader
+                    courseId={courseId}
+                    lessonId={lesson?._id ?? ''}
+                    existingUrl={lesson?.video?.provider === 's3' || lesson?.video?.provider === 'local' ? lesson.video.url ?? null : null}
+                    onUploaded={(url) => { setVideoUrl(url); }}
+                  />
+                )}
 
                 {/* Cloudflare Stream upload zone */}
                 {videoSource === 'cloudflare' && (
@@ -836,7 +968,7 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
                 )}
 
                 {/* URL input (YouTube / Vimeo) */}
-                {videoSource !== 'cloudflare' && (
+                {(videoSource === 'youtube' || videoSource === 'vimeo') && (
                 <div className="space-y-3">
                   <div>
                     <label className="block text-xs font-semibold text-gray-500 mb-1.5">
