@@ -213,7 +213,7 @@ function R2VideoUploader({ courseId, lessonId, existingUrl, onUploaded }: R2Vide
         `/courses/${courseId}/lessons/${lessonId}/video`,
         formData,
         {
-          headers: { 'Content-Type': 'multipart/form-data' },
+          headers: { 'Content-Type': undefined }, // let browser set multipart boundary
           onUploadProgress: (e) => {
             if (e.total) setProgress(Math.round(e.loaded / e.total * 100));
           },

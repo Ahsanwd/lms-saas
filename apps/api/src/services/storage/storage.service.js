@@ -93,31 +93,36 @@ class R2StorageEngine {
     const tenantId = req.user?.tenantId || 'shared';
     const key      = `${this.category}s/${tenantId}/${uuidv4()}${ext}`;
 
-    // Collect stream into buffer
-    const chunks = [];
-    file.stream.on('data', chunk => chunks.push(chunk));
-    file.stream.on('error', cb);
-    file.stream.on('end', async () => {
-      try {
-        const buffer = Buffer.concat(chunks);
-        const { PutObjectCommand } = require('@aws-sdk/client-s3');
-        await getS3Client().send(new PutObjectCommand({
-          Bucket:      config.storage.s3.bucket,
-          Key:         key,
-          Body:        buffer,
-          ContentType: file.mimetype,
-        }));
+    // Stream directly to R2 using multipart upload — no memory buffering
+    const { Upload } = require('@aws-sdk/lib-storage');
+    let uploadedSize = 0;
+    const PassThrough = require('stream').PassThrough;
+    const passThrough = new PassThrough();
 
-        cb(null, {
-          key,
-          path:     r2PublicUrl(key),  // controllers read req.file.path
-          size:     buffer.length,
-          filename: path.basename(key),
-        });
-      } catch (err) {
-        cb(err);
-      }
+    file.stream.on('data', chunk => { uploadedSize += chunk.length; passThrough.write(chunk); });
+    file.stream.on('end',  () => passThrough.end());
+    file.stream.on('error', err => passThrough.destroy(err));
+
+    const upload = new Upload({
+      client: getS3Client(),
+      params: {
+        Bucket:      config.storage.s3.bucket,
+        Key:         key,
+        Body:        passThrough,
+        ContentType: file.mimetype,
+      },
+      queueSize: 4,    // parallel upload parts
+      partSize:  5 * 1024 * 1024,  // 5 MB per part (S3 minimum)
     });
+
+    upload.done()
+      .then(() => cb(null, {
+        key,
+        path:     r2PublicUrl(key),
+        size:     uploadedSize,
+        filename: path.basename(key),
+      }))
+      .catch(err => cb(err));
   }
 
   _removeFile(req, file, cb) {
