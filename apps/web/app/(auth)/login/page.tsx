@@ -23,11 +23,15 @@ function LoginPage() {
   const [step,      setStep]    = useState<'login' | '2fa'>('login');
   const [loading,   setLoading] = useState(false);
   const [error,     setError]   = useState('');
+  const [success,   setSuccess] = useState('');
   const [googleLoading, setGoogleLoading] = useState(false);
 
   useEffect(() => {
     const tenant = searchParams.get('tenant');
     if (tenant) setSubdomainVal(tenant);
+    if (searchParams.get('registered') === '1') {
+      setSuccess('Account created! You can now sign in.');
+    }
   }, [searchParams]);
 
   async function onLogin(e: React.FormEvent) {
@@ -146,6 +150,7 @@ function LoginPage() {
         <p className="text-sm text-gray-500 mt-1">Sign in to your account</p>
       </div>
 
+      {success && <Alert variant="success" className="mb-4">{success}</Alert>}
       {error && <Alert variant="error" className="mb-4">{error}</Alert>}
 
       <form onSubmit={onLogin} className="space-y-4">

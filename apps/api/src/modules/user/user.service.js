@@ -221,8 +221,8 @@ async function inviteUser(tenantId, { email, role, name, expiresInHours }, actin
     expiresInHours: hours,
   });
 
-  await queueEmail({ to: email, ...template });
-  return { message: `Invitation sent to ${email}` };
+  await queueEmail({ to: email, ...template }).catch(() => {});
+  return { message: `Invitation sent to ${email}`, inviteUrl };
 }
 
 // ─── Accept Invite ────────────────────────────────────────────────────────────

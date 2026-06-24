@@ -219,7 +219,9 @@ async function register({ firstName, lastName, email, password, tenantId, tenant
   const existing = await userRepo.findByEmail(tenantId, email);
   if (existing) throw new AppError('Email already registered', 409, 'EMAIL_EXISTS');
 
-  const requireVerification = settings?.requireEmailVerification !== false;
+  // Skip email verification if tenant has no SMTP configured — user logs in immediately
+  const smtpConfigured = !!(settings?.smtp?.host);
+  const requireVerification = smtpConfigured && settings?.requireEmailVerification !== false;
 
   const user = await userRepo.create({
     tenantId,
@@ -242,7 +244,10 @@ async function register({ firstName, lastName, email, password, tenantId, tenant
 
   auditLogRepo.log({ tenantId, userId: user._id, email: user.email, event: 'register', ip: req?.ip, userAgent: req?.headers?.['user-agent'] });
 
-  return { message: 'Registration successful. Please verify your email.' };
+  return {
+    message: requireVerification ? 'Registration successful. Please verify your email.' : 'Registration successful. You can now log in.',
+    requiresVerification: requireVerification,
+  };
 }
 
 // ─── Login ───────────────────────────────────────────────────────────────────
@@ -447,7 +452,7 @@ async function logoutAll({ tenantId, userId }) {
 
 async function checkSubdomain(subdomain) {
   const tenant = await tenantRepo.findBySubdomain(subdomain.toLowerCase().trim());
-  return { available: !tenant };
+  return { available: !tenant, tenantName: tenant?.name ?? null };
 }
 
 // ─── Google OAuth ─────────────────────────────────────────────────────────────

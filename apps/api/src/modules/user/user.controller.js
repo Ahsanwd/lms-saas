@@ -112,7 +112,7 @@ async function invite(req, res, next) {
     const result = await userService.inviteUser(
       req.tenant.tenantId, { email, role, name, expiresInHours }, req.user
     );
-    R.created(res, {}, result.message);
+    R.created(res, { inviteUrl: result.inviteUrl }, result.message);
   } catch (err) { next(err); }
 }
 
