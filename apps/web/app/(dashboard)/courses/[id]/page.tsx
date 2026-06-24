@@ -500,8 +500,9 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
         try {
           const form = new FormData();
           form.append(endpoint, selectedFile);
+          // Content-Type must be undefined — browser sets multipart/form-data with boundary
           await api.post(`/courses/${courseId}/lessons/${savedLesson._id}/${endpoint}`, form, {
-            headers: { 'Content-Type': 'multipart/form-data' },
+            headers: { 'Content-Type': undefined },
           });
           onSaved();
         } catch (err) {
@@ -993,11 +994,42 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
                   </div>
                 </div>
 
-                {/* R2 direct upload zone */}
-                {videoSource === 'upload' && (
+                {/* Video file upload zone */}
+                {videoSource === 'upload' && !isEdit && (
+                  /* NEW lesson — file stored locally, uploaded together with Save */
+                  <div className="space-y-2">
+                    <label className={`flex w-full cursor-pointer flex-col items-center gap-2 rounded-2xl border-2 border-dashed py-8 text-center transition-all ${
+                      selectedFile
+                        ? 'border-primary-400 bg-primary-50'
+                        : 'border-gray-200 bg-gray-50 hover:border-primary-300 hover:bg-primary-50/30'
+                    }`}>
+                      <input type="file" accept="video/mp4,video/webm,video/ogg,video/quicktime" className="hidden"
+                        onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)} />
+                      {selectedFile ? (
+                        <>
+                          <div className="w-12 h-12 rounded-2xl bg-primary-100 flex items-center justify-center">
+                            <svg className="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 13l4 4L19 7"/></svg>
+                          </div>
+                          <p className="text-sm font-semibold text-primary-700">{selectedFile.name}</p>
+                          <p className="text-xs text-gray-400">{(selectedFile.size / 1024 / 1024).toFixed(1)} MB · click to change</p>
+                        </>
+                      ) : (
+                        <>
+                          <div className="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center">
+                            <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                          </div>
+                          <p className="text-sm font-semibold text-gray-700">Click to select video</p>
+                          <p className="text-xs text-gray-400">Video uploads automatically when you click Save</p>
+                        </>
+                      )}
+                    </label>
+                  </div>
+                )}
+                {videoSource === 'upload' && isEdit && (
+                  /* EXISTING lesson — upload immediately via XHR */
                   <R2VideoUploader
                     courseId={courseId}
-                    lessonId={lesson?._id ?? ''}
+                    lessonId={lesson!._id}
                     existingUrl={lesson?.video?.provider === 's3' || lesson?.video?.provider === 'local' ? lesson.video.url ?? null : null}
                     onUploaded={(url) => { setVideoUrl(url); }}
                   />
