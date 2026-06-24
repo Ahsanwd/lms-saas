@@ -269,6 +269,17 @@ function R2VideoUploader({ courseId, lessonId, existingUrl, onUploaded }: R2Vide
 
       {status === 'idle' && (
         <div className="space-y-2">
+          {!lessonId ? (
+            <div className="w-full rounded-2xl border-2 border-dashed border-amber-200 bg-amber-50 py-8 text-center">
+              <div className="flex flex-col items-center gap-2">
+                <div className="w-12 h-12 rounded-2xl bg-amber-100 flex items-center justify-center mb-1">
+                  <svg className="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+                <p className="text-sm font-semibold text-amber-800">Save lesson first</p>
+                <p className="text-xs text-amber-600">Enter a title below and click <strong>Save</strong> — then come back to upload video</p>
+              </div>
+            </div>
+          ) : (
           <button type="button" onClick={() => fileRef.current?.click()}
             className="w-full rounded-2xl border-2 border-dashed border-primary-200 bg-primary-50/30 hover:border-primary-400 hover:bg-primary-50 py-8 text-center transition-all">
             <div className="flex flex-col items-center gap-2">
@@ -279,6 +290,7 @@ function R2VideoUploader({ courseId, lessonId, existingUrl, onUploaded }: R2Vide
               <p className="text-xs text-gray-400">Video is saved automatically after upload</p>
             </div>
           </button>
+          )}
           <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2.5 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
             <span className="text-gray-600 font-medium">Supported formats</span>
             <span className="text-gray-500">MP4, WebM, MOV (QuickTime), OGG</span>
