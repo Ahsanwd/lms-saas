@@ -446,10 +446,11 @@ async function uploadLessonVideo(tenantId, courseId, lessonId, file, user) {
     });
   }
 
+  const { USE_S3 } = require('../../services/storage/storage.service');
   const url = getPublicUrl(file.path);
   const updated = await lessonRepo.updateById(tenantId, lessonId, {
     'video.url': url,
-    'video.provider': 'local',
+    'video.provider': USE_S3 ? 's3' : 'local',
     updatedBy: user.sub,
   });
   await recalcCourseCounters(tenantId, courseId);

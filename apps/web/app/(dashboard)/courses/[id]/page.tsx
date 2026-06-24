@@ -201,26 +201,26 @@ function R2VideoUploader({ courseId, lessonId, existingUrl, onUploaded }: R2Vide
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function handleUpload(file: File) {
-    if (!lessonId) { setErrorMsg('Save the lesson first before uploading a video'); return; }
+    if (!lessonId) { setErrorMsg('Save the lesson first, then upload the video'); return; }
     setFileName(file.name);
     setStatus('uploading');
     setProgress(0);
     setErrorMsg('');
     try {
-      const presignRes = await api.post(`/courses/${courseId}/lessons/${lessonId}/video/presign`, {
-        filename: file.name, mimetype: file.type,
-      });
-      const { uploadUrl, publicUrl } = presignRes.data.data;
-      await new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('PUT', uploadUrl);
-        xhr.setRequestHeader('Content-Type', file.type);
-        xhr.upload.onprogress = (e) => { if (e.lengthComputable) setProgress(Math.round(e.loaded / e.total * 100)); };
-        xhr.onload  = () => (xhr.status >= 200 && xhr.status < 300) ? resolve() : reject(new Error(`Upload error ${xhr.status}`));
-        xhr.onerror = () => reject(new Error('Network error during upload'));
-        xhr.send(file);
-      });
-      onUploaded(publicUrl);
+      const formData = new FormData();
+      formData.append('video', file);
+      const res = await api.post(
+        `/courses/${courseId}/lessons/${lessonId}/video`,
+        formData,
+        {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          onUploadProgress: (e) => {
+            if (e.total) setProgress(Math.round(e.loaded / e.total * 100));
+          },
+        }
+      );
+      const videoUrl = res.data?.data?.video?.url ?? '';
+      onUploaded(videoUrl);
       setStatus('done');
     } catch (err: any) {
       setStatus('error');
@@ -241,8 +241,8 @@ function R2VideoUploader({ courseId, lessonId, existingUrl, onUploaded }: R2Vide
               <div className="w-12 h-12 rounded-2xl bg-primary-100 flex items-center justify-center mb-1">
                 <svg className="w-6 h-6 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
               </div>
-              <p className="text-sm font-semibold text-gray-700">Click to upload video to R2</p>
-              <p className="text-xs text-gray-400">Uploads directly to Cloudflare R2 storage</p>
+              <p className="text-sm font-semibold text-gray-700">Click to upload video</p>
+              <p className="text-xs text-gray-400">Video is saved automatically after upload</p>
             </div>
           </button>
           <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2.5 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
@@ -280,7 +280,7 @@ function R2VideoUploader({ courseId, lessonId, existingUrl, onUploaded }: R2Vide
           <svg className="w-5 h-5 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg>
           <div className="flex-1">
             <p className="text-sm font-semibold text-green-800">Video uploaded successfully</p>
-            <p className="text-xs text-green-600">{fileName} — click Save to confirm</p>
+            <p className="text-xs text-green-600">{fileName} — video saved to lesson</p>
           </div>
           <button type="button" onClick={() => { setStatus('idle'); setFileName(''); onUploaded(''); }}
             className="text-xs text-green-600 hover:text-green-800 underline">Replace</button>
