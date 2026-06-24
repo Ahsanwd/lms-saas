@@ -110,16 +110,28 @@ function CfStreamUploader({ courseId, lessonId, existingUid, onConfirmed }: CfSt
         onChange={e => { const f = e.target.files?.[0]; if (f) handleUpload(f); }} />
 
       {status === 'idle' && (
-        <button type="button" onClick={() => fileRef.current?.click()}
-          className="w-full rounded-2xl border-2 border-dashed border-orange-200 bg-orange-50/30 hover:border-orange-400 hover:bg-orange-50 py-8 text-center transition-all">
-          <div className="flex flex-col items-center gap-2">
-            <div className="w-12 h-12 rounded-2xl bg-orange-100 flex items-center justify-center mb-1">
-              <svg className="w-6 h-6 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+        <div className="space-y-2">
+          <button type="button" onClick={() => fileRef.current?.click()}
+            className="w-full rounded-2xl border-2 border-dashed border-orange-200 bg-orange-50/30 hover:border-orange-400 hover:bg-orange-50 py-8 text-center transition-all">
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-12 h-12 rounded-2xl bg-orange-100 flex items-center justify-center mb-1">
+                <svg className="w-6 h-6 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+              </div>
+              <p className="text-sm font-semibold text-gray-700">Click to upload to Cloudflare Stream</p>
+              <p className="text-xs text-gray-400">Uploads directly to Cloudflare — no size limit</p>
             </div>
-            <p className="text-sm font-semibold text-gray-700">Click to upload to Cloudflare Stream</p>
-            <p className="text-xs text-gray-400">Video uploads directly to Cloudflare — no size limit, HLS adaptive quality</p>
+          </button>
+          <div className="rounded-xl border border-orange-100 bg-orange-50 px-3 py-2.5 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+            <span className="text-orange-700 font-medium">Supported formats</span>
+            <span className="text-orange-600">MP4, MOV, WebM, MKV, AVI, FLV</span>
+            <span className="text-orange-700 font-medium">Max file size</span>
+            <span className="text-orange-600">No limit (Cloudflare Stream)</span>
+            <span className="text-orange-700 font-medium">Delivery</span>
+            <span className="text-orange-600">HLS adaptive streaming (auto quality)</span>
+            <span className="text-orange-700 font-medium">Processing time</span>
+            <span className="text-orange-600">1–5 min after upload</span>
           </div>
-        </button>
+        </div>
       )}
 
       {(status === 'uploading' || status === 'processing') && (
@@ -775,8 +787,11 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
             {type === 'video' && (
               <div className="space-y-4">
                 {/* Source selector */}
-                <div>
-                  <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Video Source</label>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="w-6 h-6 rounded-full bg-primary-600 text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">1</span>
+                    <label className="text-xs font-semibold text-gray-700 uppercase tracking-widest">Select Video Source</label>
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     {([
                       { s: 'youtube'   as VideoSource, label: 'YouTube' },
@@ -791,6 +806,22 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
                         {label}
                       </button>
                     ))}
+                  </div>
+
+                  {/* Limits & format info */}
+                  <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 space-y-2">
+                    <p className="text-xs font-semibold text-blue-800 flex items-center gap-1.5">
+                      <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                      Upload limits &amp; supported formats
+                    </p>
+                    <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+                      <span className="text-blue-600 font-medium">☁ Cloudflare Stream</span>
+                      <span className="text-blue-700">No size limit · HLS adaptive streaming · MP4, MOV, WebM, MKV, AVI</span>
+                      <span className="text-blue-600 font-medium">▶ YouTube / Vimeo</span>
+                      <span className="text-blue-700">Paste video URL — no file upload needed</span>
+                      <span className="text-blue-600 font-medium">⬆ Direct R2 upload</span>
+                      <span className="text-blue-700">Max <strong>2 GB</strong> · MP4, WebM, MOV, OGG — use from lesson row</span>
+                    </div>
                   </div>
                 </div>
 
@@ -1816,17 +1847,23 @@ function LessonRow({ courseId, sectionId, lesson, onEdit, onDeleted, isFirst, is
       <div className="flex items-center gap-1.5">
         {lesson.type === 'video' && (
           <>
-            <input ref={videoRef} type="file" accept="video/*" className="hidden"
+            <input ref={videoRef} type="file" accept="video/mp4,video/webm,video/ogg,video/quicktime" className="hidden"
               onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0], 'video')} />
-            <Button
-              size="sm"
-              variant={lesson.video ? 'ghost' : 'outline'}
-              loading={uploading}
-              className={cn(!lesson.video ? '' : 'opacity-0 group-hover:opacity-100 transition-opacity')}
-              onClick={() => videoRef.current?.click()}
-            >
-              {lesson.video ? 'Replace' : '⬆ Upload Video'}
-            </Button>
+            <div className="flex flex-col gap-0.5">
+              <Button
+                size="sm"
+                variant={lesson.video ? 'ghost' : 'outline'}
+                loading={uploading}
+                className={cn(!lesson.video ? '' : 'opacity-0 group-hover:opacity-100 transition-opacity')}
+                onClick={() => videoRef.current?.click()}
+                title="Accepted: MP4, WebM, MOV, OGG — Max 2 GB"
+              >
+                {lesson.video ? 'Replace' : '⬆ Upload Video'}
+              </Button>
+              {!lesson.video && (
+                <span className="text-[10px] text-gray-400 leading-tight">MP4, WebM, MOV · Max 2 GB</span>
+              )}
+            </div>
           </>
         )}
         {lesson.type === 'file' && (
