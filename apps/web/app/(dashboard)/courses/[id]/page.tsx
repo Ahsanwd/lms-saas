@@ -202,6 +202,7 @@ function R2VideoUploader({ courseId, lessonId, existingUrl, onUploaded }: R2Vide
 
   async function handleUpload(file: File) {
     if (!lessonId) {
+      toast.error('Save the lesson first, then upload the video');
       setStatus('error');
       setErrorMsg('Save the lesson first, then upload the video');
       return;
@@ -213,7 +214,8 @@ function R2VideoUploader({ courseId, lessonId, existingUrl, onUploaded }: R2Vide
 
     const formData = new FormData();
     formData.append('video', file);
-    const apiBase = process.env.NEXT_PUBLIC_API_URL ?? '';
+    // Use the same base URL as the Axios api instance
+    const apiBase = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/api$/, '');
     const url = `${apiBase}/api/courses/${courseId}/lessons/${lessonId}/video`;
 
     await new Promise<void>((resolve, reject) => {
@@ -253,8 +255,10 @@ function R2VideoUploader({ courseId, lessonId, existingUrl, onUploaded }: R2Vide
       xhr.timeout = 30 * 60 * 1000; // 30 min timeout for large videos
       xhr.send(formData);
     }).catch((err: any) => {
+      const msg = err?.message || 'Upload failed';
       setStatus('error');
-      setErrorMsg(err?.message || 'Upload failed');
+      setErrorMsg(msg);
+      toast.error(msg);
     });
   }
 

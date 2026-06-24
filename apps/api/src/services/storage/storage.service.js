@@ -93,33 +93,26 @@ class R2StorageEngine {
     const tenantId = req.user?.tenantId || 'shared';
     const key      = `${this.category}s/${tenantId}/${uuidv4()}${ext}`;
 
-    // Stream directly to R2 using multipart upload — no memory buffering
+    // Stream directly to R2 — no memory buffering
     const { Upload } = require('@aws-sdk/lib-storage');
-    let uploadedSize = 0;
-    const PassThrough = require('stream').PassThrough;
-    const passThrough = new PassThrough();
-
-    file.stream.on('data', chunk => { uploadedSize += chunk.length; passThrough.write(chunk); });
-    file.stream.on('end',  () => passThrough.end());
-    file.stream.on('error', err => passThrough.destroy(err));
 
     const upload = new Upload({
       client: getS3Client(),
       params: {
         Bucket:      config.storage.s3.bucket,
         Key:         key,
-        Body:        passThrough,
+        Body:        file.stream,
         ContentType: file.mimetype,
       },
-      queueSize: 4,    // parallel upload parts
-      partSize:  5 * 1024 * 1024,  // 5 MB per part (S3 minimum)
+      queueSize: 4,
+      partSize:  5 * 1024 * 1024,
     });
 
     upload.done()
       .then(() => cb(null, {
         key,
         path:     r2PublicUrl(key),
-        size:     uploadedSize,
+        size:     Number(req.headers['content-length'] ?? 0),
         filename: path.basename(key),
       }))
       .catch(err => cb(err));
