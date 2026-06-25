@@ -55,7 +55,19 @@ require('./jobs/queue').analyticsReportQueue().add(
 const app    = express();
 const server = http.createServer(app);
 const io     = new Server(server, {
-  cors: { origin: /\.vercel\.app$|localhost/, credentials: true },
+  cors: {
+    origin: (origin, cb) => {
+      if (!origin) return cb(null, true);
+      const appDomain = process.env.APP_DOMAIN;
+      const domainRe  = appDomain ? new RegExp(`(^https?://)([a-z0-9-]+\\.)?${appDomain.replace('.', '\\.')}$`) : null;
+      const ok = /\.vercel\.app$/.test(origin)
+        || /localhost/.test(origin)
+        || (process.env.ALLOWED_ORIGIN && origin === process.env.ALLOWED_ORIGIN)
+        || (domainRe && domainRe.test(origin));
+      cb(null, ok);
+    },
+    credentials: true,
+  },
 });
 
 const { setIO } = require('./services/socket/io');
@@ -67,11 +79,19 @@ require('./modules/chat/chat.socket')(io);
 app.use((req, _res, next) => { req.io = io; next(); });
 
 app.use(helmet());
+
+// Build allowed origins from env — supports exact URLs and wildcard domain patterns
+const _extraOrigin = process.env.ALLOWED_ORIGIN; // e.g. https://yourdomain.com
+const _appDomain   = process.env.APP_DOMAIN;      // e.g. yourdomain.com  (for wildcard subdomains)
 const allowedOrigins = [
   config.app.url,
+  _extraOrigin,
   /\.vercel\.app$/,
   /localhost:\d+$/,
+  // Match all subdomains of APP_DOMAIN (tenant subdomains)
+  _appDomain ? new RegExp(`(^https?://)([a-z0-9-]+\\.)?${_appDomain.replace('.', '\\.')}$`) : null,
 ].filter(Boolean);
+
 app.use(cors({
   origin: (origin, cb) => {
     if (!origin) return cb(null, true);
