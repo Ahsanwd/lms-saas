@@ -96,7 +96,7 @@ userSchema.methods.generatePasswordResetToken = function () {
 
 userSchema.pre('save', async function (next) {
   if (!this.isModified('passwordHash')) return next();
-  this.passwordHash = await bcrypt.hash(this.passwordHash, 12);
+  this.passwordHash = await bcrypt.hash(this.passwordHash, 10);
   next();
 });
 

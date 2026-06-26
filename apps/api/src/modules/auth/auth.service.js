@@ -281,8 +281,7 @@ async function login({ email, password, tenantId, rememberMe = false, req }) {
     throw new AppError('Invalid credentials', 401, 'INVALID_CREDENTIALS');
   }
 
-  await userRepo.resetLoginAttempts(user._id);
-  await userRepo.updateById(user._id, { lastLoginAt: new Date() });
+  await userRepo.updateById(user._id, { loginAttempts: 0, lockUntil: null, lastLoginAt: new Date() });
 
   // If 2FA is enabled, issue a short-lived temp token instead of real session
   if (user.twoFactor?.enabled) {
