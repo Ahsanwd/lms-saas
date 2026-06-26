@@ -53,10 +53,10 @@ const plans = [
       'Email notifications',
       'Community forum',
       'Certificate builder',
-      '14-day free trial',
     ],
     highlighted: false,
-    cta: 'Start Free Trial',
+    monthlyCheckout: 'https://coursel.lemonsqueezy.com/checkout/buy/127022f2-297b-407e-a8e4-b9879a66b721',
+    yearlyCheckout:  'https://coursel.lemonsqueezy.com/checkout/buy/118720d1-1f2e-4f45-8eec-6e30254b995e',
   },
   {
     name: 'Pro',
@@ -75,10 +75,10 @@ const plans = [
       'Student memberships',
       'Custom domain support',
       'Priority support',
-      '14-day free trial',
     ],
     highlighted: true,
-    cta: 'Start Free Trial',
+    monthlyCheckout: 'https://coursel.lemonsqueezy.com/checkout/buy/917c2beb-7c33-4632-ab02-9db7f3963751',
+    yearlyCheckout:  'https://coursel.lemonsqueezy.com/checkout/buy/934fd7fe-8675-4146-b369-783395f90547',
   },
 ];
 
@@ -239,15 +239,25 @@ export default function LandingPage() {
                     </li>
                   ))}
                 </ul>
-                <Link
-                  href="/register-tenant"
-                  className={`block text-center text-sm font-semibold py-3 rounded-xl transition-all ${
+                <a
+                  href={yearly ? plan.yearlyCheckout : plan.monthlyCheckout}
+                  className={`block text-center text-sm font-semibold py-3 rounded-xl transition-all mb-3 ${
                     plan.highlighted
                       ? 'bg-white text-indigo-600 hover:bg-indigo-50'
                       : 'bg-indigo-600 text-white hover:bg-indigo-700'
                   }`}
                 >
-                  {plan.cta}
+                  Get {plan.name} Plan
+                </a>
+                <Link
+                  href="/register-tenant"
+                  className={`block text-center text-xs font-medium py-2 rounded-xl transition-all border ${
+                    plan.highlighted
+                      ? 'border-indigo-400 text-indigo-200 hover:text-white hover:border-white'
+                      : 'border-gray-200 text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  Try free for 14 days
                 </Link>
               </div>
             ))}
