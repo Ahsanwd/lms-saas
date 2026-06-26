@@ -18,6 +18,7 @@ interface AuthState {
   subdomain: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  hasHydrated: boolean;
 
   /** Set when a super_admin is viewing a specific tenant's context. NOT persisted. */
   impersonation: ImpersonatedTenant | null;
@@ -28,6 +29,8 @@ interface AuthState {
   setUser: (user: User) => void;
   setSubdomain: (subdomain: string) => void;
   clearAuth: () => void;
+  setHasHydrated: (val: boolean) => void;
+
 
   /** Begin impersonating a tenant (super_admin only). Updates the in-memory API header. */
   setImpersonation: (tenant: ImpersonatedTenant) => void;
@@ -42,9 +45,12 @@ export const useAuthStore = create<AuthState>()(
       subdomain: null,
       isAuthenticated: false,
       isLoading: false,
+      hasHydrated: false,
       impersonation: null,
 
       setUser: (user) => set({ user, isAuthenticated: true }),
+
+      setHasHydrated: (val) => set({ hasHydrated: val }),
 
       setSubdomain: (subdomain) => {
         setTenantSubdomain(subdomain);
@@ -116,8 +122,8 @@ export const useAuthStore = create<AuthState>()(
         isAuthenticated: state.isAuthenticated,
       }),
       onRehydrateStorage: () => (state) => {
-        // Re-sync subdomain cookie from persisted store on page load
         if (state?.subdomain) setTenantSubdomain(state.subdomain);
+        state?.setHasHydrated(true);
       },
     }
   )

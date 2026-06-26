@@ -15,7 +15,7 @@ import { Toaster } from 'sonner';
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router   = useRouter();
   const pathname = usePathname();
-  const { user, isAuthenticated, isLoading, fetchMe, impersonation } = useAuthStore();
+  const { user, isAuthenticated, isLoading, hasHydrated, fetchMe, impersonation } = useAuthStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Close sidebar on navigation (mobile)
@@ -56,10 +56,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [tenantFavicon, tenantLogo]);
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (hasHydrated && !isAuthenticated) {
       fetchMe();
     }
-  }, []);
+  }, [hasHydrated]);
 
   // Register service worker for offline caching
   useEffect(() => {
@@ -69,10 +69,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, []);
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
+    if (hasHydrated && !isLoading && !isAuthenticated) {
       router.replace('/login');
     }
-  }, [isLoading, isAuthenticated]);
+  }, [hasHydrated, isLoading, isAuthenticated]);
 
   if (isLoading || !user) {
     return <PageLoader />;
