@@ -339,10 +339,37 @@ async function reactivatePlan(tenantId, { billingCycle, couponCode } = {}) {
   });
 }
 
+// ── Lemon Squeezy checkout ────────────────────────────────────────────────────
+// Variant IDs are stored as env vars: LS_VARIANT_{PLAN}_{CYCLE}
+// planSlug: 'basic' | 'pro'   billingCycle: 'monthly' | 'yearly'
+async function createLsCheckout(tenantId, { planSlug, billingCycle }) {
+  const { createCheckout } = require('../../services/lemonSqueezy/lemonSqueezy.service');
+
+  const key = `LS_VARIANT_${planSlug.toUpperCase()}_${billingCycle.toUpperCase()}`;
+  const variantId = process.env[key];
+  if (!variantId) throw new AppError(`Lemon Squeezy variant not configured (${key})`, 500);
+
+  const tenant = await tenantRepo.findById(tenantId);
+  if (!tenant) throw new AppError('Tenant not found', 404);
+
+  const appUrl = process.env.APP_URL || 'http://localhost:3000';
+  const checkoutUrl = await createCheckout({
+    variantId,
+    tenantId,
+    email:        tenant.contactEmail,
+    name:         tenant.name,
+    billingCycle,
+    successUrl:   `${appUrl}/billing?ls_success=1`,
+    cancelUrl:    `${appUrl}/billing`,
+  });
+
+  return { checkoutUrl };
+}
+
 module.exports = {
   getMySubscription, getMyInvoices, getInvoice, getAvailablePlans,
   validateCoupon, upgradePlan, reactivatePlan, confirmSubscriptionPayment,
   createPortalSession, downloadInvoice,
   listPaymentMethods, deletePaymentMethod,
-  getBillingInfo,
+  getBillingInfo, createLsCheckout,
 };

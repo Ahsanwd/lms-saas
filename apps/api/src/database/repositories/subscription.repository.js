@@ -46,6 +46,14 @@ class SubscriptionRepository {
   updateById(id, update) {
     return Subscription.findByIdAndUpdate(id, update, { new: true });
   }
+
+  updateByLsId(lsSubscriptionId, update) {
+    return Subscription.findOneAndUpdate({ lsSubscriptionId }, update, { new: true });
+  }
+
+  findByLsId(lsSubscriptionId) {
+    return Subscription.findOne({ lsSubscriptionId }).populate('planId').populate('tenantId', 'name contactEmail');
+  }
 }
 
 module.exports = new SubscriptionRepository();

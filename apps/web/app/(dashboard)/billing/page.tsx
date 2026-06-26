@@ -825,84 +825,117 @@ function NoSubscriptionCard({ onChangePlan }: { onChangePlan: () => void }) {
   );
 }
 
-// ── Plans Grid ────────────────────────────────────────────────────────────────
+// ── Plans Grid (Lemon Squeezy checkout) ──────────────────────────────────────
+
+function PlanCard({ plan, currentPlan }: { plan: Plan; currentPlan?: Plan }) {
+  const [cycle, setCycle]       = useState<'monthly' | 'yearly'>('monthly');
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState('');
+
+  const isCurrent = plan._id === currentPlan?._id;
+  const dir       = planDirection(plan, currentPlan);
+  const price     = cycle === 'yearly' ? plan.price.yearly : plan.price.monthly;
+
+  async function handleCheckout() {
+    setError('');
+    setLoading(true);
+    try {
+      const { data } = await api.post('/billing/ls/checkout', { planSlug: plan.slug, billingCycle: cycle });
+      window.location.href = data.data.checkoutUrl;
+    } catch (e: unknown) {
+      setError((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Could not open checkout');
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className={cn(
+      'bg-white rounded-xl border-2 p-5 relative flex flex-col transition-all',
+      isCurrent ? 'border-primary-300 shadow-sm' : 'border-gray-100 hover:border-gray-200 hover:shadow-sm'
+    )}>
+      {isCurrent && (
+        <span className="absolute top-3 right-3 text-xs bg-primary-100 text-primary-700 px-2.5 py-0.5 rounded-full font-semibold">
+          Current
+        </span>
+      )}
+
+      <h3 className="text-base font-semibold text-gray-900 mb-1">{plan.name}</h3>
+
+      {/* Billing cycle toggle */}
+      {!isCurrent && plan.price.monthly > 0 && (
+        <div className="flex gap-1 mb-3 bg-gray-100 rounded-lg p-1 w-fit">
+          {(['monthly', 'yearly'] as const).map(c => (
+            <button
+              key={c}
+              onClick={() => setCycle(c)}
+              className={cn(
+                'text-xs px-3 py-1 rounded-md font-medium transition-all capitalize',
+                cycle === c ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'
+              )}
+            >
+              {c}
+              {c === 'yearly' && <span className="ml-1 text-green-600">-17%</span>}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="mb-4">
+        {plan.price.monthly === 0 ? (
+          <span className="text-3xl font-bold text-gray-900">Free</span>
+        ) : (
+          <div className="flex items-baseline gap-1">
+            <span className="text-3xl font-bold text-gray-900">${price}</span>
+            <span className="text-sm text-gray-400">/{cycle === 'yearly' ? 'yr' : 'mo'}</span>
+          </div>
+        )}
+      </div>
+
+      <ul className="space-y-2 mb-5 flex-1">
+        {[
+          `${limitLabel(plan.limits.students)} students`,
+          `${limitLabel(plan.limits.instructors)} instructors`,
+          `${limitLabel(plan.limits.courses)} courses`,
+          `${plan.limits.storageGB} GB storage`,
+          ...plan.features,
+        ].map(item => (
+          <li key={item} className="flex items-center gap-2 text-xs text-gray-600">
+            <svg className="w-3.5 h-3.5 text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+            </svg>
+            {item}
+          </li>
+        ))}
+      </ul>
+
+      {error && <p className="text-xs text-red-600 mb-2">{error}</p>}
+
+      {!isCurrent && plan.price.monthly > 0 && (
+        <Button
+          onClick={handleCheckout}
+          loading={loading}
+          className={cn(
+            'w-full py-2 text-sm font-semibold',
+            dir === 'upgrade'
+              ? 'bg-primary-600 text-white hover:bg-primary-700'
+              : 'bg-white border-2 border-amber-300 text-amber-700 hover:bg-amber-50'
+          )}
+        >
+          {dir === 'upgrade' ? `↑ Upgrade to ${plan.name}` : `↓ Switch to ${plan.name}`}
+        </Button>
+      )}
+    </div>
+  );
+}
 
 function PlansGrid({
-  plans, currentPlan, onSelectPlan,
-}: { plans: Plan[]; currentPlan?: Plan; onSelectPlan: (planId: string) => void }) {
+  plans, currentPlan,
+}: { plans: Plan[]; currentPlan?: Plan }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      {[...plans].sort((a, b) => a.price.monthly - b.price.monthly).map(plan => {
-        const isCurrent = plan._id === currentPlan?._id;
-        const dir = planDirection(plan, currentPlan);
-
-        return (
-          <div
-            key={plan._id}
-            className={cn(
-              'bg-white rounded-xl border-2 p-5 relative flex flex-col transition-all',
-              isCurrent
-                ? 'border-primary-300 shadow-sm'
-                : 'border-gray-100 hover:border-gray-200 hover:shadow-sm'
-            )}
-          >
-            {/* Current badge */}
-            {isCurrent && (
-              <span className="absolute top-3 right-3 text-xs bg-primary-100 text-primary-700 px-2.5 py-0.5 rounded-full font-semibold">
-                Current
-              </span>
-            )}
-
-            <h3 className="text-base font-semibold text-gray-900 mb-1">{plan.name}</h3>
-            <div className="mb-4">
-              {plan.price.monthly === 0 ? (
-                <span className="text-3xl font-bold text-gray-900">Free</span>
-              ) : (
-                <div className="flex items-baseline gap-1">
-                  <span className="text-3xl font-bold text-gray-900">${plan.price.monthly}</span>
-                  <span className="text-sm text-gray-400">/mo</span>
-                  {plan.price.yearly > 0 && (
-                    <span className="ml-2 text-xs text-gray-400">
-                      or ${plan.price.yearly}/yr
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <ul className="space-y-2 mb-5 flex-1">
-              {[
-                `${limitLabel(plan.limits.students)} students`,
-                `${limitLabel(plan.limits.instructors)} instructors`,
-                `${limitLabel(plan.limits.courses)} courses`,
-                `${plan.limits.storageGB} GB storage`,
-                ...plan.features,
-              ].map(item => (
-                <li key={item} className="flex items-center gap-2 text-xs text-gray-600">
-                  <svg className="w-3.5 h-3.5 text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                  </svg>
-                  {item}
-                </li>
-              ))}
-            </ul>
-
-            {!isCurrent && (
-              <button
-                onClick={() => onSelectPlan(plan._id)}
-                className={cn(
-                  'w-full py-2 px-4 rounded-lg text-sm font-semibold border-2 transition-all',
-                  dir === 'upgrade'
-                    ? 'bg-primary-600 border-primary-600 text-white hover:bg-primary-700 hover:border-primary-700'
-                    : 'bg-white border-amber-300 text-amber-700 hover:bg-amber-50'
-                )}
-              >
-                {dir === 'upgrade' ? `↑ Upgrade to ${plan.name}` : `↓ Downgrade to ${plan.name}`}
-              </button>
-            )}
-          </div>
-        );
-      })}
+      {[...plans].sort((a, b) => a.price.monthly - b.price.monthly).map(plan => (
+        <PlanCard key={plan._id} plan={plan} currentPlan={currentPlan} />
+      ))}
     </div>
   );
 }
@@ -1078,7 +1111,20 @@ function SavedPaymentMethodsCard() {
 export default function BillingPage() {
   const [showModal, setShowModal] = useState(false);
   const [preselectedPlanId, setPreselectedPlanId] = useState<string | undefined>();
+  const [lsSuccess, setLsSuccess] = useState(false);
   const qcPage = useQueryClient();
+
+  // Detect return from Lemon Squeezy checkout
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('ls_success') === '1') {
+      setLsSuccess(true);
+      window.history.replaceState({}, '', '/billing');
+      qcPage.invalidateQueries({ queryKey: ['billing', 'subscription'] });
+      qcPage.invalidateQueries({ queryKey: ['billing', 'invoices'] });
+    }
+  }, [qcPage]);
 
   // Real-time billing refresh — invalidate queries when server pushes billing:updated
   useEffect(() => {
@@ -1140,6 +1186,20 @@ export default function BillingPage() {
         <p className="text-sm text-gray-500 mt-0.5">Manage your plan, apply coupons, and view invoices.</p>
       </div>
 
+      {/* Lemon Squeezy payment success banner */}
+      {lsSuccess && (
+        <div className="bg-green-50 border border-green-200 rounded-xl px-5 py-4 flex items-start gap-3">
+          <span className="text-green-500 text-xl">✓</span>
+          <div>
+            <p className="font-semibold text-green-800 text-sm">Payment successful!</p>
+            <p className="text-green-700 text-xs mt-0.5">
+              Your subscription has been activated. It may take a few seconds to reflect below.
+            </p>
+          </div>
+          <button onClick={() => setLsSuccess(false)} className="ml-auto text-green-400 hover:text-green-600 text-lg leading-none">×</button>
+        </div>
+      )}
+
       {/* Expired / past-due reactivation banner */}
       {sub && (sub.status === 'expired' || sub.status === 'past_due') && (
         <ReactivateBanner
@@ -1167,7 +1227,6 @@ export default function BillingPage() {
           <PlansGrid
             plans={plans}
             currentPlan={sub?.planId}
-            onSelectPlan={(planId) => openModal(planId)}
           />
         </section>
       )}

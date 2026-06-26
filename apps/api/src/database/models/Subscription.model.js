@@ -39,6 +39,12 @@ const subscriptionSchema = new mongoose.Schema(
     stripeCustomerId: { type: String, default: null },
     notes: { type: String, default: null },
 
+    // Lemon Squeezy fields
+    lsSubscriptionId: { type: String, default: null },  // LS subscription ID
+    lsCustomerId:     { type: String, default: null },  // LS customer ID
+    lsVariantId:      { type: String, default: null },  // LS variant ID (plan+cycle)
+    lsOrderId:        { type: String, default: null },  // LS order ID for first payment
+
     // Idempotency: tracks last date each warning level was sent (keys: '7d', '3d', '1d')
     warnings: { type: Map, of: Date, default: () => new Map() },
   },

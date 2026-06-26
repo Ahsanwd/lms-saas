@@ -29,6 +29,17 @@ async function getPlans(req, res, next) {
   } catch (err) { next(err); }
 }
 
+async function createLsCheckout(req, res, next) {
+  try {
+    const { planSlug, billingCycle } = req.body;
+    if (!planSlug || !billingCycle) return R.error(res, 'planSlug and billingCycle are required', 400);
+    if (!['basic', 'pro'].includes(planSlug)) return R.error(res, 'Invalid plan', 400);
+    if (!['monthly', 'yearly'].includes(billingCycle)) return R.error(res, 'Invalid billing cycle', 400);
+    const result = await billingService.createLsCheckout(req.tenant.tenantId, { planSlug, billingCycle });
+    R.success(res, result);
+  } catch (err) { next(err); }
+}
+
 async function validateCoupon(req, res, next) {
   try {
     const { code, planId } = req.body;
@@ -106,4 +117,5 @@ module.exports = {
   validateCoupon, upgradePlan, reactivatePlan, confirmSubscriptionPayment,
   createPortalSession, downloadInvoice,
   getBillingInfo, listPaymentMethods, deletePaymentMethod,
+  createLsCheckout,
 };

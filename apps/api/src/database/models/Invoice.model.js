@@ -40,6 +40,10 @@ const invoiceSchema = new mongoose.Schema(
 
     // Stripe payment intent ID (set when Stripe is used for payment)
     stripePaymentIntentId: { type: String, default: null },
+
+    // Payment provider tracking
+    provider:          { type: String, enum: ['stripe', 'paypal', 'lemonsqueezy', 'manual'], default: 'manual' },
+    providerInvoiceId: { type: String, default: null },
   },
   { timestamps: true }
 );

@@ -118,6 +118,13 @@ app.post(
   require('./modules/webhook/paypal.webhook').handleWebhook
 );
 
+// Lemon Squeezy webhook — raw body required for HMAC-SHA256 signature verification
+app.post(
+  '/api/ls/webhook',
+  express.raw({ type: 'application/json' }),
+  require('./modules/webhook/lemonSqueezy.webhook').handleWebhook
+);
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
