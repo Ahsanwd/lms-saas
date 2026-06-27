@@ -281,19 +281,23 @@ async function login({ email, password, tenantId, rememberMe = false, req }) {
     throw new AppError('Invalid credentials', 401, 'INVALID_CREDENTIALS');
   }
 
-  await userRepo.updateById(user._id, { loginAttempts: 0, lockUntil: null, lastLoginAt: new Date() });
-
-  // If 2FA is enabled, issue a short-lived temp token instead of real session
+  // Check 2FA before any DB writes — no need to await the user update before returning tempToken
   if (user.twoFactor?.enabled) {
+    userRepo.updateById(user._id, { loginAttempts: 0, lockUntil: null, lastLoginAt: new Date() });
     const tempToken = signTempToken({ sub: user._id.toString(), tenantId: tenantId?.toString() });
     return { requiresTwoFactor: true, tempToken };
   }
 
+  // Build tokens synchronously before hitting DB
   const sessionId = uuidv4();
   const { accessToken, refreshToken } = buildTokens(user, sessionId, rememberMe);
   const expiresAt = new Date(Date.now() + (rememberMe ? 30 : 7) * 24 * 60 * 60 * 1000);
 
-  await sessionRepo.create({ tenantId, userId: user._id, sessionId, refreshToken, deviceInfo, expiresAt });
+  // Parallelize the two independent DB writes — saves one Atlas round trip
+  await Promise.all([
+    userRepo.updateById(user._id, { loginAttempts: 0, lockUntil: null, lastLoginAt: new Date() }),
+    sessionRepo.create({ tenantId, userId: user._id, sessionId, refreshToken, deviceInfo, expiresAt }),
+  ]);
 
   auditLogRepo.log({ tenantId, userId: user._id, email, event: 'login', ip: deviceInfo.ip, userAgent: deviceInfo.ua });
 
