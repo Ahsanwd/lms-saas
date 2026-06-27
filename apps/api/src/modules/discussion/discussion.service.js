@@ -2,6 +2,8 @@ const discussionRepo  = require('../../database/repositories/discussion.reposito
 const lessonRepo      = require('../../database/repositories/lesson.repository');
 const enrollmentRepo  = require('../../database/repositories/enrollment.repository');
 const userRepo        = require('../../database/repositories/user.repository');
+const courseRepo      = require('../../database/repositories/course.repository');
+const notificationSvc = require('../notification/notification.service');
 const AppError        = require('../../utils/AppError');
 
 const EDITOR_ROLES = ['tenant_admin', 'instructor'];
@@ -68,7 +70,7 @@ async function post(tenantId, lessonId, user, body) {
   const lesson  = await checkWriteAccess(tenantId, lessonId, user);
   const userDoc = await userRepo.findByIdRaw(user.sub);
 
-  return discussionRepo.create({
+  const discussion = await discussionRepo.create({
     tenantId,
     courseId:   lesson.courseId,
     lessonId,
@@ -78,6 +80,30 @@ async function post(tenantId, lessonId, user, body) {
     authorRole: user.role,
     body:       body.trim(),
   });
+
+  // Notify instructor (and tenant_admin if different) — fire-and-forget
+  if (user.role === 'student') {
+    setImmediate(async () => {
+      try {
+        const course = await courseRepo.findById(tenantId, lesson.courseId.toString());
+        if (!course) return;
+        const instructorId = course.instructorId?.toString();
+        const link = `/courses/${lesson.courseId}/learn?lesson=${lessonId}`;
+        const notifyIds = new Set();
+        if (instructorId && instructorId !== user.sub) notifyIds.add(instructorId);
+        for (const id of notifyIds) {
+          await notificationSvc.create(tenantId, id, {
+            type: 'discussion_comment',
+            title: 'New student question',
+            message: `${userDoc.firstName} ${userDoc.lastName} posted in "${lesson.title}"`,
+            link,
+          });
+        }
+      } catch {}
+    });
+  }
+
+  return discussion;
 }
 
 // ── Reply to an existing top-level post ───────────────────────────────────────
@@ -92,7 +118,7 @@ async function reply(tenantId, parentId, user, body) {
 
   const userDoc = await userRepo.findByIdRaw(user.sub);
 
-  return discussionRepo.create({
+  const replyDoc = await discussionRepo.create({
     tenantId,
     courseId:   parent.courseId,
     lessonId:   parent.lessonId,
@@ -102,6 +128,23 @@ async function reply(tenantId, parentId, user, body) {
     authorRole: user.role,
     body:       body.trim(),
   });
+
+  // Notify original post author if someone else replied — fire-and-forget
+  setImmediate(async () => {
+    try {
+      const originalAuthorId = parent.userId.toString();
+      if (originalAuthorId === user.sub) return; // replying to own post
+      const link = `/courses/${parent.courseId}/learn?lesson=${parent.lessonId}`;
+      await notificationSvc.create(tenantId, originalAuthorId, {
+        type: 'discussion_reply',
+        title: 'New reply to your post',
+        message: `${userDoc.firstName} ${userDoc.lastName} replied to your comment`,
+        link,
+      });
+    } catch {}
+  });
+
+  return replyDoc;
 }
 
 // ── Edit body of own post ─────────────────────────────────────────────────────

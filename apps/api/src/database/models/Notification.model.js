@@ -26,6 +26,8 @@ const notificationSchema = new mongoose.Schema(
         'refund_rejected',      // refund request rejected
         'live_session_reminder', // live class starting in 1 hour
         'email_delivery_failed', // dead-letter alert for tenant admin
+        'discussion_comment',   // student posted in lesson discussion
+        'discussion_reply',     // someone replied to your discussion post
       ],
       required: true,
     },
