@@ -100,30 +100,36 @@ async function createCourse(tenantId, data, user) {
   const existing = await courseRepo.findBySlug(tenantId, slug);
   if (existing) throw new AppError('A course with this title already exists', 409);
 
-  const course = await courseRepo.create({
-    tenantId,
-    title: data.title.trim(),
-    slug,
-    description: data.description,
-    shortDescription: data.shortDescription,
-    categoryId: data.categoryId || null,
-    level: data.level || 'all',
-    language: data.language || 'en',
-    tags: data.tags || [],
-    price: data.price || 0,
-    isFree: !data.price || data.price === 0,
-    requirements: data.requirements || [],
-    objectives: data.objectives || [],
-    capacity: data.capacity || 0,
-    certificateEnabled: data.certificateEnabled || false,
-    allowPreview: data.allowPreview || false,
-    instructorId: data.instructorId || user.sub,
-    status: 'draft',
-    createdBy: user.sub,
-  });
+  let course;
+  try {
+    course = await courseRepo.create({
+      tenantId,
+      title: data.title.trim(),
+      slug,
+      description: data.description,
+      shortDescription: data.shortDescription,
+      categoryId: data.categoryId || null,
+      level: data.level || 'all',
+      language: data.language || 'en',
+      tags: data.tags || [],
+      price: data.price || 0,
+      isFree: !data.price || data.price === 0,
+      requirements: data.requirements || [],
+      objectives: data.objectives || [],
+      capacity: data.capacity || 0,
+      certificateEnabled: data.certificateEnabled || false,
+      allowPreview: data.allowPreview || false,
+      instructorId: data.instructorId || user.sub,
+      status: 'draft',
+      createdBy: user.sub,
+    });
+  } catch (err) {
+    if (err.code === 11000) throw new AppError('A course with this title already exists', 409);
+    throw err;
+  }
 
   if (data.categoryId) {
-    await categoryRepo.incrementCourseCount(tenantId, data.categoryId, 1);
+    await categoryRepo.incrementCourseCount(tenantId, data.categoryId, 1).catch(() => {});
   }
 
   return course;

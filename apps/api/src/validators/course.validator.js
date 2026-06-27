@@ -4,8 +4,11 @@ const LEVELS = ['beginner', 'intermediate', 'advanced', 'all'];
 const LESSON_TYPES = ['video', 'text', 'file', 'quiz', 'audio', 'live'];
 const DISPLAY_LAYOUTS = ['classic', 'hero', 'minimal'];
 
-function validateCreateCourse({ title, level }) {
+function validateCreateCourse({ title, description, level }) {
   if (!title?.trim()) throw new AppError('Course title is required', 400);
+  if (title.trim().length < 3) throw new AppError('Course title must be at least 3 characters', 400);
+  if (!description?.trim()) throw new AppError('Course description is required', 400);
+  if (description.trim().length < 10) throw new AppError('Description must be at least 10 characters', 400);
   if (level && !LEVELS.includes(level))
     throw new AppError(`Level must be one of: ${LEVELS.join(', ')}`, 400);
 }

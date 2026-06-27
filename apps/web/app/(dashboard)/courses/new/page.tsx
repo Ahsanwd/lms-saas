@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
-import { Button, Alert } from '@/components/ui';
+import { Button } from '@/components/ui';
 import { AxiosError } from 'axios';
 import { useState } from 'react';
 
@@ -177,8 +177,6 @@ export default function NewCoursePage() {
           <p className="text-sm text-gray-500 mt-0.5">Set up your course — you can add lessons, quizzes and more after creating it.</p>
         </div>
       </div>
-
-      {error && <Alert variant="error">{error}</Alert>}
 
       {/* Two-column layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
@@ -374,7 +372,16 @@ export default function NewCoursePage() {
           </div>
 
           {/* Actions */}
-          <div className="flex items-center justify-end gap-3 pt-1">
+          <div className="space-y-3 pt-1">
+            {error && (
+              <div className="flex items-start gap-2.5 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>{error}</span>
+              </div>
+            )}
+            <div className="flex items-center justify-end gap-3">
             <Button type="button" variant="outline" onClick={() => router.back()}>
               Cancel
             </Button>
@@ -384,6 +391,7 @@ export default function NewCoursePage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
               </svg>
             </Button>
+            </div>
           </div>
         </form>
 
