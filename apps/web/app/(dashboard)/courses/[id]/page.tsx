@@ -630,32 +630,36 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
 
             {/* Lesson Type */}
             <div>
-              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Lesson Type</label>
-              <div className="grid grid-cols-6 gap-2">
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2.5">Lesson Type</label>
+              <div className="grid grid-cols-5 gap-2">
                 {([
-                  { t: 'text',  bg: 'bg-indigo-50', border: 'border-indigo-200', activeBg: 'bg-indigo-500', icon: (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                  { t: 'text', icon: (
+                    <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                   ), label: 'Text' },
-                  { t: 'video', bg: 'bg-blue-50',   border: 'border-blue-200',   activeBg: 'bg-blue-500',   icon: (
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                  { t: 'video', icon: (
+                    <svg className="w-4.5 h-4.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                   ), label: 'Video' },
-                  { t: 'audio', bg: 'bg-purple-50', border: 'border-purple-200', activeBg: 'bg-purple-500', icon: (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z"/></svg>
+                  { t: 'audio', icon: (
+                    <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z"/></svg>
                   ), label: 'Audio' },
-                  { t: 'file',  bg: 'bg-orange-50', border: 'border-orange-200', activeBg: 'bg-orange-500', icon: (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
-                  ), label: 'File/PDF' },
-                  { t: 'live',  bg: 'bg-green-50',  border: 'border-green-200',  activeBg: 'bg-green-500',  icon: (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.069A1 1 0 0121 8.845v6.31a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                  { t: 'file', icon: (
+                    <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                  ), label: 'File / PDF' },
+                  { t: 'live', icon: (
+                    <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M15 10l4.553-2.069A1 1 0 0121 8.845v6.31a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
                   ), label: 'Live' },
-                ] as { t: LessonType; bg: string; border: string; activeBg: string; icon: React.ReactNode; label: string }[]).map(({ t, bg, border, activeBg, icon, label }) => {
+                ] as { t: LessonType; icon: React.ReactNode; label: string }[]).map(({ t, icon, label }) => {
                   const isActive = type === t;
                   return (
                     <button key={t} type="button" onClick={() => { setType(t); setSelectedFile(null); }}
-                      className={cn('flex flex-col items-center gap-2 py-3.5 rounded-2xl border-2 font-medium transition-all',
-                        isActive ? `${activeBg} border-transparent text-white shadow-md scale-[1.02]` : `${bg} ${border} text-gray-500 hover:scale-[1.01] hover:shadow-sm`)}>
-                      <span className={isActive ? 'text-white' : 'text-gray-400'}>{icon}</span>
-                      <span className="text-[11px] font-semibold">{label}</span>
+                      className={cn(
+                        'flex flex-col items-center gap-2 py-3 rounded-xl border transition-all text-sm font-medium',
+                        isActive
+                          ? 'bg-gray-900 border-gray-900 text-white shadow-sm'
+                          : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50 hover:text-gray-700'
+                      )}>
+                      <span>{icon}</span>
+                      <span className="text-[11px] font-semibold tracking-wide">{label}</span>
                     </button>
                   );
                 })}
@@ -664,29 +668,29 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
 
             {/* ── Text content ── */}
             {type === 'text' && (
-              <div className="rounded-2xl border border-indigo-100 overflow-hidden shadow-sm">
+              <div className="rounded-xl border border-gray-200 overflow-hidden">
                 {/* Top bar: Write/Preview tabs + toolbar */}
-                <div className="flex items-center gap-1 px-3 py-2 bg-indigo-50 border-b border-indigo-100">
+                <div className="flex items-center gap-1 px-3 py-2 bg-gray-50 border-b border-gray-200">
                   {/* Write / Preview tabs */}
-                  <div className="flex items-center gap-0.5 mr-2">
+                  <div className="flex items-center gap-0.5 mr-2 bg-gray-200 rounded-lg p-0.5">
                     <button type="button"
                       onClick={() => setTextEditorMode('write')}
-                      className={cn('px-3 h-7 rounded-lg text-xs font-semibold transition-all',
+                      className={cn('px-3 h-6 rounded-md text-xs font-semibold transition-all',
                         textEditorMode === 'write'
-                          ? 'bg-indigo-600 text-white shadow-sm'
-                          : 'text-indigo-500 hover:bg-indigo-100')}>
+                          ? 'bg-white text-gray-900 shadow-sm'
+                          : 'text-gray-500 hover:text-gray-700')}>
                       Write
                     </button>
                     <button type="button"
                       onClick={() => setTextEditorMode('preview')}
-                      className={cn('px-3 h-7 rounded-lg text-xs font-semibold transition-all',
+                      className={cn('px-3 h-6 rounded-md text-xs font-semibold transition-all',
                         textEditorMode === 'preview'
-                          ? 'bg-indigo-600 text-white shadow-sm'
-                          : 'text-indigo-500 hover:bg-indigo-100')}>
+                          ? 'bg-white text-gray-900 shadow-sm'
+                          : 'text-gray-500 hover:text-gray-700')}>
                       Preview
                     </button>
                   </div>
-                  <div className="w-px h-4 bg-indigo-200 mx-1" />
+                  <div className="w-px h-4 bg-gray-300 mx-1" />
 
                   {/* Formatting toolbar — only visible in Write mode */}
                   {textEditorMode === 'write' && (
@@ -716,11 +720,11 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
                               ta.focus();
                             }, 0);
                           }}
-                          className={cn('w-7 h-7 rounded-lg flex items-center justify-center text-indigo-600 hover:bg-indigo-100 transition-colors', style)}>
+                          className={cn('w-7 h-7 rounded-md flex items-center justify-center text-gray-600 hover:bg-gray-200 transition-colors', style)}>
                           {label}
                         </button>
                       ))}
-                      <div className="w-px h-4 bg-indigo-200 mx-1" />
+                      <div className="w-px h-4 bg-gray-300 mx-1" />
                       {[
                         { label: 'H1', title: 'Heading 1', prefix: '# '  },
                         { label: 'H2', title: 'Heading 2', prefix: '## ' },
@@ -762,16 +766,16 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
                             setContent(newVal);
                             setTimeout(() => { ta.setSelectionRange(newCursorStart, newCursorEnd); ta.focus(); }, 0);
                           }}
-                          className="px-2 h-7 rounded-lg flex items-center justify-center text-xs font-bold text-indigo-600 hover:bg-indigo-100 transition-colors">
+                          className="px-2 h-7 rounded-md flex items-center justify-center text-xs font-bold text-gray-600 hover:bg-gray-200 transition-colors">
                           {label}
                         </button>
                       ))}
-                      <div className="w-px h-4 bg-indigo-200 mx-1" />
+                      <div className="w-px h-4 bg-gray-300 mx-1" />
                       {/* Image upload button */}
                       <button type="button" title="Insert image"
                         onMouseDown={(e) => { e.preventDefault(); setShowImageModal(v => !v); setImageTab('upload'); setImageUrl(''); setImageAlt(''); }}
-                        className={cn('px-2 h-7 rounded-lg flex items-center justify-center text-indigo-600 hover:bg-indigo-100 transition-colors',
-                          showImageModal && 'bg-indigo-100')}>
+                        className={cn('px-2 h-7 rounded-md flex items-center justify-center text-gray-600 hover:bg-gray-200 transition-colors',
+                          showImageModal && 'bg-gray-200')}>
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
@@ -779,19 +783,19 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
                     </>
                   )}
                   <div className="flex-1" />
-                  <span className="text-[10px] text-indigo-400 font-medium">Markdown</span>
+                  <span className="text-[10px] text-gray-400 font-medium tracking-wide">Markdown</span>
                 </div>
 
                 {/* ── Image insert panel ── */}
                 {showImageModal && textEditorMode === 'write' && (
-                  <div className="border-b border-indigo-100 bg-indigo-50/60 px-4 py-3">
+                  <div className="border-b border-gray-200 bg-gray-50 px-4 py-3">
                     {/* Tabs */}
                     <div className="flex gap-1 mb-3">
                       {(['upload', 'url'] as const).map(t => (
                         <button key={t} type="button"
                           onClick={() => setImageTab(t)}
                           className={cn('px-3 py-1 rounded-lg text-xs font-semibold transition-all capitalize',
-                            imageTab === t ? 'bg-indigo-600 text-white' : 'text-indigo-500 hover:bg-indigo-100')}>
+                            imageTab === t ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-200')}>
                           {t === 'upload' ? 'Upload File' : 'Paste URL'}
                         </button>
                       ))}
@@ -803,7 +807,7 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
                       placeholder="Alt text (optional)"
                       value={imageAlt}
                       onChange={e => setImageAlt(e.target.value)}
-                      className="w-full mb-2 px-3 py-1.5 text-xs rounded-lg border border-indigo-200 focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-white"
+                      className="w-full mb-2 px-3 py-1.5 text-xs rounded-lg border border-gray-200 focus:outline-none focus:ring-1 focus:ring-gray-400 bg-white"
                     />
 
                     {imageTab === 'upload' && (
@@ -845,7 +849,7 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
                         <button type="button"
                           onClick={() => imageFileRef.current?.click()}
                           disabled={imageUploading}
-                          className="flex items-center gap-1.5 px-4 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-semibold hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+                          className="flex items-center gap-1.5 px-4 py-1.5 bg-gray-900 text-white rounded-lg text-xs font-semibold hover:bg-gray-800 disabled:opacity-50 transition-colors">
                           {imageUploading ? (
                             <><svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg> Uploading…</>
                           ) : (
@@ -863,7 +867,7 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
                           placeholder="https://example.com/image.jpg"
                           value={imageUrl}
                           onChange={e => setImageUrl(e.target.value)}
-                          className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-indigo-200 focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-white"
+                          className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-gray-200 focus:outline-none focus:ring-1 focus:ring-gray-400 bg-white"
                           onKeyDown={e => {
                             if (e.key === 'Enter' && imageUrl.trim()) {
                               const alt = imageAlt || 'image';
@@ -893,7 +897,7 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
                             }
                             setShowImageModal(false);
                           }}
-                          className="px-4 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-semibold hover:bg-indigo-700 disabled:opacity-40 transition-colors">
+                          className="px-4 py-1.5 bg-gray-900 text-white rounded-lg text-xs font-semibold hover:bg-gray-800 disabled:opacity-40 transition-colors">
                           Insert
                         </button>
                       </div>
