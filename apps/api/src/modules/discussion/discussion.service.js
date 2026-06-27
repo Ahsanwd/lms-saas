@@ -81,23 +81,36 @@ async function post(tenantId, lessonId, user, body) {
     body:       body.trim(),
   });
 
-  // Notify instructor (and tenant_admin if different) — fire-and-forget
+  // Notify instructor + all tenant admins — fire-and-forget
   if (user.role === 'student') {
     setImmediate(async () => {
       try {
+        const User = require('../../database/models/User.model');
         const course = await courseRepo.findById(tenantId, lesson.courseId.toString());
         if (!course) return;
-        const instructorId = course.instructorId?.toString();
+
+        // instructorId is populated as a user object — extract _id safely
+        const instructorId = course.instructorId?._id?.toString() ?? course.instructorId?.toString();
         const link = `/courses/${lesson.courseId}/learn?lesson=${lessonId}`;
         const notifyIds = new Set();
+
         if (instructorId && instructorId !== user.sub) notifyIds.add(instructorId);
+
+        // Also notify all active tenant admins
+        const admins = await User.find({ tenantId, role: 'tenant_admin', status: 'active', deletedAt: null }).select('_id').lean();
+        for (const a of admins) {
+          const aid = a._id.toString();
+          if (aid !== user.sub) notifyIds.add(aid);
+        }
+
+        const payload = {
+          type: 'discussion_comment',
+          title: 'New student question',
+          message: `${userDoc.firstName} ${userDoc.lastName} posted in "${lesson.title}"`,
+          link,
+        };
         for (const id of notifyIds) {
-          await notificationSvc.create(tenantId, id, {
-            type: 'discussion_comment',
-            title: 'New student question',
-            message: `${userDoc.firstName} ${userDoc.lastName} posted in "${lesson.title}"`,
-            link,
-          });
+          notificationSvc.create(tenantId, id, payload).catch(() => {});
         }
       } catch {}
     });
