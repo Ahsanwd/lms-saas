@@ -53,6 +53,8 @@ require('./jobs/queue').analyticsReportQueue().add(
 ).catch(() => {});
 
 const app    = express();
+// Trust Render's proxy so express-rate-limit reads the correct client IP
+app.set('trust proxy', 1);
 const server = http.createServer(app);
 const io     = new Server(server, {
   cors: {
