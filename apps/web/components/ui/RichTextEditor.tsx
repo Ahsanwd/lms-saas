@@ -6,7 +6,7 @@ import Link from '@tiptap/extension-link';
 import Underline from '@tiptap/extension-underline';
 import TextAlign from '@tiptap/extension-text-align';
 import Placeholder from '@tiptap/extension-placeholder';
-import TextStyle from '@tiptap/extension-text-style';
+import { TextStyle } from '@tiptap/extension-text-style';
 import Color from '@tiptap/extension-color';
 import { useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
@@ -73,7 +73,7 @@ export function RichTextEditor({
     },
     editorProps: {
       attributes: {
-        class: 'prose prose-sm max-w-none focus:outline-none px-4 py-3 text-gray-800',
+        class: 'focus:outline-none px-4 py-3',
         style: `min-height:${minHeight}px`,
       },
     },
@@ -84,7 +84,7 @@ export function RichTextEditor({
     if (!editor) return;
     if (mode === 'visual') {
       const current = editor.getHTML();
-      if (value !== current) editor.commands.setContent(value ?? '', false);
+      if (value !== current) editor.commands.setContent(value ?? '');
     }
   }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -97,7 +97,7 @@ export function RichTextEditor({
 
   function switchToVisual() {
     if (!editor) return;
-    editor.commands.setContent(rawHtml, false);
+    editor.commands.setContent(rawHtml);
     onChange(rawHtml);
     setMode('visual');
   }
