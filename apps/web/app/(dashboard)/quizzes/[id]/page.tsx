@@ -1167,97 +1167,155 @@ function SettingsTab({ quizId, quiz }: { quizId: string; quiz: QuizDetail }) {
     });
   };
 
-  const toggle = (label: string, val: boolean, set: (v: boolean) => void) => (
-    <label className="flex items-center justify-between py-3 border-b border-gray-50 last:border-0 cursor-pointer">
-      <span className="text-sm text-gray-700">{label}</span>
-      <div
-        onClick={() => set(!val)}
-        className={`relative w-10 h-5 rounded-full transition-colors ${val ? 'bg-primary-600' : 'bg-gray-200'}`}
-      >
-        <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${val ? 'translate-x-5' : ''}`} />
+  const Toggle = ({ label, desc, val, set }: { label: string; desc?: string; val: boolean; set: (v: boolean) => void }) => (
+    <div
+      onClick={() => set(!val)}
+      className="flex items-center justify-between py-3.5 px-1 cursor-pointer group"
+    >
+      <div className="flex-1 min-w-0 pr-4">
+        <p className="text-sm font-medium text-gray-800 group-hover:text-gray-900">{label}</p>
+        {desc && <p className="text-xs text-gray-400 mt-0.5">{desc}</p>}
       </div>
-    </label>
+      <div className={`relative flex-shrink-0 w-11 h-6 rounded-full transition-colors duration-200 ${val ? 'bg-primary-600' : 'bg-gray-200'}`}>
+        <span className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${val ? 'translate-x-5' : ''}`} />
+      </div>
+    </div>
   );
 
   return (
-    <div className="space-y-5 max-w-lg">
+    <div className="max-w-2xl space-y-5">
       {error && <Alert variant="error">{error}</Alert>}
-      {saved && <Alert variant="success">Settings saved.</Alert>}
 
-      <Card>
-        <CardHeader><CardTitle>Quiz Info</CardTitle></CardHeader>
-        <CardContent className="space-y-4">
+      {/* ── Quiz Info ── */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100 bg-gray-50">
+          <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
+            <svg className="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Description <span className="text-gray-400 font-normal text-xs">(shown on the quiz info screen)</span></label>
+            <h3 className="text-sm font-semibold text-gray-800">Quiz Info</h3>
+            <p className="text-xs text-gray-400">Visible to students before they start</p>
+          </div>
+        </div>
+        <div className="px-6 py-5 space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Description</label>
             <textarea rows={3} value={description} onChange={e => setDescription(e.target.value)}
               placeholder="What is this quiz about?"
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none" />
+              className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 bg-gray-50 placeholder:text-gray-300 resize-none" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Instructions <span className="text-gray-400 font-normal text-xs">(shown in a yellow box before students start)</span></label>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+              Instructions
+              <span className="ml-2 normal-case text-gray-400 font-normal">shown in a notice box before students start</span>
+            </label>
             <textarea rows={3} value={instructions} onChange={e => setInstructions(e.target.value)}
               placeholder="e.g. Read each question carefully. You have one attempt."
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none" />
+              className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 bg-gray-50 placeholder:text-gray-300 resize-none" />
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      <Card>
-        <CardHeader><CardTitle>Attempt Settings</CardTitle></CardHeader>
-        <CardContent className="space-y-4">
+      {/* ── Attempt & Scoring ── */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100 bg-gray-50">
+          <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+            <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-gray-800">Attempt & Scoring</h3>
+            <p className="text-xs text-gray-400">Control how students attempt and pass</p>
+          </div>
+        </div>
+        <div className="px-6 py-5 space-y-5">
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Max Attempts</label>
-              <input type="number" min={0}
-                value={maxAttempts} onChange={(e) => setMaxAttempts(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-              />
-              <p className="text-xs text-gray-400 mt-1">0 = unlimited</p>
+            <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Max Attempts</label>
+              <input type="number" min={0} value={maxAttempts} onChange={(e) => setMaxAttempts(e.target.value)}
+                className="w-full px-3 py-2 text-sm font-semibold text-gray-800 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white" />
+              <p className="text-xs text-gray-400 mt-1.5">0 = unlimited</p>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Passing Score (%)</label>
-              <input type="number" min={0} max={100}
-                value={passingScore} onChange={(e) => setPassingScore(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-              />
+            <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Passing Score</label>
+              <div className="flex items-center gap-2">
+                <input type="number" min={0} max={100} value={passingScore} onChange={(e) => setPassingScore(e.target.value)}
+                  className="flex-1 px-3 py-2 text-sm font-semibold text-gray-800 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white" />
+                <span className="text-sm font-medium text-gray-500">%</span>
+              </div>
+              <p className="text-xs text-gray-400 mt-1.5">Minimum to pass</p>
             </div>
           </div>
 
           {/* Timer */}
-          <div>
-            <label className="flex items-center gap-2 mb-2 cursor-pointer">
-              <input type="checkbox" checked={timerEnabled} onChange={(e) => setTimerEnabled(e.target.checked)}
-                className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
-              <span className="text-sm font-medium text-gray-700">Enable Timer</span>
-            </label>
+          <div className={`rounded-xl border p-4 transition-colors ${timerEnabled ? 'bg-amber-50 border-amber-200' : 'bg-gray-50 border-gray-100'}`}>
+            <div className="flex items-center justify-between cursor-pointer" onClick={() => setTimerEnabled(v => !v)}>
+              <div className="flex items-center gap-2.5">
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${timerEnabled ? 'bg-amber-200' : 'bg-gray-200'}`}>
+                  <svg className={`w-4 h-4 ${timerEnabled ? 'text-amber-700' : 'text-gray-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">Timer</p>
+                  <p className="text-xs text-gray-400">Limit time allowed per attempt</p>
+                </div>
+              </div>
+              <div className={`relative w-11 h-6 rounded-full transition-colors ${timerEnabled ? 'bg-amber-500' : 'bg-gray-200'}`}>
+                <span className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${timerEnabled ? 'translate-x-5' : ''}`} />
+              </div>
+            </div>
             {timerEnabled && (
-              <div className="flex items-center gap-2 ml-6">
-                <input type="number" min={1}
-                  value={timerMins} onChange={(e) => setTimerMins(e.target.value)}
-                  className="w-24 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                />
-                <span className="text-sm text-gray-500">minutes</span>
+              <div className="flex items-center gap-3 mt-3 pt-3 border-t border-amber-200">
+                <input type="number" min={1} value={timerMins} onChange={(e) => setTimerMins(e.target.value)}
+                  className="w-24 px-3 py-2 text-sm font-semibold border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white" />
+                <span className="text-sm text-amber-700 font-medium">minutes per attempt</span>
               </div>
             )}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      <Card>
-        <CardHeader><CardTitle>Behaviour</CardTitle></CardHeader>
-        <CardContent className="py-1">
-          {toggle('Shuffle Questions', shuffleQuestions, setShuffleQuestions)}
-          {toggle('Shuffle Options', shuffleOptions, setShuffleOptions)}
-          {toggle('Negative Marking', negativeMarking, setNegativeMarking)}
-          {toggle('Show Correct Answers After Submit', showCorrectAnswers, setShowCorrectAnswers)}
-          {toggle('Show Explanations After Submit', showExplanations, setShowExplanations)}
-          {toggle('Allow Retake', allowRetake, setAllowRetake)}
-          {toggle('Issue Certificate on Pass', triggerCertificate, setTriggerCertificate)}
-        </CardContent>
-      </Card>
+      {/* ── Behaviour ── */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100 bg-gray-50">
+          <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
+            <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+            </svg>
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-gray-800">Behaviour</h3>
+            <p className="text-xs text-gray-400">Control quiz experience and feedback</p>
+          </div>
+        </div>
+        <div className="px-6 divide-y divide-gray-50">
+          <Toggle label="Shuffle Questions" desc="Randomise question order for each student" val={shuffleQuestions} set={setShuffleQuestions} />
+          <Toggle label="Shuffle Options" desc="Randomise answer options order" val={shuffleOptions} set={setShuffleOptions} />
+          <Toggle label="Negative Marking" desc="Deduct marks for wrong answers" val={negativeMarking} set={setNegativeMarking} />
+          <Toggle label="Show Correct Answers" desc="Reveal correct answers after submission" val={showCorrectAnswers} set={setShowCorrectAnswers} />
+          <Toggle label="Show Explanations" desc="Show question explanations after submission" val={showExplanations} set={setShowExplanations} />
+          <Toggle label="Allow Retake" desc="Students can retake within attempt limit" val={allowRetake} set={setAllowRetake} />
+          <Toggle label="Issue Certificate on Pass" desc="Auto-generate certificate when student passes" val={triggerCertificate} set={setTriggerCertificate} />
+        </div>
+      </div>
 
-      <div className="flex justify-end">
-        <Button loading={mutation.isPending} onClick={handleSave}>Save Settings</Button>
+      {/* ── Save ── */}
+      <div className="flex items-center justify-between pt-1">
+        {saved ? (
+          <span className="flex items-center gap-1.5 text-sm text-green-600 font-medium">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            Settings saved
+          </span>
+        ) : <span />}
+        <Button loading={mutation.isPending} onClick={handleSave} className="px-6">
+          Save Settings
+        </Button>
       </div>
     </div>
   );
