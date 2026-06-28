@@ -128,7 +128,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/my-learning',     label: 'My Learning',   icon: <GraduationCapIcon />, roles: ['student'] },
   { href: '/assignments',     label: 'Assignments',   icon: <AssignmentIcon />,  roles: ['tenant_admin', 'instructor', 'student'] },
   { href: '/certificates',    label: 'Certificates',  icon: <CertBuilderIcon />,  roles: ['student'] },
-  { href: '/quizzes',         label: 'Quizzes',       icon: <QuizIcon />,        roles: ['tenant_admin', 'instructor'] },
+  { href: '/quizzes',         label: 'Quizzes',       icon: <QuizIcon />,        roles: ['tenant_admin', 'instructor', 'student'] },
 
   // ── Rewards & marketing ────────────────────────────────────────────────
   { href: '/certificate-builder', label: 'Certificates', icon: <CertBuilderIcon />, roles: ['tenant_admin'] },
