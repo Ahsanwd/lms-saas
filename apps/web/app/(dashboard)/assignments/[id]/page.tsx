@@ -1332,315 +1332,400 @@ function StudentView({ assignment }: StudentViewProps) {
 
   if (isLoading) return <div className="flex items-center justify-center h-64"><Spinner size="lg" /></div>;
 
-  return (
-    <div className="p-4 sm:p-6 max-w-3xl mx-auto space-y-5">
-      {/* Header */}
-      <div className="space-y-2">
-        <div className="flex items-center gap-2 flex-wrap">
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{assignment.title}</h1>
-          {submission && statusBadge(submission.status)}
-          {!submission && overdue && <Badge variant="danger">Overdue</Badge>}
-        </div>
-        {course && <p className="text-sm text-gray-500">Course: {course.title}</p>}
-        {/* Countdown timer (#4) */}
-        {dueFuture && !submission && (
-          <CountdownTimer dueDate={effectiveDueDate!} />
-        )}
-      </div>
+  const pct = Math.round(((submission?.marks ?? 0) / assignment.totalMarks) * 100);
 
-      {/* Meta */}
-      <Card>
-        <CardContent className="py-4 space-y-4">
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm text-center">
-            <div>
-              <p className="text-gray-500">Due Date</p>
-              {assignment.myExtension ? (
-                <div className="mt-0.5 space-y-0.5">
-                  <p className="font-medium text-amber-700 text-xs line-through">
-                    {assignment.dueDate ? new Date(assignment.dueDate).toLocaleDateString() : '—'}
-                  </p>
-                  <p className="font-semibold text-green-700 text-sm">
-                    {new Date(assignment.myExtension.extendedDueDate).toLocaleDateString()}
-                  </p>
-                  <p className="text-xs text-green-600">Extended</p>
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* ── Hero header ── */}
+      <div className="bg-gradient-to-br from-primary-700 via-primary-600 to-indigo-600 px-4 sm:px-8 pt-8 pb-10">
+        <div className="max-w-3xl mx-auto">
+          <div className="flex items-center gap-2 text-primary-200 text-sm mb-4">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+            <span>Assignment</span>
+            {course && <><span className="opacity-50">·</span><span>{course.title}</span></>}
+          </div>
+
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-2xl sm:text-3xl font-bold text-white leading-tight">{assignment.title}</h1>
+              {dueFuture && !submission && (
+                <div className="mt-3">
+                  <CountdownTimer dueDate={effectiveDueDate!} />
                 </div>
-              ) : (
-                <p className={`font-medium mt-0.5 ${overdue ? 'text-red-600' : 'text-gray-900'}`}>
-                  {assignment.dueDate ? new Date(assignment.dueDate).toLocaleDateString() : '—'}
-                </p>
               )}
             </div>
-            <div>
-              <p className="text-gray-500">Total Marks</p>
-              <p className="font-medium text-gray-900 mt-0.5">{assignment.totalMarks}</p>
-            </div>
-            <div>
-              <p className="text-gray-500">Late Submission</p>
-              <p className="font-medium text-gray-900 mt-0.5">{assignment.allowLateSubmission ? 'Allowed' : 'Not Allowed'}</p>
+            <div className="flex flex-col items-end gap-2">
+              {submission && statusBadge(submission.status)}
+              {!submission && overdue && <Badge variant="danger">Overdue</Badge>}
+              {!submission && !overdue && <Badge variant="success">Open</Badge>}
             </div>
           </div>
 
-          {/* Attempt counter — only show when a limit is set */}
-          {assignment.maxSubmissions > 0 && (
-            <div className="border-t border-gray-100 pt-3">
-              {(() => {
-                const used = submission?.attemptCount ?? 0;
-                const max  = assignment.maxSubmissions;
-                const remaining = max - used;
-                const pct = max > 0 ? Math.min(100, (used / max) * 100) : 0;
-                const color = remaining <= 1 ? 'bg-red-500' : remaining <= 2 ? 'bg-amber-400' : 'bg-primary-500';
-                const textColor = remaining <= 1 ? 'text-red-600' : remaining <= 2 ? 'text-amber-600' : 'text-gray-700';
-                return (
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-500">Submissions used</span>
-                      <span className={`font-semibold ${textColor}`}>
-                        {used} / {max}
-                        {remaining === 0 && ' — limit reached'}
-                        {remaining === 1 && ' — last submission'}
-                      </span>
-                    </div>
-                    <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                      <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${pct}%` }} />
-                    </div>
+          {/* ── Stats row ── */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
+            {[
+              {
+                icon: (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                ),
+                label: 'Due Date',
+                value: assignment.myExtension
+                  ? new Date(assignment.myExtension.extendedDueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                  : assignment.dueDate
+                    ? new Date(assignment.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                    : 'No deadline',
+                sub: assignment.myExtension ? 'Extended' : overdue ? 'Past due' : '',
+                subColor: assignment.myExtension ? 'text-green-300' : 'text-red-300',
+                highlight: overdue && !assignment.myExtension,
+              },
+              {
+                icon: (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                ),
+                label: 'Total Marks',
+                value: String(assignment.totalMarks),
+                sub: submission?.status === 'graded' ? `You got ${submission.marks}` : '',
+                subColor: 'text-green-300',
+              },
+              {
+                icon: (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                ),
+                label: 'Late Policy',
+                value: assignment.allowLateSubmission ? 'Allowed' : 'Not Allowed',
+                sub: '',
+                subColor: '',
+              },
+              {
+                icon: (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                  </svg>
+                ),
+                label: 'Attempts',
+                value: assignment.maxSubmissions === 0 ? 'Unlimited' : `${submission?.attemptCount ?? 0} / ${assignment.maxSubmissions}`,
+                sub: limitReached ? 'Limit reached' : '',
+                subColor: 'text-red-300',
+              },
+            ].map((s) => (
+              <div key={s.label} className={`rounded-xl px-4 py-3 ${s.highlight ? 'bg-red-500/30 border border-red-400/40' : 'bg-white/10 border border-white/20'}`}>
+                <div className="flex items-center gap-1.5 text-primary-200 mb-1">
+                  {s.icon}
+                  <span className="text-xs font-medium">{s.label}</span>
+                </div>
+                <p className={`text-base font-bold ${s.highlight ? 'text-red-200' : 'text-white'}`}>{s.value}</p>
+                {s.sub && <p className={`text-xs mt-0.5 ${s.subColor}`}>{s.sub}</p>}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Body ── */}
+      <div className="max-w-3xl mx-auto px-4 sm:px-8 py-6 space-y-5 -mt-2">
+
+        {/* Draft restore */}
+        {showRestore && canSubmit && (
+          <Alert variant="warning">
+            <div className="flex items-center justify-between">
+              <span className="text-sm">You have an unsaved draft. Restore it?</span>
+              <div className="flex gap-3 ml-4">
+                <button onClick={() => { setText(restoredText); setShowRestore(false); }}
+                  className="text-sm font-semibold text-amber-800 hover:underline">Restore</button>
+                <button onClick={() => { clearDraft(); setShowRestore(false); }}
+                  className="text-sm text-amber-700 hover:underline">Discard</button>
+              </div>
+            </div>
+          </Alert>
+        )}
+
+        {/* Graded result */}
+        {submission?.status === 'graded' && (
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100 bg-green-50 flex items-center gap-2">
+              <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <h2 className="font-semibold text-green-800">Assignment Graded</h2>
+            </div>
+            <div className="px-5 py-5 space-y-4">
+              <div className="flex items-center gap-5">
+                <div className="w-20 h-20 rounded-full bg-primary-50 border-4 border-primary-200 flex flex-col items-center justify-center flex-shrink-0">
+                  <p className="text-2xl font-bold text-primary-600 leading-none">{submission.marks}</p>
+                  <p className="text-xs text-gray-400">/ {assignment.totalMarks}</p>
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between text-sm mb-1.5">
+                    <span className="text-gray-600">Score</span>
+                    <span className="font-semibold text-gray-800">{pct}%</span>
                   </div>
-                );
-              })()}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Instructions */}
-      {(assignment.description || assignment.instructions) && (
-        <Card>
-          <CardHeader><CardTitle>Instructions</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
-            {assignment.description  && <p className="text-sm text-gray-600">{assignment.description}</p>}
-            {assignment.instructions && <p className="text-sm text-gray-700 whitespace-pre-wrap">{assignment.instructions}</p>}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Reference file */}
-      {assignment.attachmentUrl && (
-        <Card>
-          <CardHeader><CardTitle>Reference File</CardTitle></CardHeader>
-          <CardContent>
-            <a href={assignment.attachmentUrl} target="_blank" rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 text-sm text-primary-600 hover:underline">
-              Download Reference File ↗
-            </a>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Graded result */}
-      {submission?.status === 'graded' && (
-        <Card>
-          <CardHeader><CardTitle>Your Result</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center gap-4">
-              <div className="text-center">
-                <p className="text-3xl font-bold text-primary-600">{submission.marks}</p>
-                <p className="text-xs text-gray-400">/ {assignment.totalMarks}</p>
-              </div>
-              <div className="flex-1">
-                <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
-                  <div className="h-full bg-primary-500 rounded-full transition-all"
-                    style={{ width: `${Math.min(100, ((submission.marks ?? 0) / assignment.totalMarks) * 100)}%` }} />
+                  <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div className={`h-full rounded-full transition-all ${pct >= 80 ? 'bg-green-500' : pct >= 50 ? 'bg-amber-400' : 'bg-red-500'}`}
+                      style={{ width: `${Math.min(100, pct)}%` }} />
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">Graded {formatDate(submission.gradedAt)}</p>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  {Math.round(((submission.marks ?? 0) / assignment.totalMarks) * 100)}% · graded {formatDate(submission.gradedAt)}
-                </p>
               </div>
-            </div>
-            {/* Rubric breakdown */}
-            {submission.rubricScores?.length > 0 && (
-              <div className="border border-gray-200 rounded-lg overflow-hidden">
-                <div className="bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-600 border-b border-gray-200">
-                  Rubric Breakdown
-                </div>
-                <div className="divide-y divide-gray-100">
-                  {submission.rubricScores.map((r) => (
-                    <div key={r.criterion} className="px-3 py-2.5 flex items-center gap-3">
-                      <span className="flex-1 text-sm text-gray-700">{r.criterion}</span>
-                      <div className="w-24 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                        <div className="h-full bg-primary-400 rounded-full"
-                          style={{ width: `${r.maxPoints > 0 ? Math.min(100, (r.awardedPoints / r.maxPoints) * 100) : 0}%` }} />
+
+              {submission.rubricScores?.length > 0 && (
+                <div className="border border-gray-200 rounded-xl overflow-hidden">
+                  <div className="bg-gray-50 px-4 py-2.5 text-xs font-semibold text-gray-600 border-b border-gray-200 uppercase tracking-wide">
+                    Rubric Breakdown
+                  </div>
+                  <div className="divide-y divide-gray-100">
+                    {submission.rubricScores.map((r) => (
+                      <div key={r.criterion} className="px-4 py-3 flex items-center gap-3">
+                        <span className="flex-1 text-sm text-gray-700">{r.criterion}</span>
+                        <div className="w-20 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                          <div className="h-full bg-primary-400 rounded-full"
+                            style={{ width: `${r.maxPoints > 0 ? Math.min(100, (r.awardedPoints / r.maxPoints) * 100) : 0}%` }} />
+                        </div>
+                        <span className="text-sm font-semibold text-gray-800 w-16 text-right shrink-0">
+                          {r.awardedPoints} / {r.maxPoints}
+                        </span>
                       </div>
-                      <span className="text-sm font-medium text-gray-800 w-16 text-right">
-                        {r.awardedPoints} / {r.maxPoints}
-                      </span>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {submission.feedback && (
-              <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
-                <p className="text-xs font-medium text-blue-700 mb-1">Instructor Feedback</p>
-                <p className="text-sm text-gray-700 whitespace-pre-wrap">{submission.feedback}</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+              {submission.feedback && (
+                <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+                  <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1.5">Instructor Feedback</p>
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{submission.feedback}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
-      {/* Rubric preview (#4) — shown before submission so students know how they'll be graded */}
-      {assignment.rubric?.length > 0 && submission?.status !== 'graded' && (
-        <Card>
-          <CardHeader><CardTitle>Grading Rubric</CardTitle></CardHeader>
-          <CardContent className="p-0">
+        {/* Instructions */}
+        {(assignment.description || assignment.instructions) && (
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="flex items-center gap-2.5 px-5 py-4 border-b border-gray-100">
+              <div className="w-7 h-7 rounded-lg bg-indigo-50 flex items-center justify-center">
+                <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <h2 className="font-semibold text-gray-800">Instructions</h2>
+            </div>
+            <div className="px-5 py-5 space-y-3">
+              {assignment.description && (
+                <p className="text-sm text-gray-600 leading-relaxed">{assignment.description}</p>
+              )}
+              {assignment.instructions && (
+                <div className="border-l-4 border-indigo-200 pl-4 bg-indigo-50/50 py-3 rounded-r-lg">
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{assignment.instructions}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Reference file */}
+        {assignment.attachmentUrl && (
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="flex items-center gap-2.5 px-5 py-4 border-b border-gray-100">
+              <div className="w-7 h-7 rounded-lg bg-amber-50 flex items-center justify-center">
+                <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                </svg>
+              </div>
+              <h2 className="font-semibold text-gray-800">Reference File</h2>
+            </div>
+            <div className="px-5 py-4">
+              <a href={assignment.attachmentUrl} target="_blank" rel="noopener noreferrer"
+                className="inline-flex items-center gap-2.5 px-4 py-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm font-medium hover:bg-amber-100 transition-colors">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Download Reference File
+              </a>
+            </div>
+          </div>
+        )}
+
+        {/* Rubric preview */}
+        {assignment.rubric?.length > 0 && submission?.status !== 'graded' && (
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-lg bg-purple-50 flex items-center justify-center">
+                  <svg className="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                  </svg>
+                </div>
+                <h2 className="font-semibold text-gray-800">Grading Rubric</h2>
+              </div>
+              <span className="text-xs text-gray-400">{assignment.totalMarks} pts total</span>
+            </div>
             <div className="divide-y divide-gray-100">
               {assignment.rubric.map((r) => (
-                <div key={r.criterion} className="px-4 py-3 flex items-center justify-between gap-4">
-                  <span className="text-sm text-gray-700 flex-1">{r.criterion}</span>
-                  <span className="text-sm font-semibold text-gray-900 whitespace-nowrap">{r.maxPoints} pts</span>
+                <div key={r.criterion} className="px-5 py-3 flex items-center justify-between gap-4">
+                  <span className="text-sm text-gray-700">{r.criterion}</span>
+                  <span className="text-sm font-semibold text-gray-900 bg-gray-100 px-2.5 py-0.5 rounded-full whitespace-nowrap">
+                    {r.maxPoints} pts
+                  </span>
                 </div>
               ))}
-              <div className="px-4 py-3 bg-gray-50 flex items-center justify-between">
-                <span className="text-sm font-medium text-gray-600">Total</span>
-                <span className="text-sm font-bold text-gray-900">{assignment.totalMarks} pts</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Draft restore prompt (#3) */}
-      {showRestore && canSubmit && (
-        <Alert variant="warning">
-          <div className="flex items-center justify-between">
-            <span className="text-sm">You have an unsaved draft. Restore it?</span>
-            <div className="flex gap-2 ml-4">
-              <button onClick={() => { setText(restoredText); setShowRestore(false); }}
-                className="text-sm font-medium text-amber-800 hover:underline">Restore</button>
-              <button onClick={() => { clearDraft(); setShowRestore(false); }}
-                className="text-sm text-amber-700 hover:underline">Discard</button>
             </div>
           </div>
-        </Alert>
-      )}
+        )}
 
-      {/* Submission form */}
-      {canSubmit && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>{submission ? 'Update Your Submission' : 'Submit Assignment'}</CardTitle>
-              {draftSaved && <span className="text-xs text-green-600 font-medium">Draft saved</span>}
+        {/* Already submitted preview */}
+        {submission && submission.status !== 'graded' && (
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="flex items-center gap-2.5 px-5 py-4 border-b border-gray-100 bg-blue-50">
+              <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <h2 className="font-semibold text-blue-800">Submitted — Awaiting Grade</h2>
+              <span className="ml-auto text-xs text-blue-500">{formatDate(submission.submittedAt)}</span>
             </div>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {error   && <Alert variant="error">{error}</Alert>}
-              {success && <Alert variant="success">{success}</Alert>}
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Text Response</label>
-                <textarea value={text} onChange={(e) => handleTextChange(e.target.value)} rows={7}
-                  placeholder={submission?.submissionText ?? 'Write your response here...'}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none" />
-                {submission?.submissionText && !text && (
-                  <p className="text-xs text-gray-400 mt-1">Leave blank to keep existing response.</p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">File Upload</label>
-                {submission?.fileUrl && !file && (
-                  <div className="flex items-center gap-2 mb-2 text-sm">
-                    <span className="text-gray-500">Current:</span>
-                    <a href={submission.fileUrl} target="_blank" rel="noopener noreferrer"
-                      className="text-primary-600 hover:underline">
-                      {submission.originalFileName ?? 'Submitted file'} ↗
-                    </a>
-                  </div>
-                )}
-                <input ref={fileRef} type="file" className="hidden"
-                  accept={
-                    assignment.allowedFileTypes?.length
-                      ? assignment.allowedFileTypes.map(t => `.${t}`).join(',')
-                      : '.pdf,.doc,.docx,.xls,.xlsx,.zip,.txt,.jpg,.jpeg,.png,.webp'
-                  }
-                  onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-                {file
-                  ? <div className="flex items-center gap-2"><span className="text-sm text-gray-700 truncate">{file.name}</span>
-                      <button type="button" onClick={() => setFile(null)} className="text-red-500 text-xs">Remove</button></div>
-                  : <Button type="button" variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
-                      {submission?.fileUrl ? 'Replace File' : 'Upload File'}
-                    </Button>
-                }
-                {assignment.allowedFileTypes?.length > 0 ? (
-                  <p className="text-xs text-amber-700 mt-1 font-medium">
-                    Accepted: {assignment.allowedFileTypes.map(t => t.toUpperCase()).join(', ')} — max 50 MB
+            <div className="px-5 py-4 space-y-3 text-sm">
+              {submission.submissionText && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Your Response</p>
+                  <p className="text-gray-700 whitespace-pre-wrap bg-gray-50 rounded-xl p-3 leading-relaxed border border-gray-100">
+                    {submission.submissionText}
                   </p>
-                ) : (
-                  <p className="text-xs text-gray-400 mt-1">PDF, Word, Excel, ZIP — max 50 MB</p>
-                )}
+                </div>
+              )}
+              {submission.fileUrl && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Submitted File</p>
+                  <a href={submission.fileUrl} target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 text-primary-600 hover:underline text-sm">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                    </svg>
+                    {submission.originalFileName ?? 'View file'} ↗
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Overdue / limit alerts */}
+        {overdue && !assignment.allowLateSubmission && !submission && (
+          <Alert variant="error">The submission deadline has passed and late submissions are not allowed.</Alert>
+        )}
+        {limitReached && submission?.status !== 'graded' && (
+          <Alert variant="error">
+            You have used all {assignment.maxSubmissions} allowed submission{assignment.maxSubmissions > 1 ? 's' : ''} for this assignment.
+          </Alert>
+        )}
+
+        {/* Submission form */}
+        {canSubmit && (
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-lg bg-primary-50 flex items-center justify-center">
+                  <svg className="w-4 h-4 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                  </svg>
+                </div>
+                <h2 className="font-semibold text-gray-800">{submission ? 'Update Submission' : 'Submit Assignment'}</h2>
               </div>
+              {draftSaved && <span className="text-xs text-green-600 font-medium">Draft saved ✓</span>}
+            </div>
+            <div className="px-5 py-5">
+              <form onSubmit={handleSubmit} className="space-y-5">
+                {error   && <Alert variant="error">{error}</Alert>}
+                {success && <Alert variant="success">{success}</Alert>}
 
-              <div className="flex justify-end">
-                <Button type="submit" loading={submitMutation.isPending}>
-                  {submission ? 'Update Submission' : 'Submit Assignment'}
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      )}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Text Response</label>
+                  <textarea value={text} onChange={(e) => handleTextChange(e.target.value)} rows={7}
+                    placeholder={submission?.submissionText ?? 'Write your response here...'}
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none bg-gray-50 placeholder:text-gray-400" />
+                  {submission?.submissionText && !text && (
+                    <p className="text-xs text-gray-400 mt-1">Leave blank to keep existing response.</p>
+                  )}
+                </div>
 
-      {/* Already submitted (not graded) */}
-      {submission && submission.status !== 'graded' && (
-        <Card>
-          <CardHeader><CardTitle>Your Submission</CardTitle></CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            <p><span className="text-gray-500">Submitted:</span> {formatDate(submission.submittedAt)}</p>
-            <p><span className="text-gray-500">Status:</span> {statusBadge(submission.status)}</p>
-            {submission.submissionText && (
-              <div>
-                <p className="text-gray-500 mb-1">Your response:</p>
-                <p className="text-gray-700 whitespace-pre-wrap bg-gray-50 rounded p-2">{submission.submissionText}</p>
-              </div>
-            )}
-            {submission.fileUrl && (
-              <p><span className="text-gray-500">File:</span>{' '}
-                <a href={submission.fileUrl} target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">
-                  {submission.originalFileName ?? 'View file'} ↗
-                </a>
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      )}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Attach File</label>
+                  {submission?.fileUrl && !file && (
+                    <div className="flex items-center gap-2 mb-2 text-sm">
+                      <span className="text-gray-400">Current:</span>
+                      <a href={submission.fileUrl} target="_blank" rel="noopener noreferrer"
+                        className="text-primary-600 hover:underline truncate">
+                        {submission.originalFileName ?? 'Submitted file'} ↗
+                      </a>
+                    </div>
+                  )}
+                  <input ref={fileRef} type="file" className="hidden"
+                    accept={
+                      assignment.allowedFileTypes?.length
+                        ? assignment.allowedFileTypes.map(t => `.${t}`).join(',')
+                        : '.pdf,.doc,.docx,.xls,.xlsx,.zip,.txt,.jpg,.jpeg,.png,.webp'
+                    }
+                    onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+                  {file ? (
+                    <div className="flex items-center gap-3 bg-primary-50 border border-primary-200 rounded-xl px-4 py-2.5">
+                      <svg className="w-4 h-4 text-primary-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                      </svg>
+                      <span className="text-sm text-primary-700 truncate flex-1">{file.name}</span>
+                      <button type="button" onClick={() => setFile(null)} className="text-red-400 hover:text-red-600 text-xs font-medium shrink-0">Remove</button>
+                    </div>
+                  ) : (
+                    <button type="button" onClick={() => fileRef.current?.click()}
+                      className="flex items-center gap-2 px-4 py-2.5 border-2 border-dashed border-gray-300 rounded-xl text-sm text-gray-500 hover:border-primary-400 hover:text-primary-600 hover:bg-primary-50 transition-colors w-full justify-center">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                      </svg>
+                      {submission?.fileUrl ? 'Replace File' : 'Upload File'}
+                    </button>
+                  )}
+                  <p className="text-xs text-gray-400 mt-1.5">
+                    {assignment.allowedFileTypes?.length > 0
+                      ? `Accepted: ${assignment.allowedFileTypes.map(t => t.toUpperCase()).join(', ')} · max 50 MB`
+                      : 'PDF, Word, Excel, ZIP — max 50 MB'}
+                  </p>
+                </div>
 
-      {overdue && !assignment.allowLateSubmission && !submission && (
-        <Alert variant="error">The submission deadline has passed and late submissions are not allowed.</Alert>
-      )}
+                <div className="flex justify-end pt-1">
+                  <Button type="submit" loading={submitMutation.isPending} className="px-6">
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                    </svg>
+                    {submission ? 'Update Submission' : 'Submit Assignment'}
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
 
-      {limitReached && submission?.status !== 'graded' && (
-        <Alert variant="error">
-          You have used all {assignment.maxSubmissions} allowed submission{assignment.maxSubmissions > 1 ? 's' : ''} for this assignment.
-        </Alert>
-      )}
-
-      {/* Comments thread (#9) — visible once a submission exists */}
-      {submission && user && (
-        <CommentsThreadCard
-          assignmentId={assignment._id}
-          submission={submission}
-          currentUserId={user._id}
-          onCommentAdded={(updated) => {
-            queryClient.setQueryData(
-              ['my-submission', assignment._id],
-              (old: { assignment: Assignment; submission: Submission } | undefined) =>
-                old ? { ...old, submission: { ...old.submission, comments: updated } } : old
-            );
-          }}
-        />
-      )}
+        {/* Comments */}
+        {submission && user && (
+          <CommentsThreadCard
+            assignmentId={assignment._id}
+            submission={submission}
+            currentUserId={user._id}
+            onCommentAdded={(updated) => {
+              queryClient.setQueryData(
+                ['my-submission', assignment._id],
+                (old: { assignment: Assignment; submission: Submission } | undefined) =>
+                  old ? { ...old, submission: { ...old.submission, comments: updated } } : old
+              );
+            }}
+          />
+        )}
+      </div>
     </div>
   );
 }

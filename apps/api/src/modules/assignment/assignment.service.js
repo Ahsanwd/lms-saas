@@ -149,7 +149,24 @@ async function publishAssignment(tenantId, id, user) {
   if (!canManageAssignment(assignment, user)) throw new AppError('Forbidden', 403);
 
   const newStatus = assignment.status === 'published' ? 'draft' : 'published';
-  return assignmentRepo.updateById(tenantId, id, { status: newStatus, updatedBy: user.sub });
+  const updated = await assignmentRepo.updateById(tenantId, id, { status: newStatus, updatedBy: user.sub });
+
+  // Notify all enrolled students when newly published
+  if (newStatus === 'published') {
+    try {
+      const courseId = assignment.courseId._id ?? assignment.courseId;
+      const [enrollments] = await enrollmentRepo.findByCourse(tenantId, courseId, { status: 'active' }, { limit: 1000 });
+      const studentIds = enrollments.map(e => (e.userId?._id ?? e.userId).toString()).filter(Boolean);
+      if (studentIds.length > 0) {
+        const notifySvc = require('../notification/notification.service');
+        await notifySvc.notifyAssignmentPublished(
+          tenantId, studentIds, assignment.title, courseId.toString(), id.toString()
+        );
+      }
+    } catch (_) { /* non-critical — never break publish */ }
+  }
+
+  return updated;
 }
 
 async function archiveAssignment(tenantId, id, user) {

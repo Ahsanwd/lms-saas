@@ -379,6 +379,15 @@ async function notifyLiveSessionReminder(tenantId, userIds, lessonTitle, courseN
   });
 }
 
+async function notifyAssignmentPublished(tenantId, userIds, assignmentTitle, courseId, assignmentId, ctx = {}) {
+  return createBulk(tenantId, userIds, {
+    type: 'assignment_published', title: 'New assignment posted',
+    message: `New assignment: "${assignmentTitle}" — submit before the deadline.`,
+    link: `/assignments/${assignmentId}`,
+    ctx: { assignmentTitle, courseId, assignmentId, ...ctx },
+  });
+}
+
 async function notifyRefundRejected(tenantId, userId, adminNote, courseName, courseId, ctx = {}) {
   return create(tenantId, userId, {
     type: 'refund_rejected', title: 'Refund request not approved',
@@ -398,5 +407,5 @@ module.exports = {
   notifyCoursePublished, notifyCourseCompleted, notifyCertificateIssued,
   notifyChatMessage, notifyForumReply,
   notifyQuizGraded, notifyRefundApproved, notifyRefundRejected,
-  notifyLiveSessionReminder,
+  notifyLiveSessionReminder, notifyAssignmentPublished,
 };
