@@ -13,6 +13,14 @@ import type { Course } from '@/types';
 const STATUS_BADGE: Record<string, 'default' | 'success' | 'warning' | 'danger'> = {
   draft: 'default', published: 'success', archived: 'danger',
 };
+
+function stripHtml(html: string): string {
+  return html
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 const LEVEL_LABEL: Record<string, string> = {
   beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced', all: 'All Levels',
 };
@@ -102,7 +110,7 @@ function GridCard({ course, enrolled, onEnroll, enrolling, onOpen, onLearn }: {
         <h3 className="font-bold text-gray-900 text-sm leading-snug mb-1.5 line-clamp-2 group-hover:text-primary-600 transition-colors">
           {course.title}
         </h3>
-        <p className="text-xs text-gray-500 line-clamp-2 mb-3 leading-relaxed">{course.description}</p>
+        <p className="text-xs text-gray-500 line-clamp-2 mb-3 leading-relaxed">{stripHtml(course.description ?? '')}</p>
 
         {/* Tags */}
         {course.tags && course.tags.length > 0 && (
@@ -197,7 +205,7 @@ function ListCard({ course, enrolled, onEnroll, enrolling, onOpen, onLearn }: {
           <h3 className="font-bold text-gray-900 text-base leading-snug mb-1.5 line-clamp-1 group-hover:text-primary-600 transition-colors">
             {course.title}
           </h3>
-          <p className="text-sm text-gray-500 line-clamp-2 leading-relaxed">{course.description}</p>
+          <p className="text-sm text-gray-500 line-clamp-2 leading-relaxed">{stripHtml(course.description ?? '')}</p>
         </div>
         <div className="flex items-center justify-between gap-4 flex-wrap mt-4 pt-3 border-t border-gray-50">
           <div className="flex items-center gap-4 text-xs text-gray-400">
