@@ -77,10 +77,14 @@ function queueEmail(data) {
     return Promise.resolve();
   }
 
-  // If Redis is not configured, send directly (no queue)
-  if (!process.env.REDIS_HOST) {
+  // If Redis is not configured or skipped, send directly (no queue)
+  const skipRedis = !process.env.REDIS_HOST ||
+    process.env.REDIS_HOST === 'localhost' ||
+    process.env.SKIP_REDIS === 'true';
+
+  if (skipRedis) {
     const { sendMail } = require('../services/email/email.service');
-    logger.info(`[DIRECT] Sending email to ${data.to} (no Redis configured)`);
+    logger.info(`[DIRECT] Sending email to ${data.to} (Redis not available)`);
     return sendMail({ to: data.to, subject: data.subject, html: data.html });
   }
 
