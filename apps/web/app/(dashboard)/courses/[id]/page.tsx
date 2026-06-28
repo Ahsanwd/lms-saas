@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api, { getAccessToken, getTenantSubdomain } from '@/lib/api';
-import { Button, Badge, Spinner, Alert, Card } from '@/components/ui';
+import { Button, Badge, Spinner, Alert, Card, RichTextEditor } from '@/components/ui';
 import { useAuthStore } from '@/stores/auth.store';
 import { AxiosError } from 'axios';
 import { cn } from '@/lib/utils';
@@ -14,7 +14,7 @@ import { toast } from 'sonner';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { getStripePromise } from '@/lib/stripe';
 import { PayPalScriptProvider, PayPalButtons, usePayPalScriptReducer } from '@paypal/react-paypal-js';
-import { MarkdownContent } from '@/components/ui/MarkdownContent';
+import { SmartContent } from '@/components/ui/SmartContent';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -905,40 +905,15 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
                   </div>
                 )}
 
-                {/* Write mode: textarea */}
-                {textEditorMode === 'write' && (
-                  <textarea
-                    id="lesson-text-editor"
-                    rows={12}
+                {/* Rich text editor — Visual/HTML toggle built in */}
+                <div className="p-4">
+                  <RichTextEditor
                     value={content}
-                    onChange={(e) => setContent(e.target.value)}
-                    onKeyDown={(e) => {
-                      // Tab inserts 2 spaces instead of moving focus
-                      if (e.key === 'Tab') {
-                        e.preventDefault();
-                        const ta = e.currentTarget;
-                        const { selectionStart: s, selectionEnd: e2, value: v } = ta;
-                        const newVal = v.slice(0, s) + '  ' + v.slice(e2);
-                        setContent(newVal);
-                        setTimeout(() => { ta.setSelectionRange(s + 2, s + 2); }, 0);
-                      }
-                    }}
-                    placeholder={"Start writing your lesson...\n\nUse **bold**, _italic_, # Heading 1, ## Heading 2\n- bullet list item\n1. numbered list item\n> blockquote"}
-                    className="w-full px-5 py-4 text-sm text-gray-800 bg-white focus:outline-none resize-none leading-7 placeholder-gray-300"
-                    style={{ fontFamily: 'Georgia, serif', fontSize: '14px', minHeight: '280px' }}
+                    onChange={setContent}
+                    placeholder="Start writing your lesson content…"
+                    minHeight={280}
                   />
-                )}
-
-                {/* Preview mode: rendered markdown */}
-                {textEditorMode === 'preview' && (
-                  <div className="px-6 py-5 min-h-[280px] bg-white">
-                    {content.trim() ? (
-                      <MarkdownContent content={content} />
-                    ) : (
-                      <p className="text-gray-300 italic text-sm">Nothing to preview yet — switch to Write and add some content.</p>
-                    )}
-                  </div>
-                )}
+                </div>
 
                 {/* Footer */}
                 <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-t border-gray-100">
@@ -2631,9 +2606,12 @@ function OverviewTab({ courseId, course }: { courseId: string; course: Course })
           </div>
           <div>
             <label className={labelCls}>Description</label>
-            <textarea rows={4} value={description} onChange={(e) => setDescription(e.target.value)}
+            <RichTextEditor
+              value={description}
+              onChange={setDescription}
               placeholder="What will students learn in this course?"
-              className={cn(inputCls, 'resize-none')} />
+              minHeight={160}
+            />
           </div>
           <div>
             <label className={labelCls}>

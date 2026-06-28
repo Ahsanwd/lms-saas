@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
-import { Button } from '@/components/ui';
+import { Button, RichTextEditor } from '@/components/ui';
 import { AxiosError } from 'axios';
 import { useState } from 'react';
 
@@ -88,7 +88,7 @@ function NewCategoryModal({
 
 const schema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters'),
-  description: z.string().min(10, 'Description must be at least 10 characters'),
+  description: z.string().min(10, 'Description must be at least 10 characters').refine(v => v.replace(/<[^>]*>/g, '').trim().length >= 10, 'Description must be at least 10 characters'),
   categoryId: z.string().optional(),
   level: z.enum(['beginner', 'intermediate', 'advanced']),
   price: z.coerce.number().min(0),
@@ -210,18 +210,15 @@ export default function NewCoursePage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Description <span className="text-red-500">*</span>
-                </label>
-                <textarea
-                  rows={5}
+                <RichTextEditor
+                  label="Description"
+                  required
                   placeholder="What will students learn? What are the prerequisites? Who is this course for?"
-                  className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none transition-shadow"
-                  {...register('description')}
+                  value={watch('description') ?? ''}
+                  onChange={(html) => setValue('description', html, { shouldValidate: true })}
+                  error={errors.description?.message}
+                  minHeight={180}
                 />
-                {errors.description && (
-                  <p className="text-xs text-red-500 mt-1">{errors.description.message}</p>
-                )}
               </div>
             </div>
           </div>

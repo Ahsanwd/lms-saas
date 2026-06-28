@@ -9,7 +9,7 @@ import { Button, Spinner } from '@/components/ui';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth.store';
 import type { Course, Section, Lesson } from '@/types';
-import { MarkdownContent } from '@/components/ui/MarkdownContent';
+import { SmartContent } from '@/components/ui/SmartContent';
 
 const SecurePdfViewer = dynamic(() => import('@/components/viewer/SecurePdfViewer'), { ssr: false });
 const SecureDocViewer = dynamic(() => import('@/components/viewer/SecureDocViewer'), { ssr: false });
@@ -1730,7 +1730,7 @@ function LessonContent({ lesson }: { lesson: Lesson }) {
           <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Lesson Content</span>
         </div>
         <div className="px-6 py-6">
-          <MarkdownContent content={lesson.content} />
+          <SmartContent content={lesson.content} />
         </div>
       </div>
     );
