@@ -63,7 +63,7 @@ function pwStrength(p: string): { label: string; pct: number; color: string } {
 
 // ─── Step indicator ────────────────────────────────────────────────────────────
 
-const STEP_LABELS = ['Account', 'School', 'Invite', 'Done'];
+const STEP_LABELS = ['Account', 'Organisation', 'Invite', 'Done'];
 
 function StepIndicator({ current }: { current: number }) {
   return (
@@ -192,7 +192,7 @@ export default function RegisterTenantPage() {
   async function handleCreate() {
     setError('');
     if (!tenantName.trim() || tenantName.trim().length < 2)
-      return setError('School name must be at least 2 characters');
+      return setError('Organisation name must be at least 2 characters');
     if (subdomain.length < 3 || !SUBDOMAIN_RE.test(subdomain))
       return setError('Subdomain must be 3–30 lowercase letters, numbers or hyphens');
     if (subdomainAvailable === false)
@@ -270,7 +270,7 @@ export default function RegisterTenantPage() {
         <>
           <div className="mb-5">
             <h2 className="text-xl font-semibold text-gray-900">Create your account</h2>
-            <p className="text-sm text-gray-500 mt-1">You will be the admin of your school</p>
+            <p className="text-sm text-gray-500 mt-1">You will be the admin of your organisation</p>
           </div>
 
           {error && <Alert variant="error" className="mb-4">{error}</Alert>}
@@ -335,14 +335,14 @@ export default function RegisterTenantPage() {
       {step === 2 && (
         <>
           <div className="mb-5">
-            <h2 className="text-xl font-semibold text-gray-900">Set up your school</h2>
+            <h2 className="text-xl font-semibold text-gray-900">Set up your organisation</h2>
             <p className="text-sm text-gray-500 mt-1">Choose a name and web address for your LMS</p>
           </div>
 
           {error && <Alert variant="error" className="mb-4">{error}</Alert>}
 
           <div className="space-y-4">
-            <Input label="School / Organisation Name" placeholder="e.g. Sunrise Academy"
+            <Input label="Organisation Name" placeholder="e.g. Sunrise Academy, City University, Tech Academy"
               value={tenantName} onChange={e => setTenantName(e.target.value)} autoFocus />
 
             {/* Subdomain input */}
@@ -400,7 +400,7 @@ export default function RegisterTenantPage() {
               <Button variant="outline" className="flex-1" onClick={() => { setError(''); setStep(1); }}>← Back</Button>
               <Button className="flex-1" onClick={handleCreate} loading={loading}
                 disabled={loading || subdomainAvailable === false}>
-                Create School
+                Create Organisation
               </Button>
             </div>
           </div>
@@ -493,13 +493,13 @@ export default function RegisterTenantPage() {
           </div>
 
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">Your school is ready!</h2>
+            <h2 className="text-xl font-semibold text-gray-900">Your organisation is ready!</h2>
             <p className="text-sm text-gray-500 mt-1">Welcome to {result.tenant.name}</p>
           </div>
 
           {/* School URL card */}
           <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 text-left">
-            <p className="text-xs font-medium text-gray-500 mb-1.5">Your school URL</p>
+            <p className="text-xs font-medium text-gray-500 mb-1.5">Your organisation URL</p>
             <div className="flex items-center gap-2">
               <code className="flex-1 text-sm font-mono text-gray-800 bg-white border border-gray-200 rounded-lg px-3 py-2 truncate">
                 {result.tenant.subdomain}.lmsplatform.com
@@ -549,7 +549,7 @@ export default function RegisterTenantPage() {
             {[
               '14-day free trial activated',
               'Welcome email sent to your inbox',
-              'You are the admin of your school',
+              'You are the admin of your organisation',
               'Upgrade your plan anytime from Billing',
             ].map(item => (
               <div key={item} className="flex items-center gap-2">
