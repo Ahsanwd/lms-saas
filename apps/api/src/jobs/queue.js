@@ -8,9 +8,10 @@ function getQueue(name) {
   if (!queues.has(name)) {
     const q = new Bull(name, {
       redis: {
-        host: config.redis.host,
-        port: config.redis.port,
+        host:     config.redis.host,
+        port:     config.redis.port,
         password: config.redis.password,
+        tls:      config.redis.tls ? {} : undefined,
       },
       defaultJobOptions: {
         attempts: 3,
