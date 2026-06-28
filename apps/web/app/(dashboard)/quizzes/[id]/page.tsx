@@ -2657,7 +2657,10 @@ function InstructorView() {
       <div className="border-b border-gray-200 overflow-x-auto">
         <nav className="flex gap-1 min-w-max">
           {TABS.map(({ key, label }) => (
-            <button key={key} onClick={() => setTab(key)}
+            <button key={key} onClick={() => {
+              setTab(key);
+              if (key === 'attempts') qc.invalidateQueries({ queryKey: ['quiz', quizId] });
+            }}
               className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                 tab === key
                   ? 'border-primary-600 text-primary-700'

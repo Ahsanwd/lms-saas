@@ -208,7 +208,29 @@ async function publishQuiz(tenantId, id, user) {
   if (quiz.status === 'published') throw new AppError('Already published', 400);
   if (!quiz.randomConfig?.enabled && quiz.questions.length === 0)
     throw new AppError('Cannot publish quiz with no questions', 400);
-  return quizRepo.updateById(tenantId, id, { status: 'published', updatedBy: user.sub });
+
+  const updated = await quizRepo.updateById(tenantId, id, { status: 'published', updatedBy: user.sub });
+
+  // Notify all enrolled students
+  try {
+    const courseId = quiz.courseId;
+    if (courseId) {
+      const [enrollments] = await enrollmentRepo.findByCourse(tenantId, courseId, { status: 'active' }, { limit: 1000 });
+      const studentIds = enrollments.map(e => (e.userId?._id ?? e.userId).toString()).filter(Boolean);
+      if (studentIds.length > 0) {
+        const notifySvc = require('../notification/notification.service');
+        await notifySvc.createBulk(tenantId, studentIds, {
+          type: 'quiz_published',
+          title: 'New quiz available',
+          message: `New quiz: "${quiz.title}" is now available. Test your knowledge!`,
+          link: `/quizzes/${id}`,
+          ctx: { quizTitle: quiz.title, courseId: courseId.toString(), quizId: id.toString() },
+        });
+      }
+    }
+  } catch (_) { /* non-critical */ }
+
+  return updated;
 }
 
 async function archiveQuiz(tenantId, id, user) {

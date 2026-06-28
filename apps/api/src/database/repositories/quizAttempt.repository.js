@@ -46,7 +46,7 @@ class QuizAttemptRepository {
   // Analytics aggregation
   getQuizStats(tenantId, quizId) {
     return QuizAttempt.aggregate([
-      { $match: { tenantId, quizId, status: { $in: ['auto_graded', 'manually_graded'] } } },
+      { $match: { tenantId, quizId, status: { $ne: 'in_progress' } } },
       {
         $group: {
           _id: null,
