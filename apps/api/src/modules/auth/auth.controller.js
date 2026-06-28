@@ -51,7 +51,7 @@ async function login(req, res, next) {
 
 async function verifyEmail(req, res, next) {
   try {
-    const { token } = req.query;
+    const token = req.body.token || req.query.token;
     if (!token) return R.error(res, 'Token is required', 400);
 
     const tenantId = req.tenant?.tenantId || null;

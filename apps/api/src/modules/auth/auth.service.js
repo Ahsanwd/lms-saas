@@ -314,7 +314,7 @@ async function verifyEmail({ token, tenantId, req }) {
     'emailVerification.tokenHash': tokenHash,
     'emailVerification.expiresAt': { $gt: new Date() },
     deletedAt: null,
-  }).select('+emailVerification');
+  }).select('+emailVerification +emailVerification.tokenHash');
 
   if (!user) throw new AppError('Invalid or expired verification link', 400, 'INVALID_TOKEN');
 
