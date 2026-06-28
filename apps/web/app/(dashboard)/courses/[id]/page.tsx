@@ -5240,9 +5240,9 @@ function StudentView() {
             <h2 className="text-sm font-semibold text-gray-700">About this Course</h2>
           </div>
           <div className="px-6 py-5">
-            <p className="text-sm text-gray-700 leading-7 break-words whitespace-pre-line">
-              {course.description || 'No description has been provided for this course.'}
-            </p>
+            {course.description
+              ? <SmartContent content={course.description} />
+              : <p className="text-sm text-gray-500 italic">No description has been provided for this course.</p>}
           </div>
         </div>
 
@@ -5298,9 +5298,9 @@ function StudentView() {
         {/* About */}
         <div className="border-l-4 border-primary-200 bg-primary-50/40 rounded-r-xl px-5 py-4">
           <p className="text-[10px] font-semibold uppercase tracking-widest text-primary-400 mb-2">About this Course</p>
-          <p className="text-sm text-gray-700 leading-7 break-words whitespace-pre-line">
-            {course.description || 'No description has been provided for this course.'}
-          </p>
+          {course.description
+            ? <SmartContent content={course.description} />
+            : <p className="text-sm text-gray-500 italic">No description has been provided for this course.</p>}
         </div>
 
         {isEnrolled && progress && (
@@ -5486,9 +5486,7 @@ function StudentView() {
                   <h2 className="text-sm font-bold text-gray-800">About this Course</h2>
                 </div>
                 <div className="px-5 py-5">
-                  <p className="text-sm text-gray-700 leading-8 break-words whitespace-pre-line">
-                    {course.description}
-                  </p>
+                  <SmartContent content={course.description} />
                   {/* Tags */}
                   {course.tags && course.tags.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 mt-4 pt-4 border-t border-gray-100">
