@@ -76,6 +76,14 @@ function queueEmail(data) {
     logger.info(`[DEV] Email skipped — to: ${data.to} | subject: ${data.subject}`);
     return Promise.resolve();
   }
+
+  // If Redis is not configured, send directly (no queue)
+  if (!process.env.REDIS_HOST) {
+    const { sendMail } = require('../services/email/email.service');
+    logger.info(`[DIRECT] Sending email to ${data.to} (no Redis configured)`);
+    return sendMail({ to: data.to, subject: data.subject, html: data.html });
+  }
+
   const { emailQueue } = require('./queue');
   return emailQueue().add(data);
 }
