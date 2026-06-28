@@ -208,6 +208,7 @@ const googleLimiter = rateLimit({
 router.post('/register',             ctrl.register);
 router.post('/login',                loginLimiter, ctrl.login);
 router.get('/verify-email',          ctrl.verifyEmail);
+router.post('/verify-email',         ctrl.verifyEmail);
 router.post('/resend-verification',  ctrl.resendVerification);
 router.post('/forgot-password',      forgotLimiter, ctrl.forgotPassword);
 router.post('/reset-password',       ctrl.resetPassword);
