@@ -1,8 +1,11 @@
 const logger = require('../utils/logger');
 
 const skipEmail = process.env.SKIP_EMAIL === 'true';
+const skipRedis = !process.env.REDIS_HOST ||
+  process.env.REDIS_HOST === 'localhost' ||
+  process.env.SKIP_REDIS === 'true';
 
-if (!skipEmail) {
+if (!skipEmail && !skipRedis) {
   const { emailQueue }  = require('./queue');
   const { sendMail }    = require('../services/email/email.service');
   const FailedEmailLog  = require('../database/models/FailedEmailLog.model');
@@ -76,11 +79,6 @@ function queueEmail(data) {
     logger.info(`[DEV] Email skipped — to: ${data.to} | subject: ${data.subject}`);
     return Promise.resolve();
   }
-
-  // If Redis is not configured or skipped, send directly (no queue)
-  const skipRedis = !process.env.REDIS_HOST ||
-    process.env.REDIS_HOST === 'localhost' ||
-    process.env.SKIP_REDIS === 'true';
 
   if (skipRedis) {
     const { sendMail } = require('../services/email/email.service');
