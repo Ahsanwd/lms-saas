@@ -1936,7 +1936,7 @@ function QuestionsTab({ quizId, quiz }: { quizId: string; quiz: QuizDetail }) {
                   {q.explanation && <span className="text-xs text-blue-400">has explanation</span>}
                 </div>
               </div>
-              <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="flex items-center gap-1.5">
                 <Button size="sm" variant="outline" onClick={() => setEditingQ(q)}>Edit</Button>
                 <Button
                   size="sm" variant="danger"
