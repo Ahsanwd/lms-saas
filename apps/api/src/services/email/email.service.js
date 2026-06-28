@@ -1,7 +1,35 @@
 const nodemailer = require('nodemailer');
+const axios      = require('axios');
 const config     = require('../../config');
 const logger     = require('../../utils/logger');
 const { decrypt } = require('../../utils/crypto');
+
+// ── Brevo HTTP API (used when SMTP is blocked by hosting provider) ────────────
+async function sendViaBrevoApi({ to, subject, html, from }) {
+  const apiKey = process.env.BREVO_API_KEY;
+  if (!apiKey) throw new Error('BREVO_API_KEY not set');
+
+  const fromEmail = from?.match(/<(.+)>/)?.[1] || from || config.email.from;
+  const fromName  = from?.match(/^"?([^"<]+)"?\s*</)?.[1]?.trim() || 'Coursel';
+
+  const response = await axios.post(
+    'https://api.brevo.com/v3/smtp/email',
+    {
+      sender:      { name: fromName, email: fromEmail },
+      to:          [{ email: to }],
+      subject,
+      htmlContent: html,
+    },
+    {
+      headers: {
+        'api-key':     apiKey,
+        'Content-Type': 'application/json',
+      },
+      timeout: 15000,
+    }
+  );
+  return { messageId: response.data.messageId };
+}
 
 // ── Platform-level transporter (singleton, reused across requests) ────────────
 let platformTransporter;
@@ -44,6 +72,20 @@ async function sendMail({ to, subject, html, tenantEmailSettings }) {
   const from    = resolveFrom(tenantEmailSettings);
   const replyTo = tenantEmailSettings?.replyTo || undefined;
   const smtp    = tenantEmailSettings?.smtp;
+
+  // Use Brevo HTTP API for platform emails when BREVO_API_KEY is set
+  // (avoids SMTP port blocking on cloud hosting like Render)
+  const useBrevoApi = process.env.BREVO_API_KEY && !smtp?.host;
+  if (useBrevoApi) {
+    try {
+      const info = await sendViaBrevoApi({ to, subject, html, from });
+      logger.info(`Email [brevo-api] sent to ${to}: ${info.messageId}`);
+      return info;
+    } catch (err) {
+      logger.error(`Email [brevo-api] failed to ${to}: ${err.message}`);
+      throw err;
+    }
+  }
 
   let transporter;
   let source = 'platform';
