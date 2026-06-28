@@ -84,8 +84,13 @@ function queueEmail(data) {
 
   if (skipRedis) {
     const { sendMail } = require('../services/email/email.service');
-    logger.info(`[DIRECT] Sending email to ${data.to} (Redis not available)`);
-    return sendMail({ to: data.to, subject: data.subject, html: data.html });
+    logger.info(`[DIRECT] Sending email to ${data.to} subject="${data.subject}"`);
+    return sendMail({ to: data.to, subject: data.subject, html: data.html })
+      .then(info => logger.info(`[DIRECT] Email sent OK to ${data.to} messageId=${info?.messageId}`))
+      .catch(err => {
+        logger.error(`[DIRECT] Email FAILED to ${data.to}: ${err.message}`);
+        throw err;
+      });
   }
 
   const { emailQueue } = require('./queue');
