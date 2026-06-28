@@ -90,8 +90,8 @@ async function forgotPassword(req, res, next) {
 
 async function resetPassword(req, res, next) {
   try {
-    const { token } = req.query;
-    const { password } = req.body;
+    const { token, newPassword, password: bodyPassword } = req.body;
+    const password = newPassword || bodyPassword;
     if (!token) return R.error(res, 'Token is required', 400);
 
     const passwordPolicy = req.tenant?.settings?.passwordPolicy;
