@@ -103,7 +103,7 @@ export default function RegisterPage() {
         <Input
           label="Subdomain"
           placeholder="acme"
-          hint="Your platform will be at: acme.lmsplatform.com"
+          hint="Your platform will be at: acme.coursel.space"
           error={errors.subdomain?.message}
           {...register('subdomain')}
         />

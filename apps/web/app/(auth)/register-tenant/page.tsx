@@ -365,7 +365,7 @@ export default function RegisterTenantPage() {
                   className="flex-1 px-3 py-2.5 text-sm bg-white focus:outline-none min-w-0"
                 />
                 <span className="flex items-center px-3 bg-gray-50 border-l border-gray-200 text-xs text-gray-400 whitespace-nowrap shrink-0">
-                  .lmsplatform.com
+                  .coursel.space
                 </span>
               </div>
               <div className="mt-1.5 h-4">
@@ -375,7 +375,7 @@ export default function RegisterTenantPage() {
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                     </svg>
-                    {subdomain}.lmsplatform.com is available
+                    {subdomain}.coursel.space is available
                   </p>
                 )}
                 {!checkingSubdomain && subdomainAvailable === false && (
@@ -502,11 +502,11 @@ export default function RegisterTenantPage() {
             <p className="text-xs font-medium text-gray-500 mb-1.5">Your organisation URL</p>
             <div className="flex items-center gap-2">
               <code className="flex-1 text-sm font-mono text-gray-800 bg-white border border-gray-200 rounded-lg px-3 py-2 truncate">
-                {result.tenant.subdomain}.lmsplatform.com
+                {result.tenant.subdomain}.coursel.space
               </code>
               <button
                 onClick={() => {
-                  navigator.clipboard?.writeText(`https://${result.tenant.subdomain}.lmsplatform.com`);
+                  navigator.clipboard?.writeText(`https://${result.tenant.subdomain}.coursel.space`);
                   setCopied(true);
                   setTimeout(() => setCopied(false), 2000);
                 }}
