@@ -4,6 +4,7 @@ import { Suspense } from 'react';
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import Cookies from 'js-cookie';
 import api, { setAccessToken, setTenantSubdomain, clearTenantSubdomain } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth.store';
 import { Button, Alert } from '@/components/ui';
@@ -26,9 +27,21 @@ function LoginPage() {
   const [success,   setSuccess] = useState('');
   const [googleLoading, setGoogleLoading] = useState(false);
 
+  // True when the user is on a tenant subdomain (e.g. pedofoy.coursel.space)
+  const [isSubdomainHost, setIsSubdomainHost] = useState(false);
+
   useEffect(() => {
-    const tenant = searchParams.get('tenant');
+    // Priority: ?tenant= param → cookie set by middleware from subdomain URL
+    const tenantParam = searchParams.get('tenant');
+    const tenantCookie = Cookies.get('lms_tenant') ?? '';
+    const tenant = tenantParam || tenantCookie;
     if (tenant) setSubdomainVal(tenant);
+
+    // Detect if user is on a *.coursel.space subdomain URL
+    const host = window.location.hostname;
+    const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'coursel.space';
+    if (host.endsWith(`.${rootDomain}`)) setIsSubdomainHost(true);
+
     if (searchParams.get('registered') === '1') {
       setSuccess('Account created! You can now sign in.');
     }
@@ -154,16 +167,19 @@ function LoginPage() {
       {error && <Alert variant="error" className="mb-4">{error}</Alert>}
 
       <form onSubmit={onLogin} className="space-y-4">
-        <div>
-          <label className={labelCls}>Organisation subdomain</label>
-          <input
-            type="text"
-            value={subdomain}
-            onChange={e => setSubdomainVal(e.target.value)}
-            placeholder="e.g. demo  (leave blank for super admin)"
-            className={inputCls}
-          />
-        </div>
+        {/* Hide subdomain input when already on a tenant subdomain URL */}
+        {!isSubdomainHost && (
+          <div>
+            <label className={labelCls}>Organisation subdomain</label>
+            <input
+              type="text"
+              value={subdomain}
+              onChange={e => setSubdomainVal(e.target.value)}
+              placeholder="e.g. demo  (leave blank for super admin)"
+              className={inputCls}
+            />
+          </div>
+        )}
         <div>
           <label className={labelCls}>Email address</label>
           <input
@@ -237,9 +253,9 @@ function LoginPage() {
         </Link>
       </p>
       <p className="mt-2 text-center text-sm text-gray-400">
-        Starting a new school?{' '}
+        Starting a new organisation?{' '}
         <Link href="/register-tenant" className="font-medium text-primary-600 hover:text-primary-700">
-          Create your school →
+          Create yours →
         </Link>
       </p>
     </>
