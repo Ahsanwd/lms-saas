@@ -364,7 +364,8 @@ async function resendVerification({ email, tenantId, tenantName }) {
 // ─── Forgot Password ──────────────────────────────────────────────────────────
 async function forgotPassword({ email, tenantId, tenantName }) {
   const user = await userRepo.findByEmail(tenantId, email);
-  if (!user || user.status !== 'active') return;
+  // Allow both active and unverified users — resetting via email proves inbox ownership
+  if (!user || (user.status !== 'active' && user.status !== 'unverified')) return;
 
   const rawToken = user.generatePasswordResetToken();
   await user.save();
@@ -397,6 +398,12 @@ async function resetPassword({ token, newPassword, tenantId }) {
   user.passwordHash = newPassword;
   user.passwordReset.tokenHash = null;
   user.passwordReset.expiresAt = null;
+  // Resetting via email proves inbox ownership — auto-verify if still unverified
+  if (user.status === 'unverified') {
+    user.status = 'active';
+    user.isEmailVerified = true;
+    user.emailVerification = { tokenHash: null, expiresAt: null };
+  }
   await user.save();
 
   await sessionRepo.revokeAllByUser(user.tenantId, user._id);
