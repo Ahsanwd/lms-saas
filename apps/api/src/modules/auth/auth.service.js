@@ -18,6 +18,12 @@ const welcomeTenantTemplate = require('../../services/email/templates/welcomeTen
 const AppError = require('../../utils/AppError');
 const config = require('../../config');
 
+const ROOT_DOMAIN = process.env.ROOT_DOMAIN || 'coursel.space';
+function tenantBaseUrl(subdomain) {
+  if (!subdomain) return config.app.url;
+  return `https://${subdomain}.${ROOT_DOMAIN}`;
+}
+
 // Verify reCAPTCHA v3 token — soft-fail if secret not configured
 async function verifyRecaptcha(token) {
   const secret = process.env.RECAPTCHA_SECRET_KEY;
@@ -179,7 +185,7 @@ async function registerTenant({ firstName, lastName, email, password, tenantName
   if (requireVerification) {
     const rawToken = user.generateVerificationToken();
     await user.save();
-    const verifyUrl = `${config.app.url}/verify-email?token=${rawToken}`;
+    const verifyUrl = `${tenantBaseUrl(subdomain)}/verify-email?token=${rawToken}`;
     const template = verifyEmailTemplate({ name: user.firstName, verifyUrl, tenantName, branding });
     await queueEmail({ to: user.email, tenantId: tenant._id.toString(), ...template }).catch(() => {});
   }
@@ -215,7 +221,7 @@ async function registerTenant({ firstName, lastName, email, password, tenantName
 }
 
 // ─── Register (self-registration on existing tenant) ─────────────────────────
-async function register({ firstName, lastName, email, password, tenantId, tenantName, settings, req }) {
+async function register({ firstName, lastName, email, password, tenantId, tenantName, tenantSubdomain, settings, req }) {
   const existing = await userRepo.findByEmail(tenantId, email);
   if (existing) throw new AppError('Email already registered', 409, 'EMAIL_EXISTS');
 
@@ -236,7 +242,7 @@ async function register({ firstName, lastName, email, password, tenantId, tenant
   if (requireVerification) {
     const rawToken = user.generateVerificationToken();
     await user.save();
-    const verifyUrl = `${config.app.url}/verify-email?token=${rawToken}`;
+    const verifyUrl = `${tenantBaseUrl(tenantSubdomain)}/verify-email?token=${rawToken}`;
     const { branding } = await tenantRepo.getBranding(tenantId);
     const template = verifyEmailTemplate({ name: user.firstName, verifyUrl, tenantName, branding });
     await queueEmail({ to: user.email, tenantId: tenantId.toString(), ...template }).catch(() => {});
@@ -335,7 +341,7 @@ async function verifyEmail({ token, tenantId, req }) {
 }
 
 // ─── Resend Verification ──────────────────────────────────────────────────────
-async function resendVerification({ email, tenantId, tenantName }) {
+async function resendVerification({ email, tenantId, tenantName, tenantSubdomain }) {
   const user = await userRepo.findByEmail(tenantId, email);
   if (!user || user.status !== 'unverified') return;
 
@@ -355,14 +361,14 @@ async function resendVerification({ email, tenantId, tenantName }) {
   user.emailVerification.resendCount += 1;
   await user.save();
 
-  const verifyUrl = `${config.app.url}/verify-email?token=${rawToken}`;
+  const verifyUrl = `${tenantBaseUrl(tenantSubdomain)}/verify-email?token=${rawToken}`;
   const { branding } = await tenantRepo.getBranding(tenantId);
   const template = verifyEmailTemplate({ name: user.firstName, verifyUrl, tenantName, branding });
   await queueEmail({ to: user.email, ...template }).catch(() => {});
 }
 
 // ─── Forgot Password ──────────────────────────────────────────────────────────
-async function forgotPassword({ email, tenantId, tenantName }) {
+async function forgotPassword({ email, tenantId, tenantName, tenantSubdomain }) {
   const user = await userRepo.findByEmail(tenantId, email);
   // Allow both active and unverified users — resetting via email proves inbox ownership
   if (!user || (user.status !== 'active' && user.status !== 'unverified')) return;
@@ -372,7 +378,7 @@ async function forgotPassword({ email, tenantId, tenantName }) {
 
   auditLogRepo.log({ tenantId, userId: user._id, email, event: 'password_reset_request' });
 
-  const resetUrl = `${config.app.url}/reset-password?token=${rawToken}`;
+  const resetUrl = `${tenantBaseUrl(tenantSubdomain)}/reset-password?token=${rawToken}`;
   const { branding } = await tenantRepo.getBranding(tenantId);
   const template = resetPasswordTemplate({ name: user.firstName, resetUrl, tenantName, branding });
   await queueEmail({ to: user.email, ...template }).catch(() => {});

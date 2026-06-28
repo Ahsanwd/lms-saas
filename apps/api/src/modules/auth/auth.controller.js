@@ -27,6 +27,7 @@ async function register(req, res, next) {
       firstName, lastName, email, password,
       tenantId: req.tenant.tenantId,
       tenantName: tenant.name,
+      tenantSubdomain: req.tenant.subdomain,
       settings: req.tenant.settings,
       req,
     });
@@ -70,6 +71,7 @@ async function resendVerification(req, res, next) {
       email,
       tenantId: req.tenant.tenantId,
       tenantName: tenant.name,
+      tenantSubdomain: req.tenant.subdomain,
     });
     R.success(res, {}, 'If your email is registered, a verification link has been sent.');
   } catch (err) { next(err); }
@@ -83,6 +85,7 @@ async function forgotPassword(req, res, next) {
       email,
       tenantId: req.tenant.tenantId,
       tenantName: tenant.name,
+      tenantSubdomain: req.tenant.subdomain,
     });
     R.success(res, {}, 'If your email is registered, a reset link has been sent.');
   } catch (err) { next(err); }

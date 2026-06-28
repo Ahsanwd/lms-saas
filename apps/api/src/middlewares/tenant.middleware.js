@@ -42,6 +42,7 @@ async function resolveTenant(req, res, next) {
 
     req.tenant = {
       tenantId: tenant._id,
+      subdomain: tenant.subdomain,
       plan: tenant.plan,
       dbMode: tenant.dbMode,
       status: tenant.status,
