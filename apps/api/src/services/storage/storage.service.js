@@ -62,14 +62,14 @@ function getS3Client() {
   const { S3Client } = require('@aws-sdk/client-s3');
   const s3 = config.storage.s3;
   _s3Client = new S3Client({
-    region: s3.region || 'auto',
+    region:   s3.region || 'auto',
     endpoint: s3.endpoint || undefined,
     credentials: {
       accessKeyId:     s3.accessKeyId,
       secretAccessKey: s3.secretAccessKey,
     },
-    // R2 compatibility: disable automatic checksums (R2 rejects CRC32 headers added by SDK v3.600+)
-    requestChecksumCalculation: 'WHEN_REQUIRED',
+    forcePathStyle: true,                          // R2: use path-style (bucket in URL path, not subdomain)
+    requestChecksumCalculation: 'WHEN_REQUIRED',   // R2: disable auto CRC32 headers (SDK v3.600+)
     responseChecksumValidation: 'WHEN_REQUIRED',
   });
   return _s3Client;
