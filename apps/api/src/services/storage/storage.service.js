@@ -96,29 +96,32 @@ class R2StorageEngine {
     const tenantId = req.user?.tenantId || 'shared';
     const key      = `${this.category}s/${tenantId}/${uuidv4()}${ext}`;
 
-    // Stream directly to R2 — no memory buffering
-    const { Upload } = require('@aws-sdk/lib-storage');
+    const { PutObjectCommand } = require('@aws-sdk/client-s3');
+    const chunks = [];
 
-    const upload = new Upload({
-      client: getS3Client(),
-      params: {
-        Bucket:      config.storage.s3.bucket,
-        Key:         key,
-        Body:        file.stream,
-        ContentType: file.mimetype,
-      },
-      queueSize: 4,
-      partSize:  5 * 1024 * 1024,
+    file.stream.on('data', chunk => chunks.push(chunk));
+    file.stream.on('error', err => cb(err));
+    file.stream.on('end', () => {
+      const buffer = Buffer.concat(chunks);
+      getS3Client()
+        .send(new PutObjectCommand({
+          Bucket:        config.storage.s3.bucket,
+          Key:           key,
+          Body:          buffer,
+          ContentType:   file.mimetype,
+          ContentLength: buffer.length,
+        }))
+        .then(() => cb(null, {
+          key,
+          path:     r2PublicUrl(key),
+          size:     buffer.length,
+          filename: path.basename(key),
+        }))
+        .catch(err => {
+          console.error('[R2] upload failed:', err.Code || err.name, err.message);
+          cb(err);
+        });
     });
-
-    upload.done()
-      .then(() => cb(null, {
-        key,
-        path:     r2PublicUrl(key),
-        size:     Number(req.headers['content-length'] ?? 0),
-        filename: path.basename(key),
-      }))
-      .catch(err => cb(err));
   }
 
   _removeFile(req, file, cb) {
