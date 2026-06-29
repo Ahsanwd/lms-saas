@@ -703,7 +703,7 @@ export default function UsersPage() {
   const [actionError, setActionError] = useState('');
   const [exporting, setExporting] = useState(false);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error: queryError } = useQuery({
     queryKey: ['users', search, roleFilter, statusFilter],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -825,6 +825,11 @@ export default function UsersPage() {
       </div>
 
       {actionError && <Alert variant="error">{actionError}</Alert>}
+      {isError && (
+        <Alert variant="error">
+          Failed to load users: {(queryError as AxiosError<{ message: string }>)?.response?.data?.message ?? (queryError as Error)?.message ?? 'Unknown error'}
+        </Alert>
+      )}
 
       {/* Filters */}
       <div className="flex gap-3">

@@ -35,6 +35,7 @@ const avatarUpload = multer({
 
 async function list(req, res, next) {
   try {
+    if (!req.tenant) return R.error(res, 'Tenant context missing', 400);
     const { role, status, search, page, limit } = req.query;
     const result = await userService.listUsers(req.tenant.tenantId, {
       role, status, search, page, limit,
