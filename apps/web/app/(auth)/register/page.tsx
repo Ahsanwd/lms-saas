@@ -11,7 +11,7 @@ import { Button, Input, Alert } from '@/components/ui';
 function RegisterPage() {
   const router       = useRouter();
   const searchParams = useSearchParams();
-  const setUser      = useAuthStore((s) => s.setUser);
+  const { setUser, setSubdomain: setStoreSubdomain } = useAuthStore();
 
   const [subdomain,  setSubdomain]  = useState('');
   const [tenantName, setTenantName] = useState('');
@@ -59,9 +59,10 @@ function RegisterPage() {
       if (res.data?.requiresVerification) {
         setDone(true);
       } else {
-        // No email verification required — set token and redirect
+        // No email verification — server issues token immediately, log user in
         if (res.data?.accessToken) {
           setAccessToken(res.data.accessToken);
+          setStoreSubdomain(subdomain || '');
           setUser(res.data.user);
         }
         const redirectTo = searchParams.get('redirect');

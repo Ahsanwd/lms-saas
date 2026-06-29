@@ -250,10 +250,16 @@ async function register({ firstName, lastName, email, password, tenantId, tenant
 
   auditLogRepo.log({ tenantId, userId: user._id, email: user.email, event: 'register', ip: req?.ip, userAgent: req?.headers?.['user-agent'] });
 
-  return {
-    message: requireVerification ? 'Registration successful. Please verify your email.' : 'Registration successful. You can now log in.',
-    requiresVerification: requireVerification,
-  };
+  if (requireVerification) {
+    return { message: 'Registration successful. Please verify your email.', requiresVerification: true };
+  }
+
+  // No verification needed — issue tokens so the user is logged in immediately
+  const sessionId = uuidv4();
+  const { accessToken, refreshToken } = buildTokens(user, sessionId);
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  await sessionRepo.create({ tenantId, userId: user._id, sessionId, refreshToken, deviceInfo: getDeviceInfo(req), expiresAt });
+  return { message: 'Registration successful.', requiresVerification: false, accessToken, refreshToken, user: userPublic(user) };
 }
 
 // ─── Login ───────────────────────────────────────────────────────────────────
