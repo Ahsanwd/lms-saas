@@ -30,16 +30,17 @@ function LoginPage() {
   const [isSubdomainHost, setIsSubdomainHost] = useState(false);
 
   useEffect(() => {
-    // Priority: ?tenant= param → cookie set by middleware from subdomain URL
-    const tenantParam = searchParams.get('tenant');
-    const tenantCookie = Cookies.get('lms_tenant') ?? '';
-    const tenant = tenantParam || tenantCookie;
-    if (tenant) setSubdomainVal(tenant);
-
-    // Detect if user is on a *.coursel.space subdomain URL
     const host = window.location.hostname;
     const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'coursel.space';
-    if (host.endsWith(`.${rootDomain}`)) setIsSubdomainHost(true);
+    const onSubdomain = host !== rootDomain && host !== `www.${rootDomain}` && host.endsWith(`.${rootDomain}`);
+    if (onSubdomain) setIsSubdomainHost(true);
+
+    // Pre-fill tenant from URL param always, but from cookie only when already
+    // on a subdomain — avoids the cookie poisoning the super-admin login on coursel.space
+    const tenantParam = searchParams.get('tenant');
+    const tenantCookie = onSubdomain ? (Cookies.get('lms_tenant') ?? '') : '';
+    const tenant = tenantParam || tenantCookie;
+    if (tenant) setSubdomainVal(tenant);
 
     if (searchParams.get('registered') === '1') {
       setSuccess('Account created! You can now sign in.');
