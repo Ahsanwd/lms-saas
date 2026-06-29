@@ -339,6 +339,7 @@ export default function AdminTenantsPage() {
           <option value="">All Status</option>
           <option value="active">Active</option>
           <option value="suspended">Suspended</option>
+          <option value="plan_expired">Plan Expired</option>
         </select>
       </div>
 
@@ -425,11 +426,11 @@ export default function AdminTenantsPage() {
                             Suspend
                           </Button>
                         )}
-                        {t.status === 'suspended' && (
+                        {(t.status === 'suspended' || t.status === 'plan_expired') && (
                           <Button size="sm" variant="outline"
                             loading={isActing && restoreMutation.isPending}
                             onClick={() => restoreMutation.mutate(t._id)}>
-                            Restore
+                            {t.status === 'plan_expired' ? 'Reactivate (+30d trial)' : 'Restore'}
                           </Button>
                         )}
                         <Button size="sm" variant="danger"

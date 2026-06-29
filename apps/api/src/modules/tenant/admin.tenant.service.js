@@ -107,8 +107,16 @@ async function suspendTenant(tenantId) {
 async function restoreTenant(tenantId) {
   const tenant = await tenantRepo.findById(tenantId);
   if (!tenant) throw new AppError('Tenant not found', 404);
-  if (tenant.status !== 'suspended') throw new AppError('Tenant is not suspended', 400);
-  return tenantRepo.updateById(tenantId, { status: 'active' });
+  if (!['suspended', 'plan_expired'].includes(tenant.status))
+    throw new AppError('Tenant is not suspended or expired', 400);
+
+  const updates = { status: 'active' };
+  // Extend trial by 30 days from now if the plan had expired
+  if (tenant.status === 'plan_expired') {
+    updates.trialEndsAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    updates.isOnTrial = true;
+  }
+  return tenantRepo.updateById(tenantId, updates);
 }
 
 // ─── Delete Tenant (Soft) ─────────────────────────────────────────────────────
