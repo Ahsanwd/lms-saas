@@ -30,6 +30,11 @@ const UsersIcon = () => (
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
   </svg>
 );
+const ShareIcon = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+  </svg>
+);
 const CreditCardIcon = () => (
   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
@@ -147,6 +152,9 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/groups',          label: 'Groups',        icon: <GroupIcon />,       roles: ['tenant_admin'] },
   { href: '/cohorts',         label: 'Cohorts',       icon: <CohortIcon />,      roles: ['tenant_admin'] },
   { href: '/analytics',       label: 'Analytics',     icon: <ChartIcon />,       roles: ['tenant_admin', 'instructor'] },
+
+  // ── Growth ───────────────────────────────────────────────────────────
+  { href: '/share-links',     label: 'Share Links',   icon: <ShareIcon />,       roles: ['tenant_admin', 'instructor'] },
 
   // ── Admin ─────────────────────────────────────────────────────────────
   { href: '/users',           label: 'Users',         icon: <UsersIcon />,       roles: ['tenant_admin'] },

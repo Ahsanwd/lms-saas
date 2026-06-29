@@ -29,7 +29,8 @@ router.use('/tenant',  require('../modules/tenant/tenant.routes'));
 // All other operational routes require an active (non-expired) plan.
 router.use(requireActivePlan);
 
-router.use('/users',     require('../modules/user/user.routes'));
+router.use('/users',            require('../modules/user/user.routes'));
+router.use('/enrollment-links', require('../modules/enrollmentLink/enrollmentLink.routes'));
 router.use('/courses',   require('../modules/course/course.routes'));
 router.use('/quizzes',   require('../modules/quiz/quiz.routes'));
 router.use('/dashboard',     require('../modules/dashboard/dashboard.routes'));
