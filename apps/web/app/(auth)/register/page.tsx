@@ -1,16 +1,17 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Cookies from 'js-cookie';
 import api, { setAccessToken } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth.store';
 import { Button, Input, Alert } from '@/components/ui';
 
-export default function RegisterPage() {
-  const router   = useRouter();
-  const setUser  = useAuthStore((s) => s.setUser);
+function RegisterPage() {
+  const router       = useRouter();
+  const searchParams = useSearchParams();
+  const setUser      = useAuthStore((s) => s.setUser);
 
   const [subdomain,  setSubdomain]  = useState('');
   const [tenantName, setTenantName] = useState('');
@@ -58,12 +59,13 @@ export default function RegisterPage() {
       if (res.data?.requiresVerification) {
         setDone(true);
       } else {
-        // No email verification required — set token and go to dashboard
+        // No email verification required — set token and redirect
         if (res.data?.accessToken) {
           setAccessToken(res.data.accessToken);
           setUser(res.data.user);
         }
-        router.push('/dashboard');
+        const redirectTo = searchParams.get('redirect');
+        router.push(redirectTo || '/dashboard');
       }
     } catch (err: any) {
       setError(err.response?.data?.message ?? 'Registration failed. Please try again.');
@@ -181,4 +183,8 @@ export default function RegisterPage() {
       </p>
     </>
   );
+}
+
+export default function RegisterPageWrapper() {
+  return <Suspense><RegisterPage /></Suspense>;
 }

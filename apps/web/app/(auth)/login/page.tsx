@@ -66,7 +66,8 @@ function LoginPage() {
       setAccessToken(result.accessToken);
       setSubdomain(subdomain || '');
       setUser(result.user);
-      router.push(result.user.role === 'super_admin' ? '/admin/dashboard' : '/dashboard');
+      const redirectTo = searchParams.get('redirect');
+      router.push(redirectTo || (result.user.role === 'super_admin' ? '/admin/dashboard' : '/dashboard'));
     } catch (err) {
       const e = err as AxiosError<{ message: string }>;
       setError(e.response?.data?.message ?? 'Login failed. Please try again.');
@@ -85,7 +86,8 @@ function LoginPage() {
       setAccessToken(result.accessToken);
       setSubdomain(subdomain || '');
       setUser(result.user);
-      router.push('/dashboard');
+      const redirectTo = searchParams.get('redirect');
+      router.push(redirectTo || '/dashboard');
     } catch (err) {
       const e = err as AxiosError<{ message: string }>;
       setError(e.response?.data?.message ?? 'Invalid code. Try again.');
