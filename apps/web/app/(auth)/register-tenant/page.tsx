@@ -63,7 +63,7 @@ function pwStrength(p: string): { label: string; pct: number; color: string } {
 
 // ─── Step indicator ────────────────────────────────────────────────────────────
 
-const STEP_LABELS = ['Account', 'Organisation', 'Invite', 'Done'];
+const STEP_LABELS = ['About You', 'Your School', 'Invite Team', 'Done'];
 
 function StepIndicator({ current }: { current: number }) {
   return (
@@ -269,8 +269,8 @@ export default function RegisterTenantPage() {
       {step === 1 && (
         <>
           <div className="mb-5">
-            <h2 className="text-xl font-semibold text-gray-900">Create your account</h2>
-            <p className="text-sm text-gray-500 mt-1">You will be the admin of your organisation</p>
+            <h2 className="text-xl font-semibold text-gray-900">First, tell us about yourself</h2>
+            <p className="text-sm text-gray-500 mt-1">You will be the owner and admin of your online school</p>
           </div>
 
           {error && <Alert variant="error" className="mb-4">{error}</Alert>}
@@ -316,7 +316,7 @@ export default function RegisterTenantPage() {
           </div>
 
           <p className="mt-5 text-center text-sm text-gray-500">
-            Already have an account?{' '}
+            Already launched a school?{' '}
             <Link href="/login" className="font-medium text-primary-600 hover:text-primary-700">Sign in</Link>
           </p>
 
@@ -335,72 +335,102 @@ export default function RegisterTenantPage() {
       {step === 2 && (
         <>
           <div className="mb-5">
-            <h2 className="text-xl font-semibold text-gray-900">Set up your organisation</h2>
-            <p className="text-sm text-gray-500 mt-1">Choose a name and web address for your LMS</p>
+            <h2 className="text-xl font-semibold text-gray-900">Name your school</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              We'll create a private website just for your students — like <span className="font-medium text-gray-700">yourschool.coursel.space</span>
+            </p>
           </div>
 
           {error && <Alert variant="error" className="mb-4">{error}</Alert>}
 
           <div className="space-y-4">
-            <Input label="Organisation Name" placeholder="e.g. Sunrise Academy, City University, Tech Academy"
-              value={tenantName} onChange={e => setTenantName(e.target.value)} autoFocus />
+            <Input
+              label="What is your school called?"
+              placeholder="e.g. Sarah's Art Academy, TechBootcamp, City Coding Club"
+              value={tenantName}
+              onChange={e => setTenantName(e.target.value)}
+              autoFocus
+            />
 
-            {/* Subdomain input */}
+            {/* Web address — presented as a preview, not a form field */}
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1.5">Subdomain</label>
-              <div className={cn(
-                'flex rounded-lg border overflow-hidden transition-shadow',
-                'focus-within:ring-2 focus-within:ring-primary-500 focus-within:border-transparent',
-                subdomainAvailable === false ? 'border-red-300' :
-                subdomainAvailable === true  ? 'border-emerald-400' :
-                'border-gray-300',
-              )}>
-                <input type="text" value={subdomain}
-                  onChange={e => {
-                    userEditedSubdomain.current = true;
-                    const v = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/^-+/, '').slice(0, 30);
-                    setSubdomain_(v);
-                  }}
-                  placeholder="sunrise-academy"
-                  className="flex-1 px-3 py-2.5 text-sm bg-white focus:outline-none min-w-0"
-                />
-                <span className="flex items-center px-3 bg-gray-50 border-l border-gray-200 text-xs text-gray-400 whitespace-nowrap shrink-0">
-                  .coursel.space
-                </span>
-              </div>
-              <div className="mt-1.5 h-4">
-                {checkingSubdomain && <p className="text-xs text-gray-400">Checking availability…</p>}
+              <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                Your students will log in at:
+              </label>
+
+              {/* Live preview */}
+              <div className="rounded-xl bg-gray-50 border border-gray-200 px-4 py-3 mb-2">
+                <p className="text-xs text-gray-400 mb-0.5">Your school's web address</p>
+                <p className={cn(
+                  'text-base font-mono font-semibold transition-colors',
+                  subdomain ? 'text-primary-600' : 'text-gray-300',
+                )}>
+                  {subdomain || 'yourschool'}.coursel.space
+                </p>
+                {checkingSubdomain && <p className="text-xs text-gray-400 mt-1">Checking…</p>}
                 {!checkingSubdomain && subdomain.length >= 3 && SUBDOMAIN_RE.test(subdomain) && subdomainAvailable === true && (
-                  <p className="text-xs text-emerald-600 font-medium flex items-center gap-1">
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <p className="text-xs text-emerald-600 font-medium mt-1 flex items-center gap-1">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                     </svg>
-                    {subdomain}.coursel.space is available
+                    This address is available!
                   </p>
                 )}
                 {!checkingSubdomain && subdomainAvailable === false && (
-                  <p className="text-xs text-red-500 font-medium flex items-center gap-1">
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <p className="text-xs text-red-500 font-medium mt-1 flex items-center gap-1">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
-                    Already taken — try a different subdomain
+                    This address is taken — change the school name or edit below
                   </p>
                 )}
               </div>
-              <p className="text-xs text-gray-400 mt-1">Lowercase letters, numbers and hyphens · 3–30 characters</p>
+
+              {/* Editable slug — secondary, collapsible feel */}
+              <details className="group">
+                <summary className="text-xs text-gray-400 cursor-pointer hover:text-primary-600 transition-colors select-none list-none flex items-center gap-1">
+                  <svg className="w-3 h-3 group-open:rotate-90 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                  Want a different web address? Edit it here
+                </summary>
+                <div className={cn(
+                  'flex rounded-lg border overflow-hidden mt-2 transition-shadow',
+                  'focus-within:ring-2 focus-within:ring-primary-500 focus-within:border-transparent',
+                  subdomainAvailable === false ? 'border-red-300' :
+                  subdomainAvailable === true  ? 'border-emerald-400' :
+                  'border-gray-300',
+                )}>
+                  <input
+                    type="text"
+                    value={subdomain}
+                    onChange={e => {
+                      userEditedSubdomain.current = true;
+                      const v = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/^-+/, '').slice(0, 30);
+                      setSubdomain_(v);
+                    }}
+                    placeholder="your-school-name"
+                    className="flex-1 px-3 py-2 text-sm bg-white focus:outline-none min-w-0"
+                  />
+                  <span className="flex items-center px-3 bg-gray-50 border-l border-gray-200 text-xs text-gray-400 whitespace-nowrap shrink-0">
+                    .coursel.space
+                  </span>
+                </div>
+                <p className="text-xs text-gray-400 mt-1">Only lowercase letters, numbers and hyphens</p>
+              </details>
             </div>
 
             {/* Trial notice */}
             <div className="rounded-xl bg-primary-50 border border-primary-100 p-4">
-              <p className="text-sm font-semibold text-primary-800">14-day free trial included</p>
-              <p className="text-xs text-primary-600 mt-0.5">No credit card required. Full access to all features. Upgrade or cancel anytime.</p>
+              <p className="text-sm font-semibold text-primary-800">✓ 14-day free trial — no credit card needed</p>
+              <p className="text-xs text-primary-600 mt-0.5">Full access to all features. Cancel anytime.</p>
             </div>
 
             <div className="flex gap-3">
               <Button variant="outline" className="flex-1" onClick={() => { setError(''); setStep(1); }}>← Back</Button>
               <Button className="flex-1" onClick={handleCreate} loading={loading}
                 disabled={loading || subdomainAvailable === false}>
-                Create Organisation
+                Launch My School →
               </Button>
             </div>
           </div>
@@ -411,9 +441,9 @@ export default function RegisterTenantPage() {
       {step === 3 && (
         <>
           <div className="mb-5">
-            <h2 className="text-xl font-semibold text-gray-900">Invite your team</h2>
+            <h2 className="text-xl font-semibold text-gray-900">Want to invite anyone? (optional)</h2>
             <p className="text-sm text-gray-500 mt-1">
-              Add instructors or students now — or skip and do it later from Users.
+              Add a teacher or a student now, or skip — you can always invite people later from your dashboard.
             </p>
           </div>
 
@@ -493,13 +523,13 @@ export default function RegisterTenantPage() {
           </div>
 
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">Your organisation is ready!</h2>
-            <p className="text-sm text-gray-500 mt-1">Welcome to {result.tenant.name}</p>
+            <h2 className="text-xl font-semibold text-gray-900">🎉 Your school is live!</h2>
+            <p className="text-sm text-gray-500 mt-1">Welcome to {result.tenant.name} — let's build something great.</p>
           </div>
 
           {/* School URL card */}
           <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 text-left">
-            <p className="text-xs font-medium text-gray-500 mb-1.5">Your organisation URL</p>
+            <p className="text-xs font-medium text-gray-500 mb-1.5">Your students log in at this address</p>
             <div className="flex items-center gap-2">
               <code className="flex-1 text-sm font-mono text-gray-800 bg-white border border-gray-200 rounded-lg px-3 py-2 truncate">
                 {result.tenant.subdomain}.coursel.space
@@ -547,10 +577,10 @@ export default function RegisterTenantPage() {
           {/* What's ready */}
           <div className="text-left space-y-2 text-sm text-gray-600">
             {[
-              '14-day free trial activated',
+              '14-day free trial activated — no credit card needed',
               'Welcome email sent to your inbox',
-              'You are the admin of your organisation',
-              'Upgrade your plan anytime from Billing',
+              'You are the owner and admin of your school',
+              'Create courses, add students, track progress from your dashboard',
             ].map(item => (
               <div key={item} className="flex items-center gap-2">
                 <svg className="w-4 h-4 text-emerald-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -562,7 +592,7 @@ export default function RegisterTenantPage() {
           </div>
 
           <Button className="w-full" onClick={() => router.push('/dashboard')}>
-            Open Dashboard →
+            Go to my dashboard →
           </Button>
         </div>
       )}
