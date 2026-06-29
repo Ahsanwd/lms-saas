@@ -1,120 +1,174 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import api, { setAccessToken, setTenantSubdomain } from '@/lib/api';
+import Cookies from 'js-cookie';
+import api, { setAccessToken } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth.store';
 import { Button, Input, Alert } from '@/components/ui';
-import { AxiosError } from 'axios';
-
-const schema = z.object({
-  firstName: z.string().min(1, 'First name is required'),
-  lastName: z.string().min(1, 'Last name is required'),
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
-  tenantName: z.string().min(2, 'Organization name is required'),
-  subdomain: z
-    .string()
-    .min(3, 'Subdomain must be at least 3 characters')
-    .regex(/^[a-z0-9-]+$/, 'Subdomain can only contain lowercase letters, numbers and hyphens'),
-});
-
-type FormData = z.infer<typeof schema>;
 
 export default function RegisterPage() {
-  const router = useRouter();
-  const setUser = useAuthStore((s) => s.setUser);
-  const [error, setError] = useState('');
+  const router   = useRouter();
+  const setUser  = useAuthStore((s) => s.setUser);
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
-    resolver: zodResolver(schema),
-  });
+  const [subdomain,  setSubdomain]  = useState('');
+  const [tenantName, setTenantName] = useState('');
+  const [firstName,  setFirstName]  = useState('');
+  const [lastName,   setLastName]   = useState('');
+  const [email,      setEmail]      = useState('');
+  const [password,   setPassword]   = useState('');
+  const [error,      setError]      = useState('');
+  const [loading,    setLoading]    = useState(false);
+  const [done,       setDone]       = useState(false);
 
-  const onSubmit = async (data: FormData) => {
+  useEffect(() => {
+    const sub = Cookies.get('lms_tenant');
+    if (!sub) {
+      // Not on a tenant subdomain — send to school creation instead
+      router.replace('/register-tenant');
+      return;
+    }
+    setSubdomain(sub);
+
+    // Fetch tenant name for friendly display
+    api.get('/courses/public', { headers: { 'X-Tenant-Subdomain': sub } })
+      .then(res => setTenantName(res.data?.data?.tenantName ?? sub))
+      .catch(() => setTenantName(sub));
+  }, [router]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
     setError('');
+
+    if (!firstName.trim()) return setError('First name is required');
+    if (!lastName.trim())  return setError('Last name is required');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return setError('Enter a valid email address');
+    if (password.length < 8) return setError('Password must be at least 8 characters');
+
+    setLoading(true);
     try {
-      const { data: res } = await api.post('/auth/register-tenant', data);
-      setAccessToken(res.data.accessToken);
-      setTenantSubdomain(res.data.tenant.subdomain);
-      setUser(res.data.user);
-      if (res.data.user.status === 'unverified') {
-        router.push('/verify-email?fromRegister=1');
+      const { data: res } = await api.post('/auth/register', {
+        firstName: firstName.trim(),
+        lastName:  lastName.trim(),
+        email:     email.trim().toLowerCase(),
+        password,
+      });
+
+      if (res.data?.requiresVerification) {
+        setDone(true);
       } else {
+        // No email verification required — set token and go to dashboard
+        if (res.data?.accessToken) {
+          setAccessToken(res.data.accessToken);
+          setUser(res.data.user);
+        }
         router.push('/dashboard');
       }
-    } catch (err) {
-      const e = err as AxiosError<{ message: string }>;
-      setError(e.response?.data?.message ?? 'Registration failed. Please try again.');
+    } catch (err: any) {
+      setError(err.response?.data?.message ?? 'Registration failed. Please try again.');
+    } finally {
+      setLoading(false);
     }
-  };
+  }
+
+  const displayName = tenantName
+    ? tenantName
+    : subdomain
+      ? subdomain.charAt(0).toUpperCase() + subdomain.slice(1)
+      : '';
+
+  // Email sent confirmation screen
+  if (done) {
+    return (
+      <div className="text-center space-y-4">
+        <div className="w-14 h-14 bg-emerald-100 rounded-full flex items-center justify-center mx-auto">
+          <svg className="w-7 h-7 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+        </div>
+        <h2 className="text-xl font-semibold text-gray-900">Check your email</h2>
+        <p className="text-sm text-gray-500">
+          We sent a verification link to <strong>{email}</strong>.
+          Click it to activate your account and start learning.
+        </p>
+        <p className="text-xs text-gray-400">
+          Didn't get it?{' '}
+          <button
+            onClick={async () => {
+              try {
+                await api.post('/auth/resend-verification', { email });
+                alert('Verification email resent!');
+              } catch {
+                alert('Could not resend. Please try again.');
+              }
+            }}
+            className="text-primary-600 hover:underline"
+          >
+            Resend email
+          </button>
+        </p>
+      </div>
+    );
+  }
 
   return (
     <>
       <div className="mb-6">
-        <h2 className="text-xl font-semibold text-gray-900">Create your account</h2>
-        <p className="text-sm text-gray-500 mt-1">Start your 14-day free trial</p>
+        <h2 className="text-xl font-semibold text-gray-900">
+          {displayName ? `Join ${displayName}` : 'Create your account'}
+        </h2>
+        <p className="text-sm text-gray-500 mt-1">
+          Sign up for free — no credit card needed
+        </p>
       </div>
 
       {error && <Alert variant="error" className="mb-4">{error}</Alert>}
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <Input
             label="First name"
             autoComplete="given-name"
-            placeholder="John"
-            error={errors.firstName?.message}
-            {...register('firstName')}
+            placeholder="Jane"
+            value={firstName}
+            onChange={e => setFirstName(e.target.value)}
+            autoFocus
           />
           <Input
             label="Last name"
             autoComplete="family-name"
-            placeholder="Doe"
-            error={errors.lastName?.message}
-            {...register('lastName')}
+            placeholder="Smith"
+            value={lastName}
+            onChange={e => setLastName(e.target.value)}
           />
         </div>
+
         <Input
-          label="Work email"
+          label="Email address"
           type="email"
           autoComplete="email"
-          placeholder="you@company.com"
-          error={errors.email?.message}
-          {...register('email')}
+          placeholder="jane@example.com"
+          value={email}
+          onChange={e => setEmail(e.target.value)}
         />
+
         <Input
           label="Password"
           type="password"
           autoComplete="new-password"
           placeholder="Min. 8 characters"
-          error={errors.password?.message}
-          {...register('password')}
-        />
-        <Input
-          label="Organization name"
-          placeholder="Acme Corp"
-          error={errors.tenantName?.message}
-          {...register('tenantName')}
-        />
-        <Input
-          label="Subdomain"
-          placeholder="acme"
-          hint="Your platform will be at: acme.coursel.space"
-          error={errors.subdomain?.message}
-          {...register('subdomain')}
+          value={password}
+          onChange={e => setPassword(e.target.value)}
         />
 
-        <Button type="submit" className="w-full" loading={isSubmitting}>
-          Create account
+        <Button type="submit" className="w-full" loading={loading}>
+          Create my account
         </Button>
 
-        <p className="text-xs text-center text-gray-500">
-          By creating an account, you agree to our{' '}
-          <span className="text-primary-600 cursor-pointer">Terms of Service</span> and{' '}
+        <p className="text-xs text-center text-gray-400">
+          By signing up you agree to our{' '}
+          <span className="text-primary-600 cursor-pointer">Terms</span> and{' '}
           <span className="text-primary-600 cursor-pointer">Privacy Policy</span>.
         </p>
       </form>
