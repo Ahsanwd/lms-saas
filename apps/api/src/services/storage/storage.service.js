@@ -118,8 +118,10 @@ class R2StorageEngine {
           filename: path.basename(key),
         }))
         .catch(err => {
-          console.error('[R2] upload failed:', err.Code || err.name, err.message);
-          cb(err);
+          const detail = `[R2] ${err.Code || err.name || 'Error'}: ${err.message}`;
+          console.error(detail);
+          const AppError = require('../../utils/AppError');
+          cb(new AppError(detail, 500));
         });
     });
   }
