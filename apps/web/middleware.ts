@@ -16,11 +16,12 @@ export function middleware(request: NextRequest) {
 
     if (subdomain && !EXCLUDED.has(subdomain)) {
       const response = NextResponse.next();
+      // No domain attribute — cookie is scoped to this exact subdomain only.
+      // Shared domain (.coursel.space) caused cross-tenant cookie pollution:
+      // visiting any subdomain overwrote another tenant's active session.
       response.cookies.set('lms_tenant', subdomain, {
         sameSite: 'lax',
         path: '/',
-        // Shared across all *.coursel.space subdomains
-        domain: `.${ROOT_DOMAIN}`,
       });
       return response;
     }
