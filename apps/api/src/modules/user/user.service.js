@@ -207,8 +207,11 @@ async function inviteUser(tenantId, { email, role, name, expiresInHours }, actin
   const rawToken = crypto.randomBytes(32).toString('hex');
   await inviteRepo.create({ tenantId, email, role, name, rawToken, invitedBy: actingUser.sub, expiresInHours: hours });
 
+  const ROOT_DOMAIN  = process.env.ROOT_DOMAIN || 'coursel.space';
+  const tenantOrigin = `https://${tenant.subdomain}.${ROOT_DOMAIN}`;
+
   const inviter   = await userRepo.findByIdRaw(actingUser.sub);
-  const inviteUrl = `${config.app.url}/accept-invite?token=${rawToken}&tenant=${tenant.subdomain}`;
+  const inviteUrl = `${tenantOrigin}/accept-invite?token=${rawToken}`;
   const template  = inviteTemplate({
     inviterName: inviter ? `${inviter.firstName} ${inviter.lastName}` : 'Admin',
     tenantName:  tenant.name,
