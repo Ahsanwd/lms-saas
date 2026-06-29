@@ -62,6 +62,10 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   if (subdomain && config.headers) {
     config.headers['X-Tenant-Subdomain'] = subdomain;
   }
+  // For FormData uploads let the browser set Content-Type (includes multipart boundary)
+  if (config.data instanceof FormData && config.headers) {
+    delete config.headers['Content-Type'];
+  }
   return config;
 });
 
