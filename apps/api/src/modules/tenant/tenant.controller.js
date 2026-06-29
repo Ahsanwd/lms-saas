@@ -289,8 +289,18 @@ async function testBunnyStreamConnection(req, res, next) {
   } catch (err) { next(err); }
 }
 
+async function getPublicBranding(req, res, next) {
+  try {
+    if (!req.tenant) return R.success(res, { tenantName: null, logoUrl: null, primaryColor: null });
+    const tenantRepo = require('../../database/repositories/tenant.repository');
+    const { tenantName, branding } = await tenantRepo.getBranding(req.tenant.tenantId);
+    R.success(res, { tenantName, ...branding });
+  } catch (err) { next(err); }
+}
+
 module.exports = {
   getMyTenant,
+  getPublicBranding,
   updateSettings,
   setCustomDomain,
   verifyCustomDomain,

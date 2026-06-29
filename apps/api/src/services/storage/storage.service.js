@@ -68,6 +68,9 @@ function getS3Client() {
       accessKeyId:     s3.accessKeyId,
       secretAccessKey: s3.secretAccessKey,
     },
+    // R2 compatibility: disable automatic checksums (R2 rejects CRC32 headers added by SDK v3.600+)
+    requestChecksumCalculation: 'WHEN_REQUIRED',
+    responseChecksumValidation: 'WHEN_REQUIRED',
   });
   return _s3Client;
 }
@@ -148,7 +151,9 @@ function getLocalStorage(category) {
 // STORAGE_DRIVER=s3     → uploads to R2,  req.file.path = public R2 URL
 
 function upload(category) {
-  const storage = USE_S3
+  const s3 = config.storage.s3;
+  const canUseS3 = USE_S3 && !!(s3.bucket && s3.accessKeyId && s3.secretAccessKey);
+  const storage = canUseS3
     ? new R2StorageEngine(category)
     : getLocalStorage(category);
 

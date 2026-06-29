@@ -4,7 +4,10 @@ const { authenticate } = require('../../middlewares/auth.middleware');
 const { requireRole, requirePermission } = require('../../middlewares/permission.middleware');
 const { upload } = require('../../services/storage/storage.service');
 
-// All tenant routes require authentication
+// Public — no auth needed (login/register/storefront pages fetch this for branding)
+router.get('/branding', ctrl.getPublicBranding);
+
+// All other tenant routes require authentication
 router.use(authenticate);
 
 router.get('/', ctrl.getMyTenant); // all authenticated users need basic tenant info (branding)

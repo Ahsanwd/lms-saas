@@ -135,6 +135,7 @@ function CourseCard({ course }: { course: PublicCourse }) {
 function TenantLandingPage({ subdomain }: { subdomain: string }) {
   const [courses, setCourses] = useState<PublicCourse[]>([]);
   const [tenantName, setTenantName] = useState('');
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -145,6 +146,7 @@ function TenantLandingPage({ subdomain }: { subdomain: string }) {
       .then((res) => {
         setCourses(res.data.data.courses ?? []);
         setTenantName(res.data.data.tenantName ?? '');
+        setLogoUrl(res.data.data.branding?.logoUrl ?? null);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -158,9 +160,13 @@ function TenantLandingPage({ subdomain }: { subdomain: string }) {
       {/* Navbar */}
       <nav className="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-          <span className="text-xl font-bold text-indigo-600 tracking-tight capitalize">
-            {displayName}
-          </span>
+          {logoUrl ? (
+            <img src={logoUrl} alt={displayName} className="h-9 object-contain" />
+          ) : (
+            <span className="text-xl font-bold text-indigo-600 tracking-tight capitalize">
+              {displayName}
+            </span>
+          )}
           <div className="flex items-center gap-3">
             <Link
               href="/login"

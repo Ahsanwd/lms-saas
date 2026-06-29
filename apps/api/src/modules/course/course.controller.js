@@ -53,7 +53,7 @@ async function listPublicCourses(req, res, next) {
     ]);
     const hiddenCategories = tenant?.settings?.storefront?.hiddenCategories ?? [];
     const courses = await courseRepo.findPublishedPublic(req.tenant.tenantId, { hiddenCategories });
-    R.success(res, { courses, tenantName: branding.tenantName });
+    R.success(res, { courses, tenantName: branding.tenantName, branding: branding.branding });
   } catch (err) { next(err); }
 }
 
