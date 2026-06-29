@@ -1,4 +1,6 @@
 const courseService = require('./course.service');
+const courseRepo = require('../../database/repositories/course.repository');
+const tenantRepo = require('../../database/repositories/tenant.repository');
 const {
   validateCreateCourse, validateUpdateCourse,
   validateCreateSection, validateCreateLesson,
@@ -38,6 +40,18 @@ async function deleteCategory(req, res, next) {
   try {
     await courseService.deleteCategory(req.tenant.tenantId, req.params.id, req.user.sub);
     R.success(res, {}, 'Category deleted');
+  } catch (err) { next(err); }
+}
+
+// ── Public catalog (no auth) ──────────────────────────────────────────────────
+async function listPublicCourses(req, res, next) {
+  try {
+    if (!req.tenant) return R.success(res, { courses: [], tenantName: null });
+    const [courses, { tenantName }] = await Promise.all([
+      courseRepo.findPublishedPublic(req.tenant.tenantId),
+      tenantRepo.getBranding(req.tenant.tenantId),
+    ]);
+    R.success(res, { courses, tenantName });
   } catch (err) { next(err); }
 }
 
@@ -573,6 +587,7 @@ async function importScorm(req, res, next) {
 }
 
 module.exports = {
+  listPublicCourses,
   listCategories, createCategory, updateCategory, deleteCategory,
   listCourses, getCourse, createCourse, updateCourse, uploadThumbnail, uploadContentImage,
   publishCourse, archiveCourse, deleteCourse, cloneCourse,

@@ -218,8 +218,9 @@ const { guardCourseLimit, guardStorageLimit, trackUpload } = require('../../midd
  *         description: Course not completed yet
  */
 
-// ── Public certificate verification (no auth required) ────────────────────────
+// ── Public routes (no auth required) ─────────────────────────────────────────
 router.get('/verify-certificate/:certificateId', ctrl.verifyCertificate);
+router.get('/public', ctrl.listPublicCourses);
 
 router.use(authenticate);
 

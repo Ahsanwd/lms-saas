@@ -42,6 +42,15 @@ class CourseRepository {
     if (!course) return null;
     return course.softDelete(userId);
   }
+
+  findPublishedPublic(tenantId) {
+    return Course.find({ tenantId, status: 'published', deletedAt: null })
+      .select('title slug shortDescription thumbnail price isFree level enrollmentCount rating totalLessons totalDurationSeconds instructorId categoryId')
+      .populate('instructorId', 'firstName lastName avatar')
+      .populate('categoryId', 'name')
+      .sort({ createdAt: -1 })
+      .lean();
+  }
 }
 
 module.exports = new CourseRepository();
