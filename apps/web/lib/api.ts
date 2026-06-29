@@ -38,6 +38,10 @@ export function setTenantSubdomain(subdomain: string): void {
 }
 
 export function clearTenantSubdomain(): void {
+  const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'coursel.space';
+  // Cookie was set by Next.js middleware with domain:.coursel.space — must match to delete
+  Cookies.remove(TENANT_KEY, { path: '/', domain: `.${rootDomain}` });
+  Cookies.remove(TENANT_KEY, { path: '/' });
   Cookies.remove(TENANT_KEY);
 }
 
