@@ -81,6 +81,9 @@ const courseSchema = new mongoose.Schema(
       enum: ['classic', 'hero', 'minimal'],
       default: 'classic',
     },
+
+    // Storefront visibility — admin/instructor can hide a course from the public catalog
+    showOnStorefront: { type: Boolean, default: true },
   },
   { timestamps: true }
 );

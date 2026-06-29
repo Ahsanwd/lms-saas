@@ -47,11 +47,26 @@ async function deleteCategory(req, res, next) {
 async function listPublicCourses(req, res, next) {
   try {
     if (!req.tenant) return R.success(res, { courses: [], tenantName: null });
-    const [courses, { tenantName }] = await Promise.all([
-      courseRepo.findPublishedPublic(req.tenant.tenantId),
+    const [tenant, branding] = await Promise.all([
+      tenantRepo.findById(req.tenant.tenantId),
       tenantRepo.getBranding(req.tenant.tenantId),
     ]);
-    R.success(res, { courses, tenantName });
+    const hiddenCategories = tenant?.settings?.storefront?.hiddenCategories ?? [];
+    const courses = await courseRepo.findPublishedPublic(req.tenant.tenantId, { hiddenCategories });
+    R.success(res, { courses, tenantName: branding.tenantName });
+  } catch (err) { next(err); }
+}
+
+// ── Storefront visibility toggle (admin/instructor) ───────────────────────────
+async function updateStorefront(req, res, next) {
+  try {
+    if (!req.tenant) return R.error(res, 'Tenant context missing', 400);
+    const { showOnStorefront } = req.body;
+    if (typeof showOnStorefront !== 'boolean') return R.error(res, 'showOnStorefront must be a boolean', 400);
+    const course = await courseRepo.findById(req.tenant.tenantId, req.params.id);
+    if (!course) return R.error(res, 'Course not found', 404);
+    await courseRepo.updateById(req.tenant.tenantId, req.params.id, { showOnStorefront });
+    R.success(res, { showOnStorefront }, 'Storefront visibility updated');
   } catch (err) { next(err); }
 }
 
@@ -603,4 +618,5 @@ module.exports = {
   adminEnroll, adminUnenroll, extendAccess, bulkEnrollCsv,
   saveVideoPosition, getLessonProgress,
   markLessonComplete, getCourseProgress, getCertificate, verifyCertificate, revokeCertificate,
+  updateStorefront,
 };

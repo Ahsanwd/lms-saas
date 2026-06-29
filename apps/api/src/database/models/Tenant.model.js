@@ -56,6 +56,11 @@ const tenantSchema = new mongoose.Schema(
         requireSymbols:   { type: Boolean, default: false },
       },
 
+      // Storefront visibility — which categories/courses appear on the public catalog
+      storefront: {
+        hiddenCategories: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Category' }],
+      },
+
       // Per-tenant feature flags — disable modules you don't need
       featureFlags: {
         liveClasses:   { type: Boolean, default: true },

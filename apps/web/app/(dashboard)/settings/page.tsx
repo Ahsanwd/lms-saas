@@ -1525,6 +1525,139 @@ function CloudflareStreamSection() {
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// STOREFRONT VISIBILITY SECTION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+interface Category { _id: string; name: string; }
+interface StorefrontCourse { _id: string; title: string; thumbnail?: string; categoryId?: { _id: string; name: string } | null; showOnStorefront: boolean; }
+
+function StorefrontSection() {
+  const qc = useQueryClient();
+
+  const { data: catData } = useQuery({
+    queryKey: ['categories-storefront'],
+    queryFn: async () => { const { data } = await api.get('/courses/categories'); return data.data.categories as Category[]; },
+  });
+
+  const { data: courseData } = useQuery({
+    queryKey: ['courses-storefront'],
+    queryFn: async () => {
+      const { data } = await api.get('/courses?limit=200&status=published');
+      return data.data.courses as StorefrontCourse[];
+    },
+  });
+
+  const { data: tenantData } = useQuery({
+    queryKey: ['tenant'],
+    queryFn: async () => { const { data } = await api.get('/tenant'); return data.data.tenant ?? data.data; },
+  });
+
+  const [hiddenCats, setHiddenCats] = useState<string[]>([]);
+  useEffect(() => {
+    const saved = (tenantData as any)?.settings?.storefront?.hiddenCategories ?? [];
+    setHiddenCats(saved.map((id: any) => id.toString()));
+  }, [tenantData]);
+
+  const catMutation = useMutation({
+    mutationFn: (ids: string[]) => api.patch('/tenant/settings', { storefront: { hiddenCategories: ids } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['tenant'] }),
+  });
+
+  const courseMutation = useMutation({
+    mutationFn: ({ id, show }: { id: string; show: boolean }) =>
+      api.patch(`/courses/${id}/storefront`, { showOnStorefront: show }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['courses-storefront'] }),
+  });
+
+  const toggleCategory = (id: string) => {
+    const next = hiddenCats.includes(id) ? hiddenCats.filter(x => x !== id) : [...hiddenCats, id];
+    setHiddenCats(next);
+    catMutation.mutate(next);
+  };
+
+  const categories = catData ?? [];
+  const courses    = courseData ?? [];
+
+  return (
+    <Section
+      icon={
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+        </svg>
+      }
+      title="Storefront Visibility"
+      desc="Control which courses and categories appear on your public site."
+    >
+      {/* Category visibility */}
+      {categories.length > 0 && (
+        <div>
+          <p className="text-sm font-medium text-gray-700 mb-3">Category visibility</p>
+          <div className="space-y-2">
+            {categories.map(cat => {
+              const hidden = hiddenCats.includes(cat._id);
+              return (
+                <div key={cat._id} className="flex items-center justify-between bg-gray-50 rounded-lg px-4 py-2.5">
+                  <span className="text-sm text-gray-800">{cat.name}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-400">{hidden ? 'Hidden' : 'Visible'}</span>
+                    <Toggle checked={!hidden} onChange={() => toggleCategory(cat._id)} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {catMutation.isError && <p className="text-xs text-red-500 mt-2">Failed to save category visibility.</p>}
+        </div>
+      )}
+
+      {/* Per-course visibility */}
+      {courses.length > 0 && (
+        <div>
+          <p className="text-sm font-medium text-gray-700 mb-3">Course visibility</p>
+          <div className="space-y-2">
+            {courses.map(course => {
+              const isCatHidden = course.categoryId ? hiddenCats.includes(course.categoryId._id) : false;
+              const visible = course.showOnStorefront !== false;
+              return (
+                <div
+                  key={course._id}
+                  className={cn('flex items-center justify-between rounded-lg px-4 py-2.5 border', isCatHidden ? 'bg-amber-50 border-amber-100' : 'bg-gray-50 border-transparent')}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    {course.thumbnail ? (
+                      <img src={course.thumbnail} className="w-10 h-7 object-cover rounded flex-shrink-0" />
+                    ) : (
+                      <div className="w-10 h-7 bg-gray-200 rounded flex-shrink-0" />
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-sm text-gray-800 truncate">{course.title}</p>
+                      {course.categoryId && (
+                        <p className="text-xs text-gray-400 truncate">{course.categoryId.name}{isCatHidden && ' · category hidden'}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="text-xs text-gray-400">{visible ? 'Visible' : 'Hidden'}</span>
+                    <Toggle
+                      checked={visible}
+                      onChange={v => courseMutation.mutate({ id: course._id, show: v })}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {courses.length === 0 && categories.length === 0 && (
+        <p className="text-sm text-gray-400 italic">No published courses yet. Publish a course to manage storefront visibility.</p>
+      )}
+    </Section>
+  );
+}
+
 function AdminSettings() {
   const qc = useQueryClient();
   const [saved, setSaved] = useState(false);
@@ -1906,6 +2039,7 @@ function AdminSettings() {
         {mutation.isError && <span className="text-sm text-red-600">Failed to save — {(mutation.error as Error)?.message ?? 'please try again'}</span>}
       </div>
 
+      <StorefrontSection />
       <EmailSettingsSection />
       <PasswordPolicySection />
       <FeatureFlagsSection />

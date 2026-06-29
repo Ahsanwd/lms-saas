@@ -256,8 +256,9 @@ router.post('/:id/content-images',
   trackUpload(),
   ctrl.uploadContentImage
 );
-router.patch('/:id/publish', requirePermission('course:manage'), ctrl.publishCourse);
-router.patch('/:id/archive', requirePermission('course:manage'), ctrl.archiveCourse);
+router.patch('/:id/publish',    requirePermission('course:manage'), ctrl.publishCourse);
+router.patch('/:id/archive',    requirePermission('course:manage'), ctrl.archiveCourse);
+router.patch('/:id/storefront', requirePermission('course:manage'), ctrl.updateStorefront);
 router.post('/:id/clone',   requirePermission('course:create'),  guardCourseLimit(), ctrl.cloneCourse);
 
 // ── Sections ──────────────────────────────────────────────────────────────────

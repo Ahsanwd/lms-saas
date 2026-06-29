@@ -19,6 +19,7 @@ async function updateSettings(tenantId, updates) {
     'allowSelfRegistration', 'requireEmailVerification', 'idleTimeoutMinutes',
     'passwordPolicy', 'defaultInviteExpiryHours',
     'currency', 'refundWindowDays', 'taxRate', 'taxLabel',
+    'storefront',
   ];
 
   const settingsUpdate = {};

@@ -43,9 +43,11 @@ class CourseRepository {
     return course.softDelete(userId);
   }
 
-  findPublishedPublic(tenantId) {
-    return Course.find({ tenantId, status: 'published', deletedAt: null })
-      .select('title slug shortDescription thumbnail price isFree level enrollmentCount rating totalLessons totalDurationSeconds instructorId categoryId')
+  findPublishedPublic(tenantId, { hiddenCategories = [] } = {}) {
+    const filter = { tenantId, status: 'published', deletedAt: null, showOnStorefront: { $ne: false } };
+    if (hiddenCategories.length > 0) filter.categoryId = { $nin: hiddenCategories };
+    return Course.find(filter)
+      .select('title slug shortDescription thumbnail price isFree level enrollmentCount rating totalLessons totalDurationSeconds instructorId categoryId showOnStorefront')
       .populate('instructorId', 'firstName lastName avatar')
       .populate('categoryId', 'name')
       .sort({ createdAt: -1 })
