@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/stores/auth.store';
 import api from '@/lib/api';
 import { Button, Badge, Spinner, Alert } from '@/components/ui';
+import { cn, avatarColor, getInitials } from '@/lib/utils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -350,22 +351,26 @@ function AnnouncementModal({
 // ─── Detail Modal ─────────────────────────────────────────────────────────────
 
 function DetailModal({ announcement, onClose }: { announcement: Announcement; onClose: () => void }) {
+  const name = authorName(announcement.authorId);
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
-        <div className="px-6 pt-6 pb-4 border-b border-gray-100 flex items-start justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">{announcement.title}</h2>
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+        <div className="px-6 pt-6 pb-4 border-b border-gray-100 flex items-start gap-4">
+          <div className={cn('w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 font-semibold text-sm', avatarColor(name))}>
+            {getInitials(name)}
+          </div>
+          <div className="flex-1 min-w-0">
+            {announcement.courseId && (
+              <span className="inline-flex items-center px-2.5 py-0.5 mb-1.5 bg-primary-50 text-primary-700 rounded-full text-xs font-medium">
+                {announcement.courseId.title}
+              </span>
+            )}
+            <h2 className="text-lg font-bold text-gray-900 leading-snug">{announcement.title}</h2>
             <p className="text-sm text-gray-400 mt-1">
-              {authorName(announcement.authorId)} · {formatDate(announcement.publishedAt ?? announcement.createdAt)}
-              {announcement.courseId && (
-                <span className="ml-2 inline-flex items-center px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-xs font-medium">
-                  {announcement.courseId.title}
-                </span>
-              )}
+              {name} · {formatDate(announcement.publishedAt ?? announcement.createdAt)}
             </p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 flex-shrink-0 mt-0.5">
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg p-1 flex-shrink-0 transition-colors">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -414,81 +419,90 @@ function AnnouncementCard({
     onSuccess:  () => qc.invalidateQueries({ queryKey: ['announcements'] }),
   });
 
+  const name = authorName(announcement.authorId);
+
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 hover:shadow-sm transition-shadow">
-      <div className="flex items-start justify-between gap-3">
-        {/* Left */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap mb-1">
-            {canEdit && (
-              <>
-                {announcement.isPublished && <Badge variant="success">Published</Badge>}
-                {isScheduled && (
-                  <span className="inline-flex items-center px-2 py-0.5 bg-amber-50 text-amber-700 rounded text-xs font-medium border border-amber-200">
-                    Scheduled · {formatDateTime(announcement.scheduledPublishAt!)}
-                  </span>
-                )}
-                {!announcement.isPublished && !isScheduled && <Badge variant="warning">Draft</Badge>}
-              </>
-            )}
-            {announcement.courseId && (
-              <span className="inline-flex items-center px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-xs font-medium">
-                {announcement.courseId.title}
-              </span>
-            )}
-          </div>
-
-          <button onClick={onRead} className="text-left block w-full">
-            <h3 className="text-base font-semibold text-gray-900 hover:text-primary-600 transition-colors">
-              {announcement.title}
-            </h3>
-            <p className="text-sm text-gray-500 mt-1 line-clamp-2">
-              {stripMarkdown(announcement.body)}
-            </p>
-          </button>
-
-          <p className="text-xs text-gray-400 mt-2">
-            {authorName(announcement.authorId)} · {formatDate(announcement.publishedAt ?? announcement.createdAt)}
-          </p>
+    <div className="bg-white border border-gray-100 rounded-2xl p-5 hover:shadow-md hover:-translate-y-0.5 transition-all">
+      <div className="flex items-start gap-4">
+        {/* Avatar */}
+        <div className={cn('w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 font-semibold text-sm mt-0.5', avatarColor(name))}>
+          {getInitials(name)}
         </div>
 
-        {/* Right — action buttons */}
-        {canEdit && (
-          <div className="flex items-center gap-1 flex-shrink-0 flex-wrap justify-end">
-            {isScheduled ? (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => cancelScheduleMutation.mutate()}
-                loading={cancelScheduleMutation.isPending}
-              >
-                Cancel Schedule
-              </Button>
-            ) : (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => publishMutation.mutate()}
-                loading={publishMutation.isPending}
-              >
-                {announcement.isPublished ? 'Unpublish' : 'Publish'}
-              </Button>
-            )}
+        <div className="flex-1 min-w-0 flex items-start justify-between gap-3">
+          {/* Left */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap mb-1.5">
+              {canEdit && (
+                <>
+                  {announcement.isPublished && <Badge variant="success">Published</Badge>}
+                  {isScheduled && (
+                    <span className="inline-flex items-center px-2 py-0.5 bg-amber-50 text-amber-700 rounded-full text-xs font-medium border border-amber-200">
+                      Scheduled · {formatDateTime(announcement.scheduledPublishAt!)}
+                    </span>
+                  )}
+                  {!announcement.isPublished && !isScheduled && <Badge variant="warning">Draft</Badge>}
+                </>
+              )}
+              {announcement.courseId && (
+                <span className="inline-flex items-center px-2.5 py-0.5 bg-primary-50 text-primary-700 rounded-full text-xs font-medium">
+                  {announcement.courseId.title}
+                </span>
+              )}
+            </div>
 
-            <Button size="sm" variant="outline" onClick={onEdit}>Edit</Button>
+            <button onClick={onRead} className="text-left block w-full group">
+              <h3 className="text-base font-semibold text-gray-900 group-hover:text-primary-600 transition-colors">
+                {announcement.title}
+              </h3>
+              <p className="text-sm text-gray-500 mt-1 line-clamp-2 leading-relaxed">
+                {stripMarkdown(announcement.body)}
+              </p>
+            </button>
 
-            {confirming ? (
-              <>
-                <Button size="sm" variant="danger" onClick={() => deleteMutation.mutate()} loading={deleteMutation.isPending}>
-                  Confirm
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => setConfirming(false)}>Cancel</Button>
-              </>
-            ) : (
-              <Button size="sm" variant="outline" onClick={() => setConfirming(true)}>Delete</Button>
-            )}
+            <p className="text-xs text-gray-400 mt-2.5">
+              {name} · {formatDate(announcement.publishedAt ?? announcement.createdAt)}
+            </p>
           </div>
-        )}
+
+          {/* Right — action buttons */}
+          {canEdit && (
+            <div className="flex items-center gap-1 flex-shrink-0 flex-wrap justify-end">
+              {isScheduled ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => cancelScheduleMutation.mutate()}
+                  loading={cancelScheduleMutation.isPending}
+                >
+                  Cancel Schedule
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => publishMutation.mutate()}
+                  loading={publishMutation.isPending}
+                >
+                  {announcement.isPublished ? 'Unpublish' : 'Publish'}
+                </Button>
+              )}
+
+              <Button size="sm" variant="outline" onClick={onEdit}>Edit</Button>
+
+              {confirming ? (
+                <>
+                  <Button size="sm" variant="danger" onClick={() => deleteMutation.mutate()} loading={deleteMutation.isPending}>
+                    Confirm
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setConfirming(false)}>Cancel</Button>
+                </>
+              ) : (
+                <Button size="sm" variant="outline" onClick={() => setConfirming(true)}>Delete</Button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -527,12 +541,19 @@ export default function AnnouncementsPage() {
   }
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
+    <div className="max-w-3xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="px-6 pt-8 pb-6 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Announcements</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2.5">
+            <span className="w-9 h-9 rounded-xl bg-primary-50 text-primary-600 flex items-center justify-center">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+              </svg>
+            </span>
+            Announcements
+          </h1>
+          <p className="text-sm text-gray-500 mt-1 ml-[46px]">
             {isStudent ? 'Stay up to date with the latest news.' : 'Post updates for your students.'}
           </p>
         </div>
@@ -544,31 +565,35 @@ export default function AnnouncementsPage() {
       </div>
 
       {/* List */}
-      {announcements.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-            <svg className="w-7 h-7 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
-            </svg>
+      <div className="px-6 pb-10">
+        {announcements.length === 0 ? (
+          <div className="text-center py-20 px-6 bg-white rounded-2xl border border-dashed border-gray-200">
+            <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-primary-50 flex items-center justify-center">
+              <svg className="w-7 h-7 text-primary-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+              </svg>
+            </div>
+            <p className="font-semibold text-gray-700">No announcements yet</p>
+            <p className="text-sm text-gray-400 mt-1.5 max-w-xs mx-auto">
+              {isStudent
+                ? 'Updates from your instructors and school will show up here.'
+                : 'Create your first announcement to notify students.'}
+            </p>
           </div>
-          <p className="text-gray-500 font-medium">No announcements yet.</p>
-          {!isStudent && (
-            <p className="text-gray-400 text-sm mt-1">Create your first announcement to notify students.</p>
-          )}
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {announcements.map((a) => (
-            <AnnouncementCard
-              key={a._id}
-              announcement={a}
-              canEdit={!isStudent}
-              onEdit={() => { setEditing(a); setShowModal(true); }}
-              onRead={() => setReading(a)}
-            />
-          ))}
-        </div>
-      )}
+        ) : (
+          <div className="space-y-3">
+            {announcements.map((a) => (
+              <AnnouncementCard
+                key={a._id}
+                announcement={a}
+                canEdit={!isStudent}
+                onEdit={() => { setEditing(a); setShowModal(true); }}
+                onRead={() => setReading(a)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
 
       {showModal && (
         <AnnouncementModal
