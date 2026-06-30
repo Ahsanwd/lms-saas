@@ -1,9 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { formatDistanceToNow } from 'date-fns';
+import { AxiosError } from 'axios';
 import api from '@/lib/api';
 import { connectSocket, disconnectSocket } from '@/lib/socket';
 import { useAuthStore } from '@/stores/auth.store';
@@ -39,8 +41,12 @@ function UnreadBadge({ count }: { count: number }) {
 export default function ChatPage() {
   const { user } = useAuthStore();
   const qc = useQueryClient();
+  const router = useRouter();
   const isAdmin = user?.role === 'tenant_admin';
+  const isStudent = user?.role === 'student';
   const [courseFilter, setCourseFilter] = useState('');
+  const [newChatOpen, setNewChatOpen] = useState(false);
+  const [newChatError, setNewChatError] = useState('');
 
   // Refresh list when a new chat message arrives for this user
   useEffect(() => {
@@ -79,6 +85,38 @@ export default function ChatPage() {
 
   const conversations = data?.conversations ?? [];
 
+  // Students can only see "Chat with Instructor" inside a specific course
+  // page today — let them start a new conversation right from this list too,
+  // picking from courses they're enrolled in that don't already have one.
+  const { data: enrollmentsData } = useQuery({
+    queryKey: ['chat-my-enrollments'],
+    queryFn: async () => {
+      const res = await api.get('/courses/my-enrollments');
+      return res.data.data.enrollments as Array<{ courseId: { _id: string; title: string } | null }>;
+    },
+    enabled: isStudent,
+  });
+  const enrolledCourseIds = new Set(conversations.map((c) => c.courseId));
+  const availableCourses = (enrollmentsData ?? [])
+    .map((e) => e.courseId)
+    .filter((c): c is { _id: string; title: string } => !!c && !enrolledCourseIds.has(c._id));
+
+  const startChatMutation = useMutation({
+    mutationFn: async (courseId: string) => {
+      const res = await api.post('/chat', { courseId });
+      return res.data.data as { conversation: { _id: string }; created: boolean };
+    },
+    onSuccess: ({ conversation }) => {
+      setNewChatOpen(false);
+      qc.invalidateQueries({ queryKey: ['chat-conversations'] });
+      router.push(`/chat/${conversation._id}`);
+    },
+    onError: (err: AxiosError<{ message: string }>) => {
+      setNewChatError(err.response?.data?.message ?? 'Could not start conversation');
+      setTimeout(() => setNewChatError(''), 4000);
+    },
+  });
+
   // Based on which side of the conversation this user is actually on, not
   // their account role — a tenant_admin assigned as a course's instructor is
   // still the instructor-side participant for that conversation.
@@ -98,30 +136,75 @@ export default function ChatPage() {
     <div className="max-w-3xl mx-auto">
       {/* Header */}
       <div className="px-6 pt-8 pb-6">
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2.5">
-          <span className="w-9 h-9 rounded-xl bg-primary-50 text-primary-600 flex items-center justify-center">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-            </svg>
-          </span>
-          Chat
-        </h1>
-        <p className="text-sm text-gray-500 mt-1 ml-[46px]">Course-scoped conversations between students and instructors</p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2.5">
+              <span className="w-9 h-9 rounded-xl bg-primary-50 text-primary-600 flex items-center justify-center">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+              </span>
+              Chat
+            </h1>
+            <p className="text-sm text-gray-500 mt-1 ml-[46px]">Course-scoped conversations between students and instructors</p>
+          </div>
 
-        {isAdmin && courseOptions.length > 0 && (
-          <div className="mt-4 ml-[46px]">
+          {isStudent && (
+            <div className="relative flex-shrink-0">
+              <button
+                onClick={() => setNewChatOpen((v) => !v)}
+                className="flex items-center gap-1.5 text-sm font-semibold bg-primary-600 text-white px-3.5 py-2 rounded-xl hover:bg-primary-700 transition-colors shadow-sm"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                New conversation
+              </button>
+
+              {newChatOpen && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setNewChatOpen(false)} />
+                  <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl border border-gray-100 shadow-lg z-20 py-1.5 max-h-72 overflow-y-auto">
+                    {newChatError && (
+                      <p className="px-4 py-2 text-xs text-red-500 border-b border-gray-50">{newChatError}</p>
+                    )}
+                    {availableCourses.length === 0 ? (
+                      <p className="px-4 py-3 text-sm text-gray-400">
+                        {(enrollmentsData?.length ?? 0) === 0
+                          ? 'You\'re not enrolled in any courses yet.'
+                          : 'You already have a conversation for every enrolled course.'}
+                      </p>
+                    ) : (
+                      availableCourses.map((c) => (
+                        <button
+                          key={c._id}
+                          onClick={() => startChatMutation.mutate(c._id)}
+                          disabled={startChatMutation.isPending}
+                          className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-700 transition-colors disabled:opacity-50 truncate"
+                        >
+                          {c.title}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {isAdmin && courseOptions.length > 0 && (
             <select
               value={courseFilter}
               onChange={(e) => setCourseFilter(e.target.value)}
-              className="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500 flex-shrink-0"
             >
               <option value="">All courses</option>
               {courseOptions.map((c) => (
                 <option key={c._id} value={c._id}>{c.title}</option>
               ))}
             </select>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       <div className="px-6 pb-10">
@@ -152,8 +235,8 @@ export default function ChatPage() {
             <p className="text-sm text-gray-400 mt-1.5 max-w-xs mx-auto">
               {courseFilter
                 ? 'Try a different course, or clear the filter to see everything.'
-                : user?.role === 'student'
-                ? 'Go to a course you\'re enrolled in and click "Chat with Instructor".'
+                : isStudent
+                ? 'Click "New conversation" above to message an instructor about one of your courses.'
                 : 'Conversations will appear here when students reach out.'}
             </p>
             {courseFilter && (
