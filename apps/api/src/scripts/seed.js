@@ -21,10 +21,12 @@ async function seed() {
   const User = require('../database/models/User.model');
   const Tenant = require('../database/models/Tenant.model');
 
-  // ── Free Plan ──────────────────────────────────────────────────────────────
-  let freePlan = await Plan.findOne({ slug: 'free' });
-  if (!freePlan) {
-    freePlan = await Plan.create({
+  // ── Plans ──────────────────────────────────────────────────────────────────
+  // Upserted (not just created-if-missing) so pricing/limits stay in sync with
+  // the public pricing page (apps/web/app/page.tsx `plans` array) and the
+  // Lemon Squeezy variant slugs (LS_VARIANT_{BASIC,PRO}_{MONTHLY,YEARLY}).
+  const planDefs = [
+    {
       name: 'Free',
       slug: 'free',
       price: { monthly: 0, yearly: 0 },
@@ -32,27 +34,58 @@ async function seed() {
       features: ['Basic courses', 'Email support'],
       trialDays: 14,
       isActive: true,
-    });
-    console.log('✓ Free plan created');
-  } else {
-    console.log('- Free plan already exists');
-  }
-
-  // ── Pro Plan ───────────────────────────────────────────────────────────────
-  let proPlan = await Plan.findOne({ slug: 'pro' });
-  if (!proPlan) {
-    await Plan.create({
-      name: 'Pro',
-      slug: 'pro',
-      price: { monthly: 49, yearly: 470 },
-      limits: { students: 500, instructors: 20, courses: 50, storageGB: 50, maxSessions: 10 },
-      features: ['Unlimited courses', 'Priority support', 'Custom domain', 'Advanced analytics'],
+    },
+    {
+      name: 'Basic',
+      slug: 'basic',
+      price: { monthly: 29, yearly: 290 },
+      limits: { students: 100, instructors: 3, courses: 10, storageGB: 10, maxSessions: 5 },
+      features: [
+        'Up to 100 students',
+        '3 instructors',
+        '10 courses',
+        '10 GB storage',
+        'Course payments (Stripe + PayPal)',
+        'Quizzes & Assignments',
+        'Email notifications',
+        'Community forum',
+        'Certificate builder',
+      ],
       trialDays: 14,
       isActive: true,
-    });
-    console.log('✓ Pro plan created');
-  } else {
-    console.log('- Pro plan already exists');
+    },
+    {
+      name: 'Pro',
+      slug: 'pro',
+      price: { monthly: 59, yearly: 590 },
+      limits: { students: -1, instructors: -1, courses: -1, storageGB: 50, maxSessions: 10 },
+      features: [
+        'Unlimited students',
+        'Unlimited instructors',
+        'Unlimited courses',
+        '50 GB storage',
+        'Everything in Basic',
+        'Live learning (Zoom)',
+        'Advanced analytics & CSV export',
+        'Student memberships',
+        'Custom domain support',
+        'Priority support',
+      ],
+      trialDays: 14,
+      isActive: true,
+    },
+  ];
+
+  let freePlan;
+  for (const def of planDefs) {
+    const existing = await Plan.findOne({ slug: def.slug });
+    const plan = await Plan.findOneAndUpdate(
+      { slug: def.slug },
+      { $set: def },
+      { upsert: true, new: true }
+    );
+    if (def.slug === 'free') freePlan = plan;
+    console.log(existing ? `✓ ${def.name} plan updated` : `✓ ${def.name} plan created`);
   }
 
   // ── Super Admin ────────────────────────────────────────────────────────────
