@@ -534,9 +534,12 @@ function PlatformLandingPage() {
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-400">
           <span className="font-semibold text-indigo-600">Coursel</span>
           <span>© {new Date().getFullYear()} Coursel. All rights reserved.</span>
-          <div className="flex gap-6">
+          <div className="flex flex-wrap justify-center gap-6">
             <Link href="/login" className="hover:text-gray-600 transition-colors">Sign in</Link>
             <Link href="/register-tenant" className="hover:text-gray-600 transition-colors">Get started</Link>
+            <Link href="/privacy" className="hover:text-gray-600 transition-colors">Privacy Policy</Link>
+            <Link href="/terms" className="hover:text-gray-600 transition-colors">Terms of Service</Link>
+            <Link href="/refund-policy" className="hover:text-gray-600 transition-colors">Refund Policy</Link>
           </div>
         </div>
       </footer>
