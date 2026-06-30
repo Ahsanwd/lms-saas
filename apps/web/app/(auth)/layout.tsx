@@ -2,11 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import { applyBrandColor, applySecondaryColor } from '@/lib/brandColor';
 
 interface TenantBranding {
   tenantName: string | null;
   logoUrl: string | null;
   primaryColor: string | null;
+  secondaryColor: string | null;
 }
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
@@ -28,7 +30,11 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         .get(`${process.env.NEXT_PUBLIC_API_URL}/api/tenant/branding`, {
           headers: { 'X-Tenant-Subdomain': sub },
         })
-        .then((res) => setBranding(res.data.data ?? null))
+        .then((res) => {
+          setBranding(res.data.data ?? null);
+          if (res.data.data?.primaryColor) applyBrandColor(res.data.data.primaryColor);
+          if (res.data.data?.secondaryColor) applySecondaryColor(res.data.data.secondaryColor);
+        })
         .catch(() => setBranding(null));
     } else {
       setSubdomain('');

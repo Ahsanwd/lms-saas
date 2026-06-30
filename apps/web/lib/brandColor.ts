@@ -39,3 +39,16 @@ export function applyBrandColor(hex: string) {
     // silently ignore invalid colors
   }
 }
+
+export function applySecondaryColor(hex: string) {
+  if (typeof document === 'undefined') return;
+  if (!hex || !/^#[0-9A-Fa-f]{6}$/.test(hex)) return;
+
+  try {
+    const [h, s] = hexToHsl(hex);
+    document.documentElement.style.setProperty('--secondary-h', `${h}`);
+    document.documentElement.style.setProperty('--secondary-s', `${s}%`);
+  } catch {
+    // silently ignore invalid colors
+  }
+}

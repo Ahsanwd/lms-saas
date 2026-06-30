@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import axios from 'axios';
+import { applyBrandColor, applySecondaryColor } from '@/lib/brandColor';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -50,10 +51,10 @@ function CourseCard({ course }: { course: PublicCourse }) {
   return (
     <Link
       href={`/login?redirect=/courses/${course._id}`}
-      className="group flex flex-col rounded-2xl border border-gray-200 bg-white overflow-hidden shadow-sm hover:shadow-md hover:border-indigo-200 transition-all"
+      className="group flex flex-col rounded-2xl border border-gray-200 bg-white overflow-hidden shadow-sm hover:shadow-md hover:border-primary-200 transition-all"
     >
       {/* Thumbnail */}
-      <div className="relative w-full aspect-video bg-indigo-50 overflow-hidden">
+      <div className="relative w-full aspect-video bg-primary-50 overflow-hidden">
         {course.thumbnail ? (
           <img
             src={course.thumbnail}
@@ -62,13 +63,13 @@ function CourseCard({ course }: { course: PublicCourse }) {
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <svg className="w-12 h-12 text-indigo-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-12 h-12 text-primary-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.26a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
             </svg>
           </div>
         )}
         {/* Price badge */}
-        <span className="absolute top-2 right-2 text-xs font-bold px-2 py-1 rounded-full shadow bg-white text-indigo-600">
+        <span className="absolute top-2 right-2 text-xs font-bold px-2 py-1 rounded-full shadow bg-white text-secondary-600">
           {course.isFree ? 'Free' : `$${course.price}`}
         </span>
       </div>
@@ -76,11 +77,11 @@ function CourseCard({ course }: { course: PublicCourse }) {
       {/* Body */}
       <div className="flex flex-col flex-1 p-4">
         {course.categoryId && (
-          <span className="text-xs font-semibold text-indigo-500 uppercase tracking-wide mb-1">
+          <span className="text-xs font-semibold text-secondary-500 uppercase tracking-wide mb-1">
             {course.categoryId.name}
           </span>
         )}
-        <h3 className="font-semibold text-gray-900 text-sm leading-snug mb-1 line-clamp-2 group-hover:text-indigo-600 transition-colors">
+        <h3 className="font-semibold text-gray-900 text-sm leading-snug mb-1 line-clamp-2 group-hover:text-primary-600 transition-colors">
           {course.title}
         </h3>
         {course.shortDescription && (
@@ -118,7 +119,7 @@ function CourseCard({ course }: { course: PublicCourse }) {
             {instructor?.avatar ? (
               <img src={instructor.avatar} alt={instructorName} className="w-5 h-5 rounded-full object-cover" />
             ) : (
-              <div className="w-5 h-5 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 text-xs font-bold">
+              <div className="w-5 h-5 rounded-full bg-secondary-100 flex items-center justify-center text-secondary-600 text-xs font-bold">
                 {instructor?.firstName?.[0] ?? 'I'}
               </div>
             )}
@@ -147,6 +148,8 @@ function TenantLandingPage({ subdomain }: { subdomain: string }) {
         setCourses(res.data.data.courses ?? []);
         setTenantName(res.data.data.tenantName ?? '');
         setLogoUrl(res.data.data.branding?.logoUrl ?? null);
+        if (res.data.data.branding?.primaryColor) applyBrandColor(res.data.data.branding.primaryColor);
+        if (res.data.data.branding?.secondaryColor) applySecondaryColor(res.data.data.branding.secondaryColor);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -163,20 +166,20 @@ function TenantLandingPage({ subdomain }: { subdomain: string }) {
           {logoUrl ? (
             <img src={logoUrl} alt={displayName} className="h-9 object-contain" />
           ) : (
-            <span className="text-xl font-bold text-indigo-600 tracking-tight capitalize">
+            <span className="text-xl font-bold text-primary-600 tracking-tight capitalize">
               {displayName}
             </span>
           )}
           <div className="flex items-center gap-3">
             <Link
               href="/login"
-              className="text-sm font-medium text-gray-600 hover:text-indigo-600 transition-colors"
+              className="text-sm font-medium text-gray-600 hover:text-primary-600 transition-colors"
             >
               Sign in
             </Link>
             <Link
               href="/register"
-              className="text-sm font-semibold bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
+              className="text-sm font-semibold bg-secondary-600 text-white px-4 py-2 rounded-lg hover:bg-secondary-700 transition-colors"
             >
               Sign up free
             </Link>
@@ -185,18 +188,18 @@ function TenantLandingPage({ subdomain }: { subdomain: string }) {
       </nav>
 
       {/* Hero */}
-      <section className="pt-16 pb-12 px-6 text-center bg-gradient-to-b from-indigo-50 to-white">
+      <section className="pt-16 pb-12 px-6 text-center bg-gradient-to-b from-primary-50 to-white">
         <div className="max-w-2xl mx-auto">
           <h1 className="text-4xl font-extrabold text-gray-900 leading-tight mb-4">
             Learn with{' '}
-            <span className="text-indigo-600 capitalize">{displayName}</span>
+            <span className="text-primary-600 capitalize">{displayName}</span>
           </h1>
           <p className="text-base text-gray-500 mb-6 max-w-lg mx-auto">
             Browse our courses below and start learning today. Sign up for free to enroll.
           </p>
           <Link
             href="/register"
-            className="inline-block bg-indigo-600 text-white text-sm font-semibold px-7 py-3 rounded-xl hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200"
+            className="inline-block bg-primary-600 text-white text-sm font-semibold px-7 py-3 rounded-xl hover:bg-primary-700 transition-colors shadow-lg shadow-primary-200"
           >
             Create free account
           </Link>
@@ -246,8 +249,8 @@ function TenantLandingPage({ subdomain }: { subdomain: string }) {
       {/* Footer */}
       <footer className="py-8 px-6 border-t border-gray-100 bg-white">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-gray-400">
-          <span className="font-semibold text-indigo-600 capitalize">{displayName}</span>
-          <span>Powered by <a href="https://coursel.space" className="hover:text-indigo-500 transition-colors">Coursel</a></span>
+          <span className="font-semibold text-primary-600 capitalize">{displayName}</span>
+          <span>Powered by <a href="https://coursel.space" className="hover:text-primary-500 transition-colors">Coursel</a></span>
           <div className="flex gap-5">
             <Link href="/login" className="hover:text-gray-600 transition-colors">Sign in</Link>
             <Link href="/register" className="hover:text-gray-600 transition-colors">Sign up</Link>

@@ -8,7 +8,9 @@
 :root {
   --primary-h: 199;
   --primary-s: 89%;
-  /* Shades are generated in hsl(var(--primary-h) var(--primary-s) <L>) */
+  --secondary-h: 271;
+  --secondary-s: 81%;
+  /* Shades are generated in hsl(var(--primary/secondary-h) var(--primary/secondary-s) <L>) */
 }
 
 @layer base {

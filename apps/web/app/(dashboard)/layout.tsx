@@ -7,7 +7,7 @@ import { useAuthStore } from '@/stores/auth.store';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { PageLoader } from '@/components/ui';
-import { applyBrandColor } from '@/lib/brandColor';
+import { applyBrandColor, applySecondaryColor } from '@/lib/brandColor';
 import api from '@/lib/api';
 import type { Role } from '@/types';
 import { Toaster } from 'sonner';
@@ -32,10 +32,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     staleTime: 5 * 60 * 1000,
   });
 
-  // Apply brand color whenever tenant settings change
+  // Apply brand colors whenever tenant settings change
   useEffect(() => {
     const color = tenantData?.tenant?.settings?.primaryColor;
     if (color) applyBrandColor(color);
+    const secondary = tenantData?.tenant?.settings?.secondaryColor;
+    if (secondary) applySecondaryColor(secondary);
   }, [tenantData]);
 
   const tenantLogo    = tenantData?.tenant?.settings?.logo    ?? undefined;

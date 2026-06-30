@@ -34,6 +34,7 @@ const tenantSchema = new mongoose.Schema(
       logo:    { type: String, default: null },
       favicon: { type: String, default: null },
       primaryColor: { type: String, default: '#3B82F6' },
+      secondaryColor: { type: String, default: '#8B5CF6' },
       language: { type: String, default: 'en' },
       timezone: { type: String, default: 'UTC' },
       allowSelfRegistration: { type: Boolean, default: true },

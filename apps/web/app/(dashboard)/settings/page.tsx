@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { Button, Spinner } from '@/components/ui';
 import { cn } from '@/lib/utils';
-import { applyBrandColor } from '@/lib/brandColor';
+import { applyBrandColor, applySecondaryColor } from '@/lib/brandColor';
 import { useAuthStore } from '@/stores/auth.store';
 
 // ─── Shared helpers ────────────────────────────────────────────────────────────
@@ -852,7 +852,7 @@ function StudentSettings() {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 interface TenantSettings {
-  logo?: string; favicon?: string; primaryColor: string; language: string; timezone: string;
+  logo?: string; favicon?: string; primaryColor: string; secondaryColor: string; language: string; timezone: string;
   allowSelfRegistration: boolean; requireEmailVerification: boolean; idleTimeoutMinutes: number;
   defaultInviteExpiryHours: number; currency: string; refundWindowDays: number;
   taxRate: number; taxLabel: string;
@@ -1675,9 +1675,9 @@ function AdminSettings() {
     queryFn: async () => { const { data } = await api.get('/tenant/storage'); return data.data; },
   });
 
-  const [form, setForm] = useState<TenantSettings>({ primaryColor: '#3B82F6', language: 'en', timezone: 'UTC', allowSelfRegistration: true, requireEmailVerification: true, idleTimeoutMinutes: 0, defaultInviteExpiryHours: 72, currency: 'USD', refundWindowDays: 30, taxRate: 0, taxLabel: 'Tax' });
+  const [form, setForm] = useState<TenantSettings>({ primaryColor: '#3B82F6', secondaryColor: '#8B5CF6', language: 'en', timezone: 'UTC', allowSelfRegistration: true, requireEmailVerification: true, idleTimeoutMinutes: 0, defaultInviteExpiryHours: 72, currency: 'USD', refundWindowDays: 30, taxRate: 0, taxLabel: 'Tax' });
   useEffect(() => {
-    if (tenant?.settings) setForm({ primaryColor: tenant.settings.primaryColor ?? '#3B82F6', language: tenant.settings.language ?? 'en', timezone: tenant.settings.timezone ?? 'UTC', allowSelfRegistration: tenant.settings.allowSelfRegistration ?? true, requireEmailVerification: tenant.settings.requireEmailVerification ?? true, idleTimeoutMinutes: tenant.settings.idleTimeoutMinutes ?? 0, defaultInviteExpiryHours: (tenant.settings as any).defaultInviteExpiryHours ?? 72, currency: (tenant.settings as any).currency ?? 'USD', refundWindowDays: (tenant.settings as any).refundWindowDays ?? 30, taxRate: (tenant.settings as any).taxRate ?? 0, taxLabel: (tenant.settings as any).taxLabel ?? 'Tax' });
+    if (tenant?.settings) setForm({ primaryColor: tenant.settings.primaryColor ?? '#3B82F6', secondaryColor: (tenant.settings as any).secondaryColor ?? '#8B5CF6', language: tenant.settings.language ?? 'en', timezone: tenant.settings.timezone ?? 'UTC', allowSelfRegistration: tenant.settings.allowSelfRegistration ?? true, requireEmailVerification: tenant.settings.requireEmailVerification ?? true, idleTimeoutMinutes: tenant.settings.idleTimeoutMinutes ?? 0, defaultInviteExpiryHours: (tenant.settings as any).defaultInviteExpiryHours ?? 72, currency: (tenant.settings as any).currency ?? 'USD', refundWindowDays: (tenant.settings as any).refundWindowDays ?? 30, taxRate: (tenant.settings as any).taxRate ?? 0, taxLabel: (tenant.settings as any).taxLabel ?? 'Tax' });
   }, [tenant]);
 
   const mutation = useMutation({
@@ -1963,13 +1963,13 @@ function AdminSettings() {
           <p className="text-xs text-gray-400 mt-1.5">PNG, ICO, SVG or WebP · Max 5 MB · Recommended 32 × 32 or 64 × 64 px</p>
         </div>
 
-        {/* ── Brand Color ── */}
+        {/* ── Brand Colors ── */}
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1.5">Brand Color</label>
+          <label className="block text-xs font-medium text-gray-700 mb-1.5">Primary Brand Color</label>
           <div className="flex items-center gap-3">
             <input type="color" value={form.primaryColor} onChange={e => { set('primaryColor', e.target.value); applyBrandColor(e.target.value); }} className="h-10 w-16 rounded-lg border border-gray-300 cursor-pointer p-1" />
             <input type="text" value={form.primaryColor} onChange={e => { const v = e.target.value; if (/^#[0-9A-Fa-f]{0,6}$/.test(v)) set('primaryColor', v); }} maxLength={7} className="w-32 rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
-            <span className="text-xs text-gray-400">Hex color code</span>
+            <span className="text-xs text-gray-400">Used for headings, links & primary buttons</span>
           </div>
           {/* Preset swatches */}
           <div className="flex items-center gap-2 mt-2">
@@ -1981,6 +1981,28 @@ function AdminSettings() {
                 onClick={() => { set('primaryColor', c); applyBrandColor(c); }}
                 className="w-6 h-6 rounded-full border-2 transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-1"
                 style={{ backgroundColor: c, borderColor: form.primaryColor === c ? c : 'transparent' }}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1.5">Secondary Brand Color</label>
+          <div className="flex items-center gap-3">
+            <input type="color" value={form.secondaryColor} onChange={e => { set('secondaryColor', e.target.value); applySecondaryColor(e.target.value); }} className="h-10 w-16 rounded-lg border border-gray-300 cursor-pointer p-1" />
+            <input type="text" value={form.secondaryColor} onChange={e => { const v = e.target.value; if (/^#[0-9A-Fa-f]{0,6}$/.test(v)) set('secondaryColor', v); }} maxLength={7} className="w-32 rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
+            <span className="text-xs text-gray-400">Used for accents — price badges, tags & highlights</span>
+          </div>
+          {/* Preset swatches */}
+          <div className="flex items-center gap-2 mt-2">
+            {['#8B5CF6','#3B82F6','#10B981','#F59E0B','#EF4444','#EC4899','#0EA5E9','#6366F1'].map(c => (
+              <button
+                key={c}
+                type="button"
+                title={c}
+                onClick={() => { set('secondaryColor', c); applySecondaryColor(c); }}
+                className="w-6 h-6 rounded-full border-2 transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-1"
+                style={{ backgroundColor: c, borderColor: form.secondaryColor === c ? c : 'transparent' }}
               />
             ))}
           </div>

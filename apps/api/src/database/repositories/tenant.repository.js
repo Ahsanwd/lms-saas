@@ -51,15 +51,16 @@ class TenantRepository {
   async getBranding(tenantId) {
     if (!tenantId) return { tenantName: 'LMS Platform', branding: {} };
     const tenant = await Tenant.findById(tenantId)
-      .select('name settings.logo settings.favicon settings.primaryColor')
+      .select('name settings.logo settings.favicon settings.primaryColor settings.secondaryColor')
       .lean();
     if (!tenant) return { tenantName: 'LMS Platform', branding: {} };
     return {
       tenantName: tenant.name || 'LMS Platform',
       branding: {
-        logoUrl:      tenant.settings?.logo         || null,
-        faviconUrl:   tenant.settings?.favicon      || null,
-        primaryColor: tenant.settings?.primaryColor || null,
+        logoUrl:        tenant.settings?.logo           || null,
+        faviconUrl:     tenant.settings?.favicon        || null,
+        primaryColor:   tenant.settings?.primaryColor   || null,
+        secondaryColor: tenant.settings?.secondaryColor || null,
       },
     };
   }

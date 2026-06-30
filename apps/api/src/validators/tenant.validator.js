@@ -1,9 +1,11 @@
 const AppError = require('../utils/AppError');
 
 function validateUpdateSettings(body) {
-  const { primaryColor, idleTimeoutMinutes } = body;
+  const { primaryColor, secondaryColor, idleTimeoutMinutes } = body;
   if (primaryColor && !/^#[0-9A-Fa-f]{6}$/.test(primaryColor))
     throw new AppError('Invalid color format. Use hex e.g. #3B82F6', 400);
+  if (secondaryColor && !/^#[0-9A-Fa-f]{6}$/.test(secondaryColor))
+    throw new AppError('Invalid color format. Use hex e.g. #8B5CF6', 400);
   if (idleTimeoutMinutes !== undefined && (isNaN(idleTimeoutMinutes) || idleTimeoutMinutes < 0))
     throw new AppError('idleTimeoutMinutes must be a non-negative number', 400);
   if (body.defaultInviteExpiryHours !== undefined) {

@@ -15,7 +15,7 @@ async function getMyTenant(tenantId) {
 // ─── Update Settings ──────────────────────────────────────────────────────────
 async function updateSettings(tenantId, updates) {
   const allowed = [
-    'logo', 'favicon', 'primaryColor', 'language', 'timezone',
+    'logo', 'favicon', 'primaryColor', 'secondaryColor', 'language', 'timezone',
     'allowSelfRegistration', 'requireEmailVerification', 'idleTimeoutMinutes',
     'passwordPolicy', 'defaultInviteExpiryHours',
     'currency', 'refundWindowDays', 'taxRate', 'taxLabel',
