@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
@@ -8,6 +8,8 @@ import api from '@/lib/api';
 import { connectSocket, disconnectSocket } from '@/lib/socket';
 import { useAuthStore } from '@/stores/auth.store';
 import { cn, avatarColor, getInitials } from '@/lib/utils';
+
+interface CourseOption { _id: string; title: string }
 
 interface Conversation {
   _id: string;
@@ -37,6 +39,8 @@ function UnreadBadge({ count }: { count: number }) {
 export default function ChatPage() {
   const { user } = useAuthStore();
   const qc = useQueryClient();
+  const isAdmin = user?.role === 'tenant_admin';
+  const [courseFilter, setCourseFilter] = useState('');
 
   // Refresh list when a new chat message arrives for this user
   useEffect(() => {
@@ -51,11 +55,25 @@ export default function ChatPage() {
     };
   }, [qc]);
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['chat-conversations'],
+  // Admins moderate conversations across every course — let them narrow the
+  // list down to a single course instead of scrolling through everything.
+  const { data: courseData } = useQuery({
+    queryKey: ['chat-course-options'],
     queryFn: async () => {
-      const res = await api.get('/chat');
-      return res.data.data as { conversations: Conversation[]; pagination?: object };
+      const res = await api.get('/courses', { params: { limit: 100 } });
+      return res.data.data.courses as CourseOption[];
+    },
+    enabled: isAdmin,
+  });
+  const courseOptions = courseData ?? [];
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['chat-conversations', courseFilter],
+    queryFn: async () => {
+      const res = await api.get('/chat', {
+        params: { limit: 100, ...(courseFilter && { courseId: courseFilter }) },
+      });
+      return res.data.data as { conversations: Conversation[]; pagination?: { total: number } };
     },
   });
 
@@ -89,6 +107,21 @@ export default function ChatPage() {
           Chat
         </h1>
         <p className="text-sm text-gray-500 mt-1 ml-[46px]">Course-scoped conversations between students and instructors</p>
+
+        {isAdmin && courseOptions.length > 0 && (
+          <div className="mt-4 ml-[46px]">
+            <select
+              value={courseFilter}
+              onChange={(e) => setCourseFilter(e.target.value)}
+              className="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            >
+              <option value="">All courses</option>
+              {courseOptions.map((c) => (
+                <option key={c._id} value={c._id}>{c.title}</option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       <div className="px-6 pb-10">
@@ -113,12 +146,24 @@ export default function ChatPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </svg>
             </div>
-            <p className="font-semibold text-gray-700">No conversations yet</p>
+            <p className="font-semibold text-gray-700">
+              {courseFilter ? 'No conversations for this course' : 'No conversations yet'}
+            </p>
             <p className="text-sm text-gray-400 mt-1.5 max-w-xs mx-auto">
-              {user?.role === 'student'
+              {courseFilter
+                ? 'Try a different course, or clear the filter to see everything.'
+                : user?.role === 'student'
                 ? 'Go to a course you\'re enrolled in and click "Chat with Instructor".'
                 : 'Conversations will appear here when students reach out.'}
             </p>
+            {courseFilter && (
+              <button
+                onClick={() => setCourseFilter('')}
+                className="mt-4 text-sm font-medium text-primary-600 hover:text-primary-700"
+              >
+                Clear filter
+              </button>
+            )}
           </div>
         )}
 
