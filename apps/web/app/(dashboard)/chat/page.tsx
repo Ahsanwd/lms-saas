@@ -61,15 +61,18 @@ export default function ChatPage() {
 
   const conversations = data?.conversations ?? [];
 
+  // Based on which side of the conversation this user is actually on, not
+  // their account role — a tenant_admin assigned as a course's instructor is
+  // still the instructor-side participant for that conversation.
   function getUnread(conv: Conversation) {
-    if (user?.role === 'student')    return conv.studentUnread;
-    if (user?.role === 'instructor') return conv.instructorUnread;
+    if (user?._id === conv.studentId)    return conv.studentUnread;
+    if (user?._id === conv.instructorId) return conv.instructorUnread;
     return 0;
   }
 
   function getOtherName(conv: Conversation) {
-    if (user?.role === 'student')    return conv.instructorName;
-    if (user?.role === 'instructor') return conv.studentName;
+    if (user?._id === conv.studentId)    return conv.instructorName;
+    if (user?._id === conv.instructorId) return conv.studentName;
     return `${conv.studentName} ↔ ${conv.instructorName}`;
   }
 

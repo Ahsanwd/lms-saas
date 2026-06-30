@@ -1,10 +1,12 @@
 'use client';
 
+import { useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import api from '@/lib/api';
+import { connectSocket } from '@/lib/socket';
 import type { Role } from '@/types';
 
 interface NavItem {
@@ -182,6 +184,7 @@ export function Sidebar({ role, tenantName, logoUrl, isOpen = false, onClose, ef
   const pathname = usePathname();
   const navRole  = effectiveRole ?? role;
   const items    = NAV_ITEMS.filter((item) => item.roles.includes(navRole));
+  const queryClient = useQueryClient();
 
   const isImpersonating = !!effectiveRole && effectiveRole !== role;
 
@@ -208,6 +211,18 @@ export function Sidebar({ role, tenantName, logoUrl, isOpen = false, onClose, ef
     staleTime: 10_000,
   });
   const chatUnreadCount = chatCountData?.count ?? 0;
+
+  // Real-time: bump the chat badge the instant a message arrives, instead of
+  // waiting on the 30s poll (see chat.service.js sendMessage -> chat_notification)
+  useEffect(() => {
+    if (role === 'super_admin') return;
+    const socket = connectSocket();
+    function handleChatNotification() {
+      queryClient.invalidateQueries({ queryKey: ['chat-unread'] });
+    }
+    socket.on('chat_notification', handleChatNotification);
+    return () => { socket.off('chat_notification', handleChatNotification); };
+  }, [role, queryClient]);
 
   const asideCls = [
     'w-64 h-full bg-white border-r border-gray-200 flex flex-col flex-shrink-0',

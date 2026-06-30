@@ -219,18 +219,18 @@ async function searchMessages(tenantId, conversationId, user, query) {
   return { messages, total };
 }
 
+// Unread count is based on which side of each conversation this user is on
+// (studentId / instructorId), not their account role — a tenant_admin who is
+// also assigned as the instructor on a course still needs their unread count.
 async function getTotalUnread(tenantId, user) {
-  if (user.role === 'student') {
-    const convs = await chatRepo.findConversationsForStudent(tenantId, user.sub);
-    const count = convs.reduce((acc, c) => acc + (c.studentUnread || 0), 0);
-    return { count };
-  }
-  if (user.role === 'instructor') {
-    const convs = await chatRepo.findConversationsForInstructor(tenantId, user.sub);
-    const count = convs.reduce((acc, c) => acc + (c.instructorUnread || 0), 0);
-    return { count };
-  }
-  return { count: 0 };
+  const [asStudent, asInstructor] = await Promise.all([
+    chatRepo.findConversationsForStudent(tenantId, user.sub),
+    chatRepo.findConversationsForInstructor(tenantId, user.sub),
+  ]);
+  const count =
+    asStudent.reduce((acc, c) => acc + (c.studentUnread || 0), 0) +
+    asInstructor.reduce((acc, c) => acc + (c.instructorUnread || 0), 0);
+  return { count };
 }
 
 module.exports = {

@@ -215,8 +215,8 @@ export default function ConversationPage() {
 
   function getTitle() {
     if (!conv) return '...';
-    if (user?.role === 'student')    return conv.instructorName;
-    if (user?.role === 'instructor') return conv.studentName;
+    if (user?._id === conv.studentId)    return conv.instructorName;
+    if (user?._id === conv.instructorId) return conv.studentName;
     return `${conv.studentName} ↔ ${conv.instructorName}`;
   }
 
