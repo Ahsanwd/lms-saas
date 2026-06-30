@@ -18,6 +18,21 @@ const quizGradedTpl           = require('../../services/email/templates/quizGrad
 const refundApprovedTpl       = require('../../services/email/templates/refundApproved');
 const refundRejectedTpl       = require('../../services/email/templates/refundRejected');
 const liveSessionReminderTpl  = require('../../services/email/templates/liveSessionReminder');
+const forumReplyTpl          = require('../../services/email/templates/forumReply');
+const discussionQuestionTpl  = require('../../services/email/templates/discussionQuestion');
+const { emitNotificationNew } = require('../../services/socket/io');
+
+// Default "owning module" per notification type — used for the audit `source`
+// field when the caller doesn't explicitly pass one.
+const TYPE_SOURCE = {
+  enrollment: 'course', waitlist_promoted: 'waitlist', enrollment_approved: 'enrollmentRequest',
+  enrollment_rejected: 'enrollmentRequest', assignment_graded: 'assignment', assignment_due: 'assignment',
+  assignment_published: 'assignment', announcement: 'announcement', course_published: 'course',
+  course_completed: 'course', certificate_issued: 'course', trial_expiring: 'membership',
+  chat_message: 'chat', forum_reply: 'discussion', quiz_graded: 'quiz', quiz_published: 'quiz',
+  refund_approved: 'refund', refund_rejected: 'refund', live_session_reminder: 'liveClass',
+  email_delivery_failed: 'email', discussion_comment: 'discussion', discussion_reply: 'discussion',
+};
 
 // ── Push (lazy-loaded so server still boots if web-push isn't configured) ─────
 function getPushService() {
@@ -49,7 +64,10 @@ function buildEmailPayload(type, ctx, userDoc, appUrl, tenantName, branding = {}
         courseName: ctx.courseName, courseId: ctx.courseId,
       });
     case 'trial_expiring':
-      return trialExpiringTpl({ ...base, courseId: ctx.courseId, daysLeft: ctx.daysLeft ?? 3 });
+      return trialExpiringTpl({
+        ...base, courseId: ctx.courseId, daysLeft: ctx.daysLeft ?? 3,
+        courseName: ctx.courseName || ctx.planName || 'your plan',
+      });
     case 'quiz_graded':
       return quizGradedTpl({
         ...base, recipientName: base.studentName,
@@ -78,8 +96,19 @@ function buildEmailPayload(type, ctx, userDoc, appUrl, tenantName, branding = {}
         joinUrl: null,
         courseId: ctx.courseId,
       });
-    // chat_message and forum_reply: in-app + push only, no email from here
-    // (chat is real-time socket; forum email is sent by discussion.service.js directly)
+    case 'discussion_reply':
+      return forumReplyTpl({
+        ...base, recipientName: base.studentName,
+        replyAuthorName: ctx.replyAuthorName, threadTitle: ctx.threadTitle,
+        preview: ctx.preview, threadUrl: `${appUrl}${ctx.link || ''}`,
+      });
+    case 'discussion_comment':
+      return discussionQuestionTpl({
+        ...base, recipientName: base.studentName,
+        studentName: ctx.studentName, lessonTitle: ctx.lessonTitle,
+        preview: ctx.preview, threadUrl: `${appUrl}${ctx.link || ''}`,
+      });
+    // chat_message: in-app + push only, no email — it's a real-time conversation
     default:
       return null;
   }
@@ -104,7 +133,7 @@ async function dispatch(userId, type, title, message, link, ctx = {}) {
 
     // Email
     if (emailOk) {
-      const emailPayload = buildEmailPayload(type, ctx, userDoc, appUrl, tenantName, branding);
+      const emailPayload = buildEmailPayload(type, { ...ctx, link }, userDoc, appUrl, tenantName, branding);
       if (emailPayload) {
         await queueEmail({ to: userDoc.email, tenantId: tenantId || null, ...emailPayload });
       }
@@ -127,9 +156,13 @@ async function dispatch(userId, type, title, message, link, ctx = {}) {
 }
 
 // ── Core: Create a notification (+ dispatch email + push) ─────────────────────
-async function create(tenantId, userId, { type, title, message, link = null, ctx = {} }) {
+async function create(tenantId, userId, { type, title, message, link = null, ctx = {}, triggeredBy = null, source = null, metadata = {} }) {
   try {
-    const doc = await Notification.create({ tenantId, userId, type, title, message, link });
+    const doc = await Notification.create({
+      tenantId, userId, type, title, message, link,
+      triggeredBy, source: source || TYPE_SOURCE[type] || null, metadata,
+    });
+    emitNotificationNew(userId.toString(), doc.toObject());
     dispatch(userId, type, title, message, link, ctx).catch(() => {});
     return doc;
   } catch {
@@ -138,11 +171,13 @@ async function create(tenantId, userId, { type, title, message, link = null, ctx
 }
 
 // ── Core: Create notifications for multiple users at once ─────────────────────
-async function createBulk(tenantId, userIds, { type, title, message, link = null, ctx = {} }) {
+async function createBulk(tenantId, userIds, { type, title, message, link = null, ctx = {}, triggeredBy = null, source = null, metadata = {} }) {
   if (!userIds?.length) return;
   try {
-    const docs = userIds.map(userId => ({ tenantId, userId, type, title, message, link }));
-    await Notification.insertMany(docs, { ordered: false });
+    const resolvedSource = source || TYPE_SOURCE[type] || null;
+    const docs = userIds.map(userId => ({ tenantId, userId, type, title, message, link, triggeredBy, source: resolvedSource, metadata }));
+    const inserted = await Notification.insertMany(docs, { ordered: false });
+    inserted.forEach(doc => emitNotificationNew(doc.userId.toString(), doc.toObject ? doc.toObject() : doc));
     Promise.all(userIds.map(uid => dispatch(uid, type, title, message, link, ctx))).catch(() => {});
   } catch {
     // non-critical
@@ -388,6 +423,33 @@ async function notifyAssignmentPublished(tenantId, userIds, assignmentTitle, cou
   });
 }
 
+async function notifyQuizPublished(tenantId, userIds, quizTitle, courseId, quizId, ctx = {}) {
+  return createBulk(tenantId, userIds, {
+    type: 'quiz_published', title: 'New quiz available',
+    message: `New quiz: "${quizTitle}" is now available. Test your knowledge!`,
+    link: `/quizzes/${quizId}`,
+    ctx: { quizTitle, courseId, quizId, ...ctx },
+  });
+}
+
+async function notifyAssignmentDue(tenantId, userIds, assignmentTitle, courseId, assignmentId, dueDate, ctx = {}) {
+  return createBulk(tenantId, userIds, {
+    type: 'assignment_due', title: 'Assignment due soon',
+    message: `"${assignmentTitle}" is due ${ctx.dueLabel || 'soon'} — submit before the deadline.`,
+    link: `/assignments/${assignmentId}`,
+    ctx: { assignmentTitle, courseId, assignmentId, dueDate, ...ctx },
+  });
+}
+
+async function notifyTrialExpiring(tenantId, userId, planName, daysLeft, courseId = null, ctx = {}) {
+  return create(tenantId, userId, {
+    type: 'trial_expiring', title: 'Your trial is ending soon',
+    message: `Your free trial of "${planName}" ends in ${daysLeft} day${daysLeft === 1 ? '' : 's'}.`,
+    link: '/membership',
+    ctx: { planName, daysLeft, courseId, ...ctx },
+  });
+}
+
 async function notifyRefundRejected(tenantId, userId, adminNote, courseName, courseId, ctx = {}) {
   return create(tenantId, userId, {
     type: 'refund_rejected', title: 'Refund request not approved',
@@ -408,4 +470,5 @@ module.exports = {
   notifyChatMessage, notifyForumReply,
   notifyQuizGraded, notifyRefundApproved, notifyRefundRejected,
   notifyLiveSessionReminder, notifyAssignmentPublished,
+  notifyQuizPublished, notifyAssignmentDue, notifyTrialExpiring,
 };

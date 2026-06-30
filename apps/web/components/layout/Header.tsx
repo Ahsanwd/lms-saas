@@ -9,6 +9,7 @@ import api from '@/lib/api';
 import type { User } from '@/types';
 import { usePushSubscription } from '@/hooks/usePushSubscription';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { connectSocket } from '@/lib/socket';
 
 interface HeaderProps {
   user: User;
@@ -199,16 +200,29 @@ function NotificationBell() {
   const queryClient = useQueryClient();
   const { isSupported, isSubscribed, permission, isLoading: pushLoading, subscribe, unsubscribe } = usePushSubscription();
 
-  // Poll unread count every 30 seconds
+  // Poll unread count every 60 seconds — a fallback safety net; the socket
+  // listener below delivers updates in real time when connected.
   const { data: countData } = useQuery({
     queryKey: ['notif-count'],
     queryFn: async () => {
       const { data } = await api.get('/notifications/unread-count');
       return data.data as { count: number };
     },
-    refetchInterval: 30_000,
+    refetchInterval: 60_000,
     staleTime: 10_000,
   });
+
+  // Real-time push: increment count + invalidate list as soon as a new
+  // notification is created server-side (see services/socket/io.js emitNotificationNew)
+  useEffect(() => {
+    const socket = connectSocket();
+    function handleNew() {
+      queryClient.setQueryData<{ count: number }>(['notif-count'], (old) => ({ count: (old?.count ?? 0) + 1 }));
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    }
+    socket.on('notification:new', handleNew);
+    return () => { socket.off('notification:new', handleNew); };
+  }, [queryClient]);
 
   // Fetch full list when panel opens
   const { data: listData, refetch } = useQuery({
@@ -260,17 +274,28 @@ function NotificationBell() {
   }
 
   const ICON: Record<string, string> = {
-    enrollment:          '🎓',
-    waitlist_promoted:   '🎉',
-    enrollment_approved: '✅',
-    enrollment_rejected: '❌',
-    assignment_graded:   '📝',
-    assignment_due:      '⏰',
-    announcement:        '📢',
-    course_published:    '🆕',
-    course_completed:    '🏆',
-    certificate_issued:  '🏅',
-    trial_expiring:      '⚠️',
+    enrollment:            '🎓',
+    waitlist_promoted:     '🎉',
+    enrollment_approved:   '✅',
+    enrollment_rejected:   '❌',
+    assignment_graded:     '📝',
+    assignment_due:        '⏰',
+    assignment_published:  '📘',
+    announcement:          '📢',
+    course_published:      '🆕',
+    course_completed:      '🏆',
+    certificate_issued:    '🏅',
+    trial_expiring:        '⚠️',
+    chat_message:          '💬',
+    forum_reply:           '🗨️',
+    quiz_graded:           '📊',
+    quiz_published:        '🧪',
+    refund_approved:       '💚',
+    refund_rejected:       '🔴',
+    live_session_reminder: '🎥',
+    discussion_comment:    '💭',
+    discussion_reply:      '↩️',
+    email_delivery_failed: '📭',
   };
 
   function timeAgo(date: string) {

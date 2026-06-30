@@ -44,6 +44,9 @@ const membershipSubscriptionSchema = new mongoose.Schema(
 
     cancelledAt:  { type: Date, default: null },
     cancelReason: { type: String, default: null },
+
+    // Dedupe map for trial-expiring reminder job — key '3d'|'1d' -> last-sent timestamp
+    trialWarnings: { type: Map, of: Date, default: () => new Map() },
   },
   { timestamps: true }
 );

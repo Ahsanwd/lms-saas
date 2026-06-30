@@ -53,6 +53,9 @@ const assignmentSchema = new mongoose.Schema(
     // Denormalized counters — updated on submission changes
     submissionCount: { type: Number, default: 0 },
     gradedCount:     { type: Number, default: 0 },
+
+    // Dedupe map for due-date reminder job — key '3d'|'1d' -> last-sent timestamp
+    dueReminders: { type: Map, of: Date, default: () => new Map() },
   },
   { timestamps: true }
 );

@@ -103,11 +103,13 @@ async function post(tenantId, lessonId, user, body) {
           if (aid !== user.sub) notifyIds.add(aid);
         }
 
+        const studentName = `${userDoc.firstName} ${userDoc.lastName}`;
         const payload = {
           type: 'discussion_comment',
           title: 'New student question',
-          message: `${userDoc.firstName} ${userDoc.lastName} posted in "${lesson.title}"`,
+          message: `${studentName} posted in "${lesson.title}"`,
           link,
+          ctx: { studentName, lessonTitle: lesson.title, preview: body.trim().slice(0, 200), link },
         };
         for (const id of notifyIds) {
           notificationSvc.create(tenantId, id, payload).catch(() => {});
@@ -127,8 +129,7 @@ async function reply(tenantId, parentId, user, body) {
   if (!parent) throw new AppError('Discussion not found', 404);
   if (parent.parentId) throw new AppError('Cannot reply to a reply', 400);
 
-  await checkWriteAccess(tenantId, parent.lessonId.toString(), user);
-
+  const lesson  = await checkWriteAccess(tenantId, parent.lessonId.toString(), user);
   const userDoc = await userRepo.findByIdRaw(user.sub);
 
   const replyDoc = await discussionRepo.create({
@@ -148,11 +149,13 @@ async function reply(tenantId, parentId, user, body) {
       const originalAuthorId = parent.userId.toString();
       if (originalAuthorId === user.sub) return; // replying to own post
       const link = `/courses/${parent.courseId}/learn?lesson=${parent.lessonId}`;
+      const replyAuthorName = `${userDoc.firstName} ${userDoc.lastName}`;
       await notificationSvc.create(tenantId, originalAuthorId, {
         type: 'discussion_reply',
         title: 'New reply to your post',
-        message: `${userDoc.firstName} ${userDoc.lastName} replied to your comment`,
+        message: `${replyAuthorName} replied to your comment`,
         link,
+        ctx: { replyAuthorName, threadTitle: lesson.title, preview: body.trim().slice(0, 200), link },
       });
     } catch {}
   });

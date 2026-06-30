@@ -52,6 +52,20 @@ require('./jobs/queue').analyticsReportQueue().add(
   { repeat: { cron: '0 8 * * 1' }, jobId: 'analytics-weekly-report', removeOnComplete: true }
 ).catch(() => {});
 
+// ── Assignment due-date reminders — runs daily at 09:00 UTC ──────────────────
+require('./jobs/assignmentDue.job');
+require('./jobs/queue').assignmentDueQueue().add(
+  { type: 'daily-cron' },
+  { repeat: { cron: '0 9 * * *' }, jobId: 'assignment-due-cron', removeOnComplete: true }
+).catch(() => {});
+
+// ── Membership trial-expiring reminders — runs daily at 09:10 UTC ────────────
+require('./jobs/trialExpiring.job');
+require('./jobs/queue').trialExpiringQueue().add(
+  { type: 'daily-cron' },
+  { repeat: { cron: '10 9 * * *' }, jobId: 'trial-expiring-cron', removeOnComplete: true }
+).catch(() => {});
+
 const app    = express();
 // Trust Render's proxy so express-rate-limit reads the correct client IP
 app.set('trust proxy', 1);

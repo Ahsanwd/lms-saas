@@ -29,4 +29,15 @@ function emitGroupMessage(groupId, message) {
   _io.to(`group:${groupId}`).emit('group:message', message);
 }
 
-module.exports = { setIO, getIO, emitBillingUpdated, emitDashboardUpdated, emitGroupMessage };
+// Push a freshly-created notification straight to the recipient's open tabs.
+// No-ops if Socket.IO isn't ready or the user has no connected socket — the
+// 60s polling fallback in the frontend still picks it up either way.
+function emitNotificationNew(userId, notification) {
+  if (!_io || !userId) return;
+  _io.to(`user:${userId}`).emit('notification:new', notification);
+}
+
+module.exports = {
+  setIO, getIO, emitBillingUpdated, emitDashboardUpdated, emitGroupMessage,
+  emitNotificationNew,
+};

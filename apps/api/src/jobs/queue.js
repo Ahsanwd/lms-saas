@@ -37,5 +37,10 @@ const announcementQueue       = () => getQueue('announcement-scheduler');
 const liveReminderQueue       = () => getQueue('live-reminder');
 const zoomRecordingQueue      = () => getQueue('zoom-recording');
 const analyticsReportQueue    = () => getQueue('analytics-report');
+const assignmentDueQueue      = () => getQueue('assignment-due');
+const trialExpiringQueue      = () => getQueue('trial-expiring');
 
-module.exports = { emailQueue, membershipRenewalQueue, tenantExpiryQueue, announcementQueue, liveReminderQueue, zoomRecordingQueue, analyticsReportQueue };
+module.exports = {
+  emailQueue, membershipRenewalQueue, tenantExpiryQueue, announcementQueue, liveReminderQueue,
+  zoomRecordingQueue, analyticsReportQueue, assignmentDueQueue, trialExpiringQueue,
+};

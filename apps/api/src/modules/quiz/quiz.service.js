@@ -219,13 +219,7 @@ async function publishQuiz(tenantId, id, user) {
       const studentIds = enrollments.map(e => (e.userId?._id ?? e.userId).toString()).filter(Boolean);
       if (studentIds.length > 0) {
         const notifySvc = require('../notification/notification.service');
-        await notifySvc.createBulk(tenantId, studentIds, {
-          type: 'quiz_published',
-          title: 'New quiz available',
-          message: `New quiz: "${quiz.title}" is now available. Test your knowledge!`,
-          link: `/quizzes/${id}`,
-          ctx: { quizTitle: quiz.title, courseId: courseId.toString(), quizId: id.toString() },
-        });
+        await notifySvc.notifyQuizPublished(tenantId, studentIds, quiz.title, courseId.toString(), id.toString());
       }
     }
   } catch (_) { /* non-critical */ }
