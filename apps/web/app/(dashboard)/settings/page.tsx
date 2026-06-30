@@ -1634,8 +1634,16 @@ function AdminSettings() {
   return (
     <div className="max-w-3xl space-y-6">
       <div>
-        <h1 className="text-xl font-semibold text-gray-900">Settings</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Manage your organisation settings</p>
+        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2.5">
+          <span className="w-9 h-9 rounded-xl bg-primary-50 text-primary-600 flex items-center justify-center">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </span>
+          Settings
+        </h1>
+        <p className="text-sm text-gray-500 mt-1 ml-[46px]">Manage your organisation settings</p>
       </div>
 
       {/* ── Tab bar ── */}
@@ -1659,31 +1667,45 @@ function AdminSettings() {
 
       {activeTab === 'general' && (
       <>
-      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
-        <h2 className="text-sm font-semibold text-gray-900">Organisation</h2>
+      <Section
+        icon={
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+          </svg>
+        }
+        title="Organisation"
+        desc="Your school's identity on Coursel"
+      >
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Organisation Name</label>
-            <p className="text-sm text-gray-900 bg-gray-50 rounded-lg px-3 py-2 border border-gray-200">{tenant?.name ?? '—'}</p>
+            <label className={labelCls}>Organisation Name</label>
+            <p className="text-sm text-gray-900 bg-gray-50 rounded-xl px-3 py-2.5 border border-gray-200">{tenant?.name ?? '—'}</p>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Subdomain</label>
-            <p className="text-sm text-gray-900 bg-gray-50 rounded-lg px-3 py-2 border border-gray-200">{tenant?.subdomain ?? '—'}</p>
+            <label className={labelCls}>Subdomain</label>
+            <p className="text-sm text-gray-900 bg-gray-50 rounded-xl px-3 py-2.5 border border-gray-200">{tenant?.subdomain ?? '—'}</p>
           </div>
         </div>
-      </div>
+      </Section>
 
       {plan && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
-          <h2 className="text-sm font-semibold text-gray-900">Plan</h2>
-          <div className="flex items-center gap-3 mb-3">
+        <Section
+          icon={
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+            </svg>
+          }
+          title="Plan"
+          desc="Your subscription tier and usage"
+        >
+          <div className="flex items-center gap-3 mb-1">
             <span className="text-base font-semibold text-gray-900">{plan.plan?.name ?? '—'}</span>
             <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium capitalize', plan.status === 'active' ? 'bg-green-50 text-green-700' : 'bg-yellow-50 text-yellow-700')}>{plan.isOnTrial ? 'Trial' : plan.status}</span>
           </div>
           <div className="grid grid-cols-3 gap-4 text-sm">
             {[{ label: 'student limit', value: plan.plan?.limits?.students === -1 ? '∞' : plan.plan?.limits?.students ?? '—' }, { label: 'course limit', value: plan.plan?.limits?.courses === -1 ? '∞' : plan.plan?.limits?.courses ?? '—' }, { label: 'storage limit', value: `${plan.plan?.limits?.storageGB ?? '—'} GB` }].map(({ label, value }) => (
-              <div key={label} className="bg-gray-50 rounded-lg p-3 text-center">
-                <p className="text-2xl font-semibold text-gray-900">{value}</p>
+              <div key={label} className="bg-gray-50 rounded-xl border border-gray-100 p-3.5 text-center">
+                <p className="text-2xl font-extrabold text-gray-900">{value}</p>
                 <p className="text-xs text-gray-500 mt-0.5">{label}</p>
               </div>
             ))}
@@ -1697,11 +1719,19 @@ function AdminSettings() {
               <p className="text-xs text-gray-400 mt-1">{storage.percentUsed ?? 0}% used</p>
             </div>
           )}
-        </div>
+        </Section>
       )}
 
-      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
-        <h2 className="text-sm font-semibold text-gray-900">Preferences</h2>
+      <Section
+        icon={
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="8.5" strokeWidth={2} />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.5 12h17M12 3.5c2.2 2.6 3.4 5.6 3.4 8.5s-1.2 5.9-3.4 8.5c-2.2-2.6-3.4-5.6-3.4-8.5S9.8 6.1 12 3.5z" />
+          </svg>
+        }
+        title="Regional & Billing"
+        desc="Language, timezone, currency and tax defaults"
+      >
         <div className="grid grid-cols-2 gap-5">
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1.5">Language</label>
@@ -1767,6 +1797,17 @@ function AdminSettings() {
             <p className="text-xs text-gray-400 mt-1">Shown on invoices next to the tax line (e.g. "VAT 20%").</p>
           </div>
         </div>
+      </Section>
+
+      <Section
+        icon={
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+        }
+        title="Branding"
+        desc="Logo, favicon and brand colors shown across your school"
+      >
         {/* ── Logo ── */}
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-1.5">Logo</label>
@@ -1903,14 +1944,17 @@ function AdminSettings() {
             ))}
           </div>
         </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1.5">Session Idle Timeout <span className="font-normal text-gray-400">(minutes, 0 = disabled)</span></label>
-          <input type="number" min={0} value={form.idleTimeoutMinutes} onChange={e => set('idleTimeoutMinutes', Math.max(0, parseInt(e.target.value) || 0))} className="w-32 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
-        </div>
-      </div>
+      </Section>
 
-      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
-        <h2 className="text-sm font-semibold text-gray-900">Registration & Security</h2>
+      <Section
+        icon={
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+          </svg>
+        }
+        title="Registration & Security"
+        desc="Control how new users sign up and how sessions expire"
+      >
         <div className="space-y-4">
           <div className="flex items-center justify-between py-1">
             <div>
@@ -1948,8 +1992,21 @@ function AdminSettings() {
               ].map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </div>
+          <div className="border-t border-gray-100" />
+          <div className="flex items-center justify-between py-1">
+            <div>
+              <p className="text-sm font-medium text-gray-900">Session Idle Timeout</p>
+              <p className="text-xs text-gray-500 mt-0.5">Minutes of inactivity before auto sign-out. Set 0 to disable.</p>
+            </div>
+            <input
+              type="number" min={0}
+              value={form.idleTimeoutMinutes}
+              onChange={e => set('idleTimeoutMinutes', Math.max(0, parseInt(e.target.value) || 0))}
+              className="w-24 rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            />
+          </div>
         </div>
-      </div>
+      </Section>
 
       <div className="flex items-center gap-3 pb-4">
         <Button onClick={() => mutation.mutate(form)} loading={mutation.isPending} disabled={mutation.isPending}>Save Changes</Button>
