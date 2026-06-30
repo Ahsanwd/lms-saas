@@ -2,7 +2,6 @@
 
 const https = require('https');
 const jwt   = require('jsonwebtoken');
-const { encrypt, decrypt } = require('../../utils/crypto');
 
 // ── Low-level CF API helper (JSON endpoints) ──────────────────────────────────
 function cfRequest(method, accountId, apiToken, path, body = null) {
@@ -97,14 +96,14 @@ async function deleteVideo(accountId, apiToken, videoUid) {
 
 // Generate a signed playback token (RS256 JWT) so only enrolled students can watch
 // CF Stream requires: kid in JWT *header*, sub=videoUid in payload
-function generateSignedToken(videoUid, signingKeyId, signingKeyEnc) {
-  const pem = decrypt(signingKeyEnc);
-  if (!pem) throw new Error('Cloudflare Stream signing key not configured');
+// `signingKeyPem` is the raw PEM (from platform-level config, not DB-encrypted)
+function generateSignedToken(videoUid, signingKeyId, signingKeyPem) {
+  if (!signingKeyPem) throw new Error('Cloudflare Stream signing key not configured');
   return jwt.sign(
     { sub: videoUid },
-    pem,
+    signingKeyPem,
     { algorithm: 'RS256', expiresIn: '1h', keyid: signingKeyId }
   );
 }
 
-module.exports = { testConnection, createDirectUpload, getVideoStatus, deleteVideo, generateSignedToken, encrypt, decrypt };
+module.exports = { testConnection, createDirectUpload, getVideoStatus, deleteVideo, generateSignedToken };

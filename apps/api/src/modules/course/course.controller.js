@@ -475,21 +475,17 @@ async function detachLessonQuiz(req, res, next) {
 }
 
 // ── SCORM Import ──────────────────────────────────────────────────────────────
-// ── Cloudflare Stream BYOK ────────────────────────────────────────────────────
+// ── Cloudflare Stream (shared platform-level account — config.cloudflareStream) ─
 async function cfStreamUploadUrl(req, res, next) {
   try {
-    const { tenantId } = req.tenant;
     const { lessonId } = req.params;
-    const Tenant = require('../../database/models/Tenant.model');
-    const tenant = await Tenant.findById(tenantId)
-      .select('+cloudflareStream.apiTokenEnc cloudflareStream').lean();
-    const cf = tenant?.cloudflareStream;
-    if (!cf?.enabled || !cf.accountId || !cf.apiTokenEnc)
-      return R.error(res, 'Cloudflare Stream is not configured for this tenant', 400);
+    const config = require('../../config');
+    const cf = config.cloudflareStream;
+    if (!cf.accountId || !cf.apiToken)
+      return R.error(res, 'Cloudflare Stream is not configured on this platform', 400);
 
     const cfSvc = require('../../services/cloudflareStream/cloudflareStream.service');
-    const apiToken = cfSvc.decrypt(cf.apiTokenEnc);
-    const { uploadUrl, videoUid } = await cfSvc.createDirectUpload(cf.accountId, apiToken, {
+    const { uploadUrl, videoUid } = await cfSvc.createDirectUpload(cf.accountId, cf.apiToken, {
       meta: { lessonId },
     });
     R.success(res, { uploadUrl, videoUid });
@@ -510,19 +506,15 @@ async function cfStreamConfirm(req, res, next) {
 
 async function cfStreamStatus(req, res, next) {
   try {
-    const { tenantId } = req.tenant;
     const { videoUid } = req.query;
     if (!videoUid) return R.error(res, 'videoUid required', 400);
 
-    const Tenant = require('../../database/models/Tenant.model');
-    const tenant = await Tenant.findById(tenantId)
-      .select('+cloudflareStream.apiTokenEnc cloudflareStream').lean();
-    const cf = tenant?.cloudflareStream;
-    if (!cf?.enabled) return R.error(res, 'Cloudflare Stream not configured', 400);
+    const config = require('../../config');
+    const cf = config.cloudflareStream;
+    if (!cf.accountId || !cf.apiToken) return R.error(res, 'Cloudflare Stream not configured', 400);
 
     const cfSvc = require('../../services/cloudflareStream/cloudflareStream.service');
-    const apiToken = cfSvc.decrypt(cf.apiTokenEnc);
-    const status = await cfSvc.getVideoStatus(cf.accountId, apiToken, videoUid);
+    const status = await cfSvc.getVideoStatus(cf.accountId, cf.apiToken, videoUid);
     R.success(res, status);
   } catch (err) { next(err); }
 }
@@ -547,15 +539,13 @@ async function cfStreamToken(req, res, next) {
       if (!enrolled) return R.error(res, 'Not enrolled in this course', 403);
     }
 
-    const Tenant = require('../../database/models/Tenant.model');
-    const tenant = await Tenant.findById(tenantId)
-      .select('+cloudflareStream.apiTokenEnc +cloudflareStream.signingKeyEnc cloudflareStream').lean();
-    const cf = tenant?.cloudflareStream;
-    if (!cf?.enabled || !cf.signingKeyId || !cf.signingKeyEnc)
+    const config = require('../../config');
+    const cf = config.cloudflareStream;
+    if (!cf.signingKeyId || !cf.signingKeyPem)
       return R.error(res, 'Cloudflare Stream signing key not configured', 400);
 
     const cfSvc = require('../../services/cloudflareStream/cloudflareStream.service');
-    const token = cfSvc.generateSignedToken(lesson.video.url, cf.signingKeyId, cf.signingKeyEnc);
+    const token = cfSvc.generateSignedToken(lesson.video.url, cf.signingKeyId, cf.signingKeyPem);
     R.success(res, { token });
   } catch (err) { next(err); }
 }

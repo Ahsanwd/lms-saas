@@ -62,6 +62,15 @@ module.exports = {
     },
   },
 
+  // Shared platform-level Cloudflare Stream account — used by ALL tenants.
+  // Tenants no longer bring their own keys; configure once here.
+  cloudflareStream: {
+    accountId:     process.env.CF_STREAM_ACCOUNT_ID     || null,
+    apiToken:      process.env.CF_STREAM_API_TOKEN      || null,
+    signingKeyId:  process.env.CF_STREAM_SIGNING_KEY_ID || null,
+    signingKeyPem: process.env.CF_STREAM_SIGNING_KEY_PEM|| null,
+  },
+
   log: {
     level: process.env.LOG_LEVEL || 'debug',
   },

@@ -458,9 +458,9 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isEdit = !!lesson;
 
-  const { data: cfStreamSettings } = useQuery<{ connected: boolean; accountId: string | null }>({
-    queryKey: ['cf-stream-settings'],
-    queryFn: () => api.get('/tenant/cloudflare-stream').then(r => r.data.data),
+  const { data: cfStreamSettings } = useQuery<{ connected: boolean }>({
+    queryKey: ['cf-stream-status'],
+    queryFn: () => api.get('/tenant/cloudflare-stream/status').then(r => r.data.data),
     staleTime: 5 * 60_000,
     enabled: type === 'video',
   });

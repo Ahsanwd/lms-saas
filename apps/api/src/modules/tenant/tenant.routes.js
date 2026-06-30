@@ -34,11 +34,9 @@ router.get( '/email-settings',      requireRole('tenant_admin'), ctrl.getEmailSe
 router.put( '/email-settings',      requireRole('tenant_admin'), ctrl.saveEmailSettings);
 router.post('/email-settings/test', requireRole('tenant_admin'), ctrl.testEmailSmtp);
 
-// Cloudflare Stream BYOK (tenant admin only)
-router.get(   '/cloudflare-stream',      requireRole('tenant_admin'), ctrl.getCfStreamSettings);
-router.post(  '/cloudflare-stream',      requireRole('tenant_admin'), ctrl.saveCfStreamSettings);
-router.delete('/cloudflare-stream',      requireRole('tenant_admin'), ctrl.disconnectCfStream);
-router.post(  '/cloudflare-stream/test', requireRole('tenant_admin'), ctrl.testCfStreamConnection);
+// Cloudflare Stream — shared platform-level account, any authenticated user can
+// check availability (instructors need this when uploading lesson videos)
+router.get('/cloudflare-stream/status', ctrl.getCfStreamStatus);
 
 // Bunny.net Stream BYOK (tenant admin only)
 router.get(   '/bunny-stream',      requireRole('tenant_admin'), ctrl.getBunnyStreamSettings);

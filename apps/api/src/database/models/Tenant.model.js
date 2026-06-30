@@ -89,15 +89,6 @@ const tenantSchema = new mongoose.Schema(
       },
     },
 
-    // Per-tenant Cloudflare Stream BYOK integration
-    cloudflareStream: {
-      enabled:      { type: Boolean, default: false },
-      accountId:    { type: String,  default: null },
-      apiTokenEnc:  { type: String,  default: null, select: false }, // AES-256 encrypted
-      signingKeyId: { type: String,  default: null },
-      signingKeyEnc:{ type: String,  default: null, select: false }, // AES-256 encrypted PEM
-    },
-
     // Per-tenant Bunny.net Stream integration
     bunnyStream: {
       enabled:         { type: Boolean, default: false },
