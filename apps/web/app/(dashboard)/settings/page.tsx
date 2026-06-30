@@ -1632,7 +1632,7 @@ function AdminSettings() {
   if (tenantLoading) return <div className="flex justify-center py-20"><Spinner size="lg" /></div>;
 
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="max-w-5xl space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2.5">
           <span className="w-9 h-9 rounded-xl bg-primary-50 text-primary-600 flex items-center justify-center">
