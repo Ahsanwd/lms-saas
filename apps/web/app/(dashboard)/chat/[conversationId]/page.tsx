@@ -7,7 +7,7 @@ import { formatDistanceToNow } from 'date-fns';
 import api from '@/lib/api';
 import { connectSocket, disconnectSocket } from '@/lib/socket';
 import { useAuthStore } from '@/stores/auth.store';
-import { cn } from '@/lib/utils';
+import { cn, avatarColor, getInitials, formatBytes } from '@/lib/utils';
 
 interface ChatFile {
   url: string;
@@ -232,23 +232,28 @@ export default function ConversationPage() {
 
       {/* Header */}
       <div className="border-b border-gray-200 bg-white">
-        <div className="flex items-center gap-3 px-6 py-4">
-          <button onClick={() => router.push('/chat')} className="text-gray-400 hover:text-gray-600 transition-colors">
+        <div className="flex items-center gap-3 px-6 py-3.5">
+          <button onClick={() => router.push('/chat')} className="text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
+          {conv && (
+            <div className={cn('w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 font-semibold text-xs', avatarColor(getTitle()))}>
+              {getInitials(getTitle())}
+            </div>
+          )}
           <div className="flex-1 min-w-0">
-            <p className="font-semibold text-gray-900 truncate">{getTitle()}</p>
+            <p className="font-semibold text-gray-900 truncate leading-tight">{getTitle()}</p>
             <p className="text-xs text-primary-600 truncate">{conv?.courseName}</p>
           </div>
           {isClosed && (
-            <span className="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded-full">Closed</span>
+            <span className="text-xs bg-gray-100 text-gray-500 px-2.5 py-1 rounded-full font-medium flex-shrink-0">Closed</span>
           )}
           {/* Search toggle */}
           <button
             onClick={() => { setSearchOpen((v) => !v); setSearchQuery(''); }}
-            className={cn('p-1.5 rounded-lg transition-colors', searchOpen ? 'bg-primary-100 text-primary-700' : 'text-gray-400 hover:text-gray-600')}
+            className={cn('p-2 rounded-lg transition-colors flex-shrink-0', searchOpen ? 'bg-primary-100 text-primary-700' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50')}
             title="Search messages"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -260,16 +265,21 @@ export default function ConversationPage() {
         {/* Search bar */}
         {searchOpen && (
           <div className="px-6 pb-3">
-            <input
-              autoFocus
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search messages…"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-            />
+            <div className="relative">
+              <svg className="w-4 h-4 text-gray-300 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+              </svg>
+              <input
+                autoFocus
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search messages…"
+                className="w-full border border-gray-200 bg-gray-50 rounded-xl pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white transition-colors"
+              />
+            </div>
             {debouncedSearch.length >= 2 && (
-              <div className="mt-2 max-h-60 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-sm divide-y divide-gray-100">
+              <div className="mt-2 max-h-60 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-lg divide-y divide-gray-100">
                 {!searchData?.length && (
                   <p className="px-3 py-3 text-sm text-gray-400">No results for &ldquo;{debouncedSearch}&rdquo;</p>
                 )}
@@ -298,8 +308,14 @@ export default function ConversationPage() {
         )}
 
         {!isLoading && messages.length === 0 && (
-          <div className="text-center py-12 text-gray-400 text-sm">
-            No messages yet. Say hello!
+          <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+            <div className="w-12 h-12 rounded-2xl bg-white border border-gray-200 flex items-center justify-center mb-3">
+              <svg className="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+            </div>
+            <p className="text-sm font-medium text-gray-500">No messages yet</p>
+            <p className="text-xs text-gray-400 mt-0.5">Say hello to start the conversation</p>
           </div>
         )}
 
@@ -309,8 +325,8 @@ export default function ConversationPage() {
           return (
             <div key={msg._id} className={cn('flex gap-2', isOwn ? 'justify-end' : 'justify-start')}>
               {!isOwn && (
-                <div className="w-7 h-7 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0 self-end">
-                  <span className="text-primary-700 text-xs font-semibold">{msg.senderName.charAt(0)}</span>
+                <div className={cn('w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 self-end font-semibold text-xs', avatarColor(msg.senderName))}>
+                  {getInitials(msg.senderName)}
                 </div>
               )}
               <div className={cn('max-w-[70%] group', isOwn ? 'items-end' : 'items-start')}>
@@ -333,21 +349,28 @@ export default function ConversationPage() {
                     <button onClick={() => setEditingId(null)} className="text-xs text-gray-400">Cancel</button>
                   </div>
                 ) : (
-                  <div className={cn('rounded-2xl text-sm overflow-hidden', isOwn ? 'bg-primary-600 text-white rounded-br-sm' : 'bg-white text-gray-800 border border-gray-200 rounded-bl-sm')}>
+                  <div className={cn('rounded-2xl text-sm overflow-hidden shadow-sm', isOwn ? 'bg-primary-600 text-white rounded-br-sm' : 'bg-white text-gray-800 border border-gray-100 rounded-bl-sm')}>
                     {/* File attachment */}
-                    {msg.file && (
-                      msg.file.mimeType.startsWith('image/') ? (
+                    {msg.file?.url && (
+                      msg.file.mimeType?.startsWith('image/') ? (
                         <a href={msg.file.url} target="_blank" rel="noopener noreferrer">
-                          <img src={msg.file.url} alt={msg.file.name}
+                          <img src={msg.file.url} alt={msg.file.name ?? 'attachment'}
                             className="max-w-[240px] max-h-[200px] object-cover block" />
                         </a>
                       ) : (
                         <a href={msg.file.url} target="_blank" rel="noopener noreferrer"
-                          className={cn('flex items-center gap-2 px-4 py-2.5 hover:opacity-80 transition-opacity', isOwn ? 'text-white' : 'text-primary-700')}>
-                          <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                          </svg>
-                          <span className="text-xs font-medium truncate max-w-[160px]">{msg.file.name}</span>
+                          className={cn('flex items-center gap-2.5 px-4 py-3 hover:opacity-80 transition-opacity', isOwn ? 'text-white' : 'text-primary-700')}>
+                          <span className={cn('w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0', isOwn ? 'bg-white/15' : 'bg-primary-50')}>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                            </svg>
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block text-xs font-medium truncate max-w-[160px]">{msg.file.name}</span>
+                            {!!msg.file.sizeBytes && (
+                              <span className={cn('block text-[10px]', isOwn ? 'text-primary-100' : 'text-gray-400')}>{formatBytes(msg.file.sizeBytes)}</span>
+                            )}
+                          </span>
                         </a>
                       )
                     )}
@@ -408,12 +431,14 @@ export default function ConversationPage() {
         <div className="px-6 py-4 border-t border-gray-200 bg-white space-y-2">
           {/* Selected file preview */}
           {selectedFile && (
-            <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm">
-              <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-              </svg>
+            <div className="flex items-center gap-2.5 bg-primary-50/60 border border-primary-100 rounded-xl px-3 py-2 text-sm">
+              <span className="w-7 h-7 rounded-lg bg-white flex items-center justify-center flex-shrink-0">
+                <svg className="w-4 h-4 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                </svg>
+              </span>
               <span className="truncate flex-1 text-gray-700">{selectedFile.name}</span>
-              <button onClick={() => setSelectedFile(null)} className="text-red-400 hover:text-red-600 text-xs flex-shrink-0">Remove</button>
+              <button onClick={() => setSelectedFile(null)} className="text-gray-400 hover:text-red-500 text-xs flex-shrink-0 font-medium transition-colors">Remove</button>
             </div>
           )}
           <div className="flex gap-2 items-end">
@@ -425,7 +450,7 @@ export default function ConversationPage() {
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
-              className="h-10 w-10 flex-shrink-0 border border-gray-200 text-gray-400 rounded-xl flex items-center justify-center hover:text-primary-600 hover:border-primary-300 transition-colors"
+              className="h-11 w-11 flex-shrink-0 border border-gray-200 text-gray-400 rounded-xl flex items-center justify-center hover:text-primary-600 hover:border-primary-300 hover:bg-primary-50/50 transition-colors"
               title="Attach file"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -440,13 +465,13 @@ export default function ConversationPage() {
               }}
               placeholder="Type a message… (Enter to send, Shift+Enter for new line)"
               rows={1}
-              className="flex-1 resize-none border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className="flex-1 resize-none border border-gray-200 bg-gray-50 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white focus:border-transparent transition-colors"
               style={{ maxHeight: '120px' }}
             />
             <button
               onClick={handleSend}
               disabled={(!text.trim() && !selectedFile) || sendMutation.isPending}
-              className="h-10 w-10 flex-shrink-0 bg-primary-600 text-white rounded-xl flex items-center justify-center hover:bg-primary-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="h-11 w-11 flex-shrink-0 bg-primary-600 text-white rounded-xl flex items-center justify-center hover:bg-primary-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />

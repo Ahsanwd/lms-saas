@@ -9,10 +9,13 @@ const chatMessageSchema = new mongoose.Schema(
     senderRole:     { type: String, enum: ['student', 'instructor', 'tenant_admin'], required: true },
     text:      { type: String, default: null, maxlength: 4000 },
     file: {
-      url:       { type: String, default: null },
-      name:      { type: String, default: null },
-      mimeType:  { type: String, default: null },
-      sizeBytes: { type: Number, default: null },
+      type: {
+        url:       { type: String, default: null },
+        name:      { type: String, default: null },
+        mimeType:  { type: String, default: null },
+        sizeBytes: { type: Number, default: null },
+      },
+      default: null,
     },
     editedAt:  { type: Date, default: null },
     deletedAt: { type: Date, default: null },
