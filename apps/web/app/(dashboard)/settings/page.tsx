@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { Button, Spinner } from '@/components/ui';
 import { cn } from '@/lib/utils';
-import { applyBrandColor, applySecondaryColor } from '@/lib/brandColor';
+import { applyBrandColor, applySecondaryColor, applyFontFamily, FONT_OPTIONS } from '@/lib/brandColor';
 import { useAuthStore } from '@/stores/auth.store';
 
 // ─── Shared helpers ────────────────────────────────────────────────────────────
@@ -852,7 +852,7 @@ function StudentSettings() {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 interface TenantSettings {
-  logo?: string; favicon?: string; primaryColor: string; secondaryColor: string; language: string; timezone: string;
+  logo?: string; favicon?: string; primaryColor: string; secondaryColor: string; fontFamily: string; language: string; timezone: string;
   allowSelfRegistration: boolean; requireEmailVerification: boolean; idleTimeoutMinutes: number;
   defaultInviteExpiryHours: number; currency: string; refundWindowDays: number;
   taxRate: number; taxLabel: string;
@@ -1550,9 +1550,9 @@ function AdminSettings() {
     queryFn: async () => { const { data } = await api.get('/tenant/storage'); return data.data; },
   });
 
-  const [form, setForm] = useState<TenantSettings>({ primaryColor: '#3B82F6', secondaryColor: '#8B5CF6', language: 'en', timezone: 'UTC', allowSelfRegistration: true, requireEmailVerification: true, idleTimeoutMinutes: 0, defaultInviteExpiryHours: 72, currency: 'USD', refundWindowDays: 30, taxRate: 0, taxLabel: 'Tax' });
+  const [form, setForm] = useState<TenantSettings>({ primaryColor: '#3B82F6', secondaryColor: '#8B5CF6', fontFamily: 'Inter', language: 'en', timezone: 'UTC', allowSelfRegistration: true, requireEmailVerification: true, idleTimeoutMinutes: 0, defaultInviteExpiryHours: 72, currency: 'USD', refundWindowDays: 30, taxRate: 0, taxLabel: 'Tax' });
   useEffect(() => {
-    if (tenant?.settings) setForm({ primaryColor: tenant.settings.primaryColor ?? '#3B82F6', secondaryColor: (tenant.settings as any).secondaryColor ?? '#8B5CF6', language: tenant.settings.language ?? 'en', timezone: tenant.settings.timezone ?? 'UTC', allowSelfRegistration: tenant.settings.allowSelfRegistration ?? true, requireEmailVerification: tenant.settings.requireEmailVerification ?? true, idleTimeoutMinutes: tenant.settings.idleTimeoutMinutes ?? 0, defaultInviteExpiryHours: (tenant.settings as any).defaultInviteExpiryHours ?? 72, currency: (tenant.settings as any).currency ?? 'USD', refundWindowDays: (tenant.settings as any).refundWindowDays ?? 30, taxRate: (tenant.settings as any).taxRate ?? 0, taxLabel: (tenant.settings as any).taxLabel ?? 'Tax' });
+    if (tenant?.settings) setForm({ primaryColor: tenant.settings.primaryColor ?? '#3B82F6', secondaryColor: (tenant.settings as any).secondaryColor ?? '#8B5CF6', fontFamily: (tenant.settings as any).fontFamily ?? 'Inter', language: tenant.settings.language ?? 'en', timezone: tenant.settings.timezone ?? 'UTC', allowSelfRegistration: tenant.settings.allowSelfRegistration ?? true, requireEmailVerification: tenant.settings.requireEmailVerification ?? true, idleTimeoutMinutes: tenant.settings.idleTimeoutMinutes ?? 0, defaultInviteExpiryHours: (tenant.settings as any).defaultInviteExpiryHours ?? 72, currency: (tenant.settings as any).currency ?? 'USD', refundWindowDays: (tenant.settings as any).refundWindowDays ?? 30, taxRate: (tenant.settings as any).taxRate ?? 0, taxLabel: (tenant.settings as any).taxLabel ?? 'Tax' });
   }, [tenant]);
 
   const mutation = useMutation({
@@ -1943,6 +1943,20 @@ function AdminSettings() {
               />
             ))}
           </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1.5">Font</label>
+          <select
+            value={form.fontFamily}
+            onChange={e => { set('fontFamily', e.target.value); applyFontFamily(e.target.value); }}
+            className="w-full max-w-xs rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          >
+            {FONT_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
+          </select>
+          <p className="text-xs text-gray-400 mt-1.5">
+            Applied across your public storefront, login/register pages, and the LMS dashboard.
+          </p>
         </div>
       </Section>
 

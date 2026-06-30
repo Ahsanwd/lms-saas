@@ -35,6 +35,11 @@ const tenantSchema = new mongoose.Schema(
       favicon: { type: String, default: null },
       primaryColor: { type: String, default: '#3B82F6' },
       secondaryColor: { type: String, default: '#8B5CF6' },
+      fontFamily: {
+        type: String,
+        enum: ['Inter', 'Poppins', 'Roboto', 'Open Sans', 'Lato', 'Montserrat', 'Nunito', 'Work Sans', 'Plus Jakarta Sans', 'Source Sans 3'],
+        default: 'Inter',
+      },
       language: { type: String, default: 'en' },
       timezone: { type: String, default: 'UTC' },
       allowSelfRegistration: { type: Boolean, default: true },

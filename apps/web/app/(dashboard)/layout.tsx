@@ -7,7 +7,7 @@ import { useAuthStore } from '@/stores/auth.store';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { PageLoader } from '@/components/ui';
-import { applyBrandColor, applySecondaryColor } from '@/lib/brandColor';
+import { applyBrandColor, applySecondaryColor, applyFontFamily } from '@/lib/brandColor';
 import api from '@/lib/api';
 import type { Role } from '@/types';
 import { Toaster } from 'sonner';
@@ -38,6 +38,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (color) applyBrandColor(color);
     const secondary = tenantData?.tenant?.settings?.secondaryColor;
     if (secondary) applySecondaryColor(secondary);
+    applyFontFamily(tenantData?.tenant?.settings?.fontFamily);
   }, [tenantData]);
 
   const tenantLogo    = tenantData?.tenant?.settings?.logo    ?? undefined;

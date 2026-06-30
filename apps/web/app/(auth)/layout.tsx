@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { applyBrandColor, applySecondaryColor } from '@/lib/brandColor';
+import { applyBrandColor, applySecondaryColor, applyFontFamily } from '@/lib/brandColor';
 
 interface TenantBranding {
   tenantName: string | null;
   logoUrl: string | null;
   primaryColor: string | null;
   secondaryColor: string | null;
+  fontFamily: string | null;
 }
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
@@ -34,6 +35,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           setBranding(res.data.data ?? null);
           if (res.data.data?.primaryColor) applyBrandColor(res.data.data.primaryColor);
           if (res.data.data?.secondaryColor) applySecondaryColor(res.data.data.secondaryColor);
+          applyFontFamily(res.data.data?.fontFamily);
         })
         .catch(() => setBranding(null));
     } else {

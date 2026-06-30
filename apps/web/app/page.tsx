@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import axios from 'axios';
-import { applyBrandColor, applySecondaryColor } from '@/lib/brandColor';
+import { applyBrandColor, applySecondaryColor, applyFontFamily } from '@/lib/brandColor';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -150,6 +150,7 @@ function TenantLandingPage({ subdomain }: { subdomain: string }) {
         setLogoUrl(res.data.data.branding?.logoUrl ?? null);
         if (res.data.data.branding?.primaryColor) applyBrandColor(res.data.data.branding.primaryColor);
         if (res.data.data.branding?.secondaryColor) applySecondaryColor(res.data.data.branding.secondaryColor);
+        applyFontFamily(res.data.data.branding?.fontFamily);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
