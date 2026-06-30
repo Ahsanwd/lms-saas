@@ -424,7 +424,16 @@ async function adminListThreads(tenantId, query) {
 
   const [threads, total] = await forumRepo.adminListThreads(tenantId, { page, limit, courseId });
   return {
-    threads,
+    // Raw docs still carry the `flags` subdocument array — collapse it to the
+    // flagCount the frontend actually reads, same as formatThread() does for
+    // every other forum endpoint. Without this, flagged threads always read
+    // as flagCount: undefined (?? 0) and never surface in the admin view.
+    threads: threads.map(t => {
+      const obj = t.toObject ? t.toObject() : { ...t };
+      obj.flagCount = (obj.flags ?? []).length;
+      delete obj.flags;
+      return obj;
+    }),
     pagination: { page, limit, total, pages: Math.ceil(total / limit) },
   };
 }
