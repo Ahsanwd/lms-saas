@@ -316,8 +316,8 @@ const plans = [
       'Certificate builder',
     ],
     highlighted: false,
-    monthlyCheckout: 'https://coursel.lemonsqueezy.com/checkout/buy/127022f2-297b-407e-a8e4-b9879a66b721',
-    yearlyCheckout:  'https://coursel.lemonsqueezy.com/checkout/buy/118720d1-1f2e-4f45-8eec-6e30254b995e',
+    monthlyCheckout: 'https://coursel.lemonsqueezy.com/checkout/buy/473b73c3-f646-4d5f-aa8b-65a83f17db15',
+    yearlyCheckout:  'https://coursel.lemonsqueezy.com/checkout/buy/c1dde874-556d-4c75-8f62-170be01b6151',
   },
   {
     name: 'Pro',
@@ -338,8 +338,8 @@ const plans = [
       'Priority support',
     ],
     highlighted: true,
-    monthlyCheckout: 'https://coursel.lemonsqueezy.com/checkout/buy/917c2beb-7c33-4632-ab02-9db7f3963751',
-    yearlyCheckout:  'https://coursel.lemonsqueezy.com/checkout/buy/934fd7fe-8675-4146-b369-783395f90547',
+    monthlyCheckout: 'https://coursel.lemonsqueezy.com/checkout/buy/0e0b2fb6-3ba2-4e1e-93f6-802828bbb3e7',
+    yearlyCheckout:  'https://coursel.lemonsqueezy.com/checkout/buy/c89afe0e-29e8-49c3-b430-c46b21b54eaf',
   },
 ];
 
