@@ -316,8 +316,6 @@ const plans = [
       'Certificate builder',
     ],
     highlighted: false,
-    monthlyCheckout: 'https://coursel.lemonsqueezy.com/checkout/buy/473b73c3-f646-4d5f-aa8b-65a83f17db15',
-    yearlyCheckout:  'https://coursel.lemonsqueezy.com/checkout/buy/c1dde874-556d-4c75-8f62-170be01b6151',
   },
   {
     name: 'Pro',
@@ -338,8 +336,6 @@ const plans = [
       'Priority support',
     ],
     highlighted: true,
-    monthlyCheckout: 'https://coursel.lemonsqueezy.com/checkout/buy/0e0b2fb6-3ba2-4e1e-93f6-802828bbb3e7',
-    yearlyCheckout:  'https://coursel.lemonsqueezy.com/checkout/buy/c89afe0e-29e8-49c3-b430-c46b21b54eaf',
   },
 ];
 
@@ -500,25 +496,15 @@ function PlatformLandingPage() {
                     </li>
                   ))}
                 </ul>
-                <a
-                  href={yearly ? plan.yearlyCheckout : plan.monthlyCheckout}
+                <Link
+                  href="/register-tenant"
                   className={`block text-center text-sm font-semibold py-3 rounded-xl transition-all mb-3 ${
                     plan.highlighted
                       ? 'bg-white text-indigo-600 hover:bg-indigo-50'
                       : 'bg-indigo-600 text-white hover:bg-indigo-700'
                   }`}
                 >
-                  Get {plan.name} Plan
-                </a>
-                <Link
-                  href="/register-tenant"
-                  className={`block text-center text-xs font-medium py-2 rounded-xl transition-all border ${
-                    plan.highlighted
-                      ? 'border-indigo-400 text-indigo-200 hover:text-white hover:border-white'
-                      : 'border-gray-200 text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  Try free for 14 days
+                  Start Free Trial
                 </Link>
               </div>
             ))}
