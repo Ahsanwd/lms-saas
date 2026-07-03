@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Cookies from 'js-cookie';
-import api, { setAccessToken } from '@/lib/api';
+import api, { setAccessToken, clearTenantSubdomain } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth.store';
 import { Button, Input, Alert } from '@/components/ui';
 
@@ -24,9 +24,21 @@ function RegisterPage() {
   const [done,       setDone]       = useState(false);
 
   useEffect(() => {
+    const host = window.location.hostname;
+    const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'coursel.space';
+    const onSubdomain = host !== rootDomain && host !== `www.${rootDomain}` && host.endsWith(`.${rootDomain}`);
+
+    // Not actually on a tenant subdomain — ignore any stale/leaked lms_tenant
+    // cookie (e.g. from before subdomain cookies were host-only scoped) and
+    // send to school creation instead
+    if (!onSubdomain) {
+      clearTenantSubdomain();
+      router.replace('/register-tenant');
+      return;
+    }
+
     const sub = Cookies.get('lms_tenant');
     if (!sub) {
-      // Not on a tenant subdomain — send to school creation instead
       router.replace('/register-tenant');
       return;
     }
