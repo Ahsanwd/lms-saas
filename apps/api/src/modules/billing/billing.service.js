@@ -352,15 +352,18 @@ async function createLsCheckout(tenantId, { planSlug, billingCycle }) {
   const tenant = await tenantRepo.findById(tenantId);
   if (!tenant) throw new AppError('Tenant not found', 404);
 
-  const appUrl = process.env.APP_URL || 'http://localhost:3000';
+  const rootDomain = process.env.ROOT_DOMAIN || 'coursel.space';
+  const tenantUrl  = tenant.subdomain
+    ? `https://${tenant.subdomain}.${rootDomain}`
+    : (process.env.APP_URL || 'http://localhost:3000');
   const checkoutUrl = await createCheckout({
     variantId,
     tenantId,
     email:        tenant.contactEmail,
     name:         tenant.name,
     billingCycle,
-    successUrl:   `${appUrl}/billing?ls_success=1`,
-    cancelUrl:    `${appUrl}/billing`,
+    successUrl:   `${tenantUrl}/billing?ls_success=1`,
+    cancelUrl:    `${tenantUrl}/billing`,
   });
 
   return { checkoutUrl };
