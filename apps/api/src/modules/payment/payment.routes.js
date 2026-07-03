@@ -20,11 +20,6 @@ router.post('/courses/:courseId/trial',             ctrl.startTrial);
 router.get('/courses/:courseId/trial',              ctrl.trialStatus);
 router.post('/courses/:courseId/trial/upgrade',     ctrl.upgradeTrial);
 router.post('/:paymentId/confirm',                  ctrl.confirm);
-router.post('/:paymentId/paypal-capture',            ctrl.capturePaypal);
-
-// PayPal subscriptions (membership billing)
-router.post('/paypal/subscription',                        ctrl.initiatePaypalSubscription);
-router.delete('/paypal/subscription/:subscriptionId',      ctrl.cancelPaypalSubscription);
 
 // Admin
 router.get('/courses/:courseId',                    requirePermission('course:manage'), ctrl.coursePayments);

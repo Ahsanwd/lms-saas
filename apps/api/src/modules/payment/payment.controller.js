@@ -20,15 +20,6 @@ async function confirm(req, res, next) {
   } catch (err) { next(err); }
 }
 
-async function capturePaypal(req, res, next) {
-  try {
-    const result = await svc.capturePaypalPayment(
-      req.tenant.tenantId, req.params.paymentId, req.user.sub
-    );
-    R.success(res, result, 'PayPal payment captured — enrollment created');
-  } catch (err) { next(err); }
-}
-
 async function refund(req, res, next) {
   try {
     const payment = await svc.refundPayment(
@@ -109,30 +100,9 @@ async function receiptPdf(req, res, next) {
   } catch (err) { next(err); }
 }
 
-async function initiatePaypalSubscription(req, res, next) {
-  try {
-    const result = await svc.initiatePaypalSubscription(
-      req.tenant.tenantId, req.user.sub, req.body
-    );
-    R.success(res, result, 'PayPal subscription initiated — redirect user to approveUrl');
-  } catch (err) { next(err); }
-}
-
-async function cancelPaypalSubscription(req, res, next) {
-  try {
-    await svc.cancelPaypalSubscription(
-      req.tenant.tenantId, req.user.sub,
-      req.params.subscriptionId,
-      req.body.reason
-    );
-    R.success(res, null, 'PayPal subscription cancelled');
-  } catch (err) { next(err); }
-}
-
 module.exports = {
-  initiate, confirm, capturePaypal, refund, myPayments, coursePayments,
+  initiate, confirm, refund, myPayments, coursePayments,
   startTrial, upgradeTrial, trialStatus,
   listMethods, setupIntent, deleteMethod,
   receiptPdf,
-  initiatePaypalSubscription, cancelPaypalSubscription,
 };

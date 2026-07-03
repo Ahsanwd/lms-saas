@@ -127,13 +127,6 @@ app.post(
   require('./modules/webhook/stripe.webhook').handleWebhook
 );
 
-// PayPal webhook — also needs raw body for signature verification
-app.post(
-  '/api/paypal/webhook',
-  express.raw({ type: 'application/json' }),
-  require('./modules/webhook/paypal.webhook').handleWebhook
-);
-
 // Lemon Squeezy webhook — raw body required for HMAC-SHA256 signature verification
 app.post(
   '/api/ls/webhook',

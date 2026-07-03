@@ -273,7 +273,7 @@ const features = [
   {
     icon: '💳',
     title: 'Built-in Payments',
-    desc: 'Accept course payments via Stripe or PayPal. Set your own prices, run coupons, and issue refunds.',
+    desc: 'Accept course payments via Stripe. Set your own prices, run coupons, and issue refunds.',
   },
   {
     icon: '📊',
@@ -309,7 +309,7 @@ const plans = [
       '3 instructors',
       '10 courses',
       '10 GB storage',
-      'Course payments (Stripe + PayPal)',
+      'Course payments (Stripe)',
       'Quizzes & Assignments',
       'Email notifications',
       'Community forum',

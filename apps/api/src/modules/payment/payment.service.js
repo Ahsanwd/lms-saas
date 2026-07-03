@@ -5,7 +5,6 @@ const Enrollment                  = require('../../database/models/Enrollment.mo
 const User                        = require('../../database/models/User.model');
 const AppError                    = require('../../utils/AppError');
 const { getStripe, createOrGetCustomer } = require('../../services/stripe/stripe');
-const paypalSvc                   = require('../../services/paypal/paypal');
 const tenantRepo                  = require('../../database/repositories/tenant.repository');
 
 // ─── Provider helpers ─────────────────────────────────────────────────────────
@@ -76,11 +75,8 @@ function calcExpiresAt(days) {
 }
 
 // ─── Initiate payment ─────────────────────────────────────────────────────────
-// provider: 'stripe' (default) | 'paypal'
-// Returns different fields per provider:
-//   stripe  → { paymentId, clientSecret, stripeAccountId, amount, currency, courseName }
-//   paypal  → { paymentId, paypalOrderId, amount, currency, courseName }
-async function initiatePayment(tenantId, courseId, userId, { couponCode, provider = 'stripe' } = {}) {
+// Returns { paymentId, clientSecret, stripeAccountId, amount, currency, courseName }
+async function initiatePayment(tenantId, courseId, userId, { couponCode } = {}) {
   const [course, tenant, user] = await Promise.all([
     Course.findOne({ _id: courseId, tenantId, deletedAt: null }),
     tenantRepo.findById(tenantId),
@@ -112,35 +108,7 @@ async function initiatePayment(tenantId, courseId, userId, { couponCode, provide
     }
   }
 
-  // ── PayPal branch ──────────────────────────────────────────────────────────
-  if (provider === 'paypal') {
-    const order = await paypalSvc.createOrder(
-      finalAmount, currency,
-      `${courseId}_${userId}`
-    );
-    const resolvedProvider = paypalSvc.isConfigured() ? 'paypal' : 'mock';
-    const payment = await CoursePayment.create({
-      tenantId, courseId, userId,
-      amount:        finalAmount,
-      currency,
-      discountAmount,
-      couponCode:    appliedCoupon,
-      paypalOrderId: order.id,
-      provider:      resolvedProvider,
-      receiptNumber: receiptNumber(),
-      status:        'pending',
-    });
-    return {
-      paymentId:    payment._id,
-      paypalOrderId: order.id,
-      amount:       finalAmount / 100,
-      currency,
-      courseName:   course.title,
-      provider:     resolvedProvider,
-    };
-  }
-
-  // ── Stripe branch (default) ───────────────────────────────────────────────
+  // ── Stripe ─────────────────────────────────────────────────────────────────
   let stripeAccountId = null;
   try {
     const connectSvc = require('../stripeConnect/stripeConnect.service');
@@ -264,8 +232,7 @@ async function refundPayment(tenantId, paymentId, actingUserId, { reason = '', a
   const isPartial   = refundCents !== null && refundCents < payment.amount;
 
   if (payment.provider === 'paypal') {
-    if (!payment.paypalCaptureId) throw new AppError('PayPal capture ID missing — refund must be processed manually in PayPal dashboard', 400);
-    await paypalSvc.refundCapture(payment.paypalCaptureId, refundCents || 0, payment.currency);
+    throw new AppError('This was a PayPal payment — PayPal is no longer integrated. Process the refund manually in the PayPal dashboard.', 400);
   } else {
     await providerRefund(payment.paymentIntentId, payment.stripeAccountId, refundCents);
   }
@@ -290,28 +257,6 @@ async function refundPayment(tenantId, paymentId, actingUserId, { reason = '', a
   await Course.updateOne({ _id: payment.courseId, tenantId }, { $inc: { enrollmentCount: -1 } });
 
   return payment;
-}
-
-// ─── PayPal capture (step 2 — called after buyer approves on PayPal) ─────────
-async function capturePaypalPayment(tenantId, paymentId, userId) {
-  const payment = await CoursePayment.findOne({ _id: paymentId, tenantId, userId, status: 'pending' });
-  if (!payment) throw new AppError('Payment not found or already processed', 404);
-  if (!payment.paypalOrderId) throw new AppError('Not a PayPal payment', 400);
-
-  if (payment.provider === 'paypal') {
-    const capture = await paypalSvc.captureOrder(payment.paypalOrderId);
-    const captureObj = capture.purchase_units?.[0]?.payments?.captures?.[0];
-    if (capture.status !== 'COMPLETED' && captureObj?.status !== 'COMPLETED') {
-      throw new AppError(`PayPal capture not completed: ${capture.status}`, 402, 'PAYMENT_FAILED');
-    }
-    // Store capture ID so refunds can target the specific capture resource
-    if (captureObj?.id) {
-      payment.paypalCaptureId = captureObj.id;
-    }
-  }
-  // mock provider — no real capture needed
-
-  return _activatePayment(payment);
 }
 
 // ─── History ──────────────────────────────────────────────────────────────────
@@ -478,40 +423,9 @@ async function generateReceiptPdf(tenantId, paymentId, userId, res) {
   doc.end();
 }
 
-// ─── PayPal subscription (tenant membership billing) ─────────────────────────
-// Creates a PayPal billing plan + subscription for a tenant plan upgrade.
-// Returns { subscriptionId, approveUrl } — frontend redirects user to approveUrl.
-async function initiatePaypalSubscription(tenantId, userId, { planName, amountCents, currency = 'usd', billingCycle = 'monthly' } = {}) {
-  const user = await User.findOne({ _id: userId, tenantId, deletedAt: null });
-  if (!user) throw new AppError('User not found', 404);
-
-  const intervalUnit = billingCycle === 'yearly' ? 'YEAR' : 'MONTH';
-  const plan = await paypalSvc.createBillingPlan(planName, amountCents, currency, intervalUnit);
-
-  const subscriberName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
-  const subscription   = await paypalSvc.createSubscription(plan.id, user.email, subscriberName);
-
-  const approveLink = subscription.links?.find(l => l.rel === 'approve');
-  return {
-    subscriptionId: subscription.id,
-    paypalPlanId:   plan.id,
-    approveUrl:     approveLink?.href ?? null,
-    status:         subscription.status,
-  };
-}
-
-async function cancelPaypalSubscription(tenantId, userId, subscriptionId, reason = '') {
-  // Verify the user belongs to this tenant before cancelling
-  const user = await User.findOne({ _id: userId, tenantId, deletedAt: null });
-  if (!user) throw new AppError('User not found', 404);
-  return paypalSvc.cancelSubscription(subscriptionId, reason || 'Cancelled by user');
-}
-
 module.exports = {
   initiatePayment, confirmPayment, confirmPaymentByIntentId,
-  capturePaypalPayment,
   refundPayment, getMyPayments, getCoursePayments,
   getPaymentMethods, createSetupIntent, deletePaymentMethod,
   generateReceiptPdf,
-  initiatePaypalSubscription, cancelPaypalSubscription,
 };

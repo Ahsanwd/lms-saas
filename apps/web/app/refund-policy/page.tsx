@@ -36,7 +36,7 @@ export default function RefundPolicyPage() {
           <li>Each school sets its own refund window for course purchases (30 days by default, configurable by the school).</li>
           <li>To request a refund for a course, students should use the refund request option on the course/payment within their school's portal.</li>
           <li>The school's admin reviews each refund request and may approve it in full, approve it partially, or decline it.</li>
-          <li>Approved refunds are processed back to the original payment method through the payment provider used at checkout (Stripe or PayPal).</li>
+          <li>Approved refunds are processed back to the original payment method through the payment provider used at checkout (Stripe).</li>
         </ul>
       </section>
 

@@ -45,7 +45,7 @@ async function seed() {
         '3 instructors',
         '10 courses',
         '10 GB storage',
-        'Course payments (Stripe + PayPal)',
+        'Course payments (Stripe)',
         'Quizzes & Assignments',
         'Email notifications',
         'Community forum',

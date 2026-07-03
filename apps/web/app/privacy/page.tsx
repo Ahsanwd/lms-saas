@@ -19,7 +19,7 @@ export default function PrivacyPolicyPage() {
         <ul>
           <li><strong>Account information:</strong> name, email address, and password (hashed) when you or a Tenant registers.</li>
           <li><strong>Tenant data:</strong> school name, branding, course content, and student records, owned and controlled by each Tenant.</li>
-          <li><strong>Billing information:</strong> processed by our payment partners (Lemon Squeezy for subscriptions, Stripe and PayPal for course purchases). We do not store full card numbers.</li>
+          <li><strong>Billing information:</strong> processed by our payment partners (Lemon Squeezy for subscriptions, Stripe for course purchases). We do not store full card numbers.</li>
           <li><strong>Usage data:</strong> log data, device/browser information, and analytics collected to operate and improve the platform.</li>
           <li><strong>Cookies:</strong> used for authentication sessions and to remember tenant context (subdomain).</li>
         </ul>
@@ -50,7 +50,7 @@ export default function PrivacyPolicyPage() {
         <p>We share data with the following service providers only as needed to operate the platform:</p>
         <ul>
           <li><strong>Lemon Squeezy</strong> — subscription billing and payment processing.</li>
-          <li><strong>Stripe / PayPal</strong> — course payment processing (per-tenant, where enabled).</li>
+          <li><strong>Stripe</strong> — course payment processing (per-tenant, where enabled).</li>
           <li><strong>Cloudflare</strong> — content delivery, file storage, and video streaming.</li>
           <li><strong>Brevo</strong> — transactional email delivery.</li>
           <li><strong>MongoDB Atlas</strong> — database hosting.</li>

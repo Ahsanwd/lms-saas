@@ -13,7 +13,6 @@ import { loadStripe } from '@stripe/stripe-js';
 import { toast } from 'sonner';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { getStripePromise } from '@/lib/stripe';
-import { PayPalScriptProvider, PayPalButtons, usePayPalScriptReducer } from '@paypal/react-paypal-js';
 import { SmartContent } from '@/components/ui/SmartContent';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -4240,98 +4239,6 @@ function StripeCardForm({
   );
 }
 
-// ─── PayPal Form ──────────────────────────────────────────────────────────────
-
-// Inner component — must be rendered inside a PayPalScriptProvider.
-function PayPalButtonsInner({
-  paymentId,
-  paypalOrderId,
-  onSuccess,
-  onError,
-}: {
-  paymentId: string | null;
-  paypalOrderId: string | null;
-  onSuccess: () => void;
-  onError: (msg: string) => void;
-}) {
-  const [{ isPending }] = usePayPalScriptReducer();
-
-  if (isPending) {
-    return <div className="flex justify-center py-4"><Spinner /></div>;
-  }
-
-  return (
-    <PayPalButtons
-      style={{ layout: 'vertical', color: 'gold', shape: 'rect', label: 'pay', height: 45 }}
-      createOrder={() => {
-        if (!paypalOrderId) return Promise.reject(new Error('No PayPal order'));
-        return Promise.resolve(paypalOrderId);
-      }}
-      onApprove={async () => {
-        try {
-          await api.post(`/payments/${paymentId}/paypal-capture`);
-          onSuccess();
-        } catch (e: unknown) {
-          onError((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'PayPal capture failed');
-        }
-      }}
-      onError={(err) => {
-        onError((err as { message?: string })?.message ?? 'PayPal encountered an error');
-      }}
-      onCancel={() => onError('Payment cancelled')}
-    />
-  );
-}
-
-// Outer wrapper — loads the PayPal SDK lazily only when this component mounts
-// (i.e. only when the user selects PayPal as payment method).
-function PayPalForm({
-  paymentId,
-  paypalOrderId,
-  onSuccess,
-  onError,
-}: {
-  paymentId: string | null;
-  paypalOrderId: string | null;
-  onSuccess: () => void;
-  onError: (msg: string) => void;
-}) {
-  const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
-
-  // Mock mode — no PayPal client ID configured
-  if (!clientId) {
-    return (
-      <button
-        className="w-full py-3 rounded-xl bg-[#FFC439] hover:bg-[#f0b429] text-[#003087] font-bold text-sm transition-colors flex items-center justify-center gap-2"
-        onClick={async () => {
-          try {
-            await api.post(`/payments/${paymentId}/paypal-capture`);
-            onSuccess();
-          } catch (e: unknown) {
-            onError((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'PayPal payment failed');
-          }
-        }}
-      >
-        <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor"><path d="M7.076 21.337H2.47a.641.641 0 01-.633-.74L4.944.901C5.026.382 5.474 0 5.998 0h7.46c2.57 0 4.578.543 5.69 1.81 1.01 1.15 1.304 2.42 1.012 4.287-.023.143-.047.288-.077.437-.983 5.05-4.349 6.797-8.647 6.797h-2.19c-.524 0-.968.382-1.05.9l-1.12 7.106zm14.146-14.42a3.35 3.35 0 00-.607-.541c-.013.076-.026.175-.041.254-.93 4.778-4.005 7.201-9.138 7.201h-2.19a.563.563 0 00-.556.479l-1.187 7.527h-.506l-.24 1.516a.56.56 0 00.554.647h3.882c.46 0 .85-.334.922-.788.06-.26.76-4.852.816-5.09a.932.932 0 01.923-.788h.58c3.76 0 6.705-1.528 7.565-5.946.36-1.847.174-3.388-.777-4.471z"/></svg>
-        Pay with PayPal (mock)
-      </button>
-    );
-  }
-
-  // Real mode — PayPalScriptProvider mounts here, so the SDK script tag is only
-  // injected when the user reaches the PayPal payment step.
-  return (
-    <PayPalScriptProvider options={{ clientId, currency: 'USD', intent: 'capture' }}>
-      <PayPalButtonsInner
-        paymentId={paymentId}
-        paypalOrderId={paypalOrderId}
-        onSuccess={onSuccess}
-        onError={onError}
-      />
-    </PayPalScriptProvider>
-  );
-}
-
 // ─── Student View ─────────────────────────────────────────────────────────────
 
 function StudentView() {
@@ -4361,12 +4268,10 @@ function StudentView() {
 
   // ── Payment modal state ───────────────────────────────────────────────────────
   const [showPayment, setShowPayment]           = useState(false);
-  const [paymentStep, setPaymentStep]           = useState<'method' | 'card' | 'paypal' | 'done'>('method');
+  const [paymentStep, setPaymentStep]           = useState<'method' | 'card' | 'done'>('method');
   const [paymentId, setPaymentId]               = useState<string | null>(null);
   const [clientSecret, setClientSecret]         = useState<string | null>(null);
   const [stripeAccountId, setStripeAccountId]   = useState<string | null>(null);
-  const [paypalOrderId, setPaypalOrderId]       = useState<string | null>(null);
-  const [paypalError, setPaypalError]           = useState('');
 
   const { data: course, isLoading } = useQuery({
     queryKey: ['course', courseId],
@@ -4453,22 +4358,15 @@ function StudentView() {
 
   // ── Payment mutations ─────────────────────────────────────────────────────────
   const initPaymentMutation = useMutation({
-    mutationFn: (provider: 'stripe' | 'paypal') => api.post(`/payments/courses/${courseId}/initiate`, {
+    mutationFn: () => api.post(`/payments/courses/${courseId}/initiate`, {
       couponCode: appliedCoupon?.code ?? undefined,
-      provider,
     }),
-    onSuccess: (res, provider) => {
+    onSuccess: (res) => {
       const d = res.data.data;
       setPaymentId(d.paymentId);
-      if (provider === 'paypal') {
-        setPaypalOrderId(d.paypalOrderId ?? null);
-        setPaypalError('');
-        setPaymentStep('paypal');
-      } else {
-        setClientSecret(d.clientSecret ?? null);
-        setStripeAccountId(d.stripeAccountId ?? null);
-        setPaymentStep('card');
-      }
+      setClientSecret(d.clientSecret ?? null);
+      setStripeAccountId(d.stripeAccountId ?? null);
+      setPaymentStep('card');
       setShowPayment(true);
     },
     onError: (err: AxiosError<{ message: string }>) => {
@@ -4643,7 +4541,7 @@ function StudentView() {
 
             <div className="space-y-3">
               <button
-                onClick={() => initPaymentMutation.mutate('stripe')}
+                onClick={() => initPaymentMutation.mutate()}
                 disabled={initPaymentMutation.isPending}
                 className="w-full py-3.5 rounded-xl border-2 border-gray-200 hover:border-primary-400 bg-white flex items-center gap-4 px-4 transition-all disabled:opacity-50"
               >
@@ -4658,25 +4556,6 @@ function StudentView() {
                 <div className="text-left flex-1">
                   <p className="text-sm font-semibold text-gray-900">Credit / Debit Card</p>
                   <p className="text-xs text-gray-400">Visa, Mastercard, Amex</p>
-                </div>
-                <svg className="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/>
-                </svg>
-              </button>
-
-              <button
-                onClick={() => initPaymentMutation.mutate('paypal')}
-                disabled={initPaymentMutation.isPending}
-                className="w-full py-3.5 rounded-xl border-2 border-gray-200 hover:border-[#FFC439] bg-white flex items-center gap-4 px-4 transition-all disabled:opacity-50"
-              >
-                <div className="w-10 h-7 bg-[#003087] rounded flex items-center justify-center flex-shrink-0">
-                  <svg viewBox="0 0 24 24" className="w-5 h-5 text-[#009cde]" fill="currentColor">
-                    <path d="M7.076 21.337H2.47a.641.641 0 01-.633-.74L4.944.901C5.026.382 5.474 0 5.998 0h7.46c2.57 0 4.578.543 5.69 1.81 1.01 1.15 1.304 2.42 1.012 4.287-.023.143-.047.288-.077.437-.983 5.05-4.349 6.797-8.647 6.797h-2.19c-.524 0-.968.382-1.05.9l-1.12 7.106zm14.146-14.42a3.35 3.35 0 00-.607-.541c-.013.076-.026.175-.041.254-.93 4.778-4.005 7.201-9.138 7.201h-2.19a.563.563 0 00-.556.479l-1.187 7.527h-.506l-.24 1.516a.56.56 0 00.554.647h3.882c.46 0 .85-.334.922-.788.06-.26.76-4.852.816-5.09a.932.932 0 01.923-.788h.58c3.76 0 6.705-1.528 7.565-5.946.36-1.847.174-3.388-.777-4.471z"/>
-                  </svg>
-                </div>
-                <div className="text-left flex-1">
-                  <p className="text-sm font-semibold text-gray-900">PayPal</p>
-                  <p className="text-xs text-gray-400">Pay with your PayPal account</p>
                 </div>
                 <svg className="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/>
@@ -4727,39 +4606,6 @@ function StudentView() {
                 onSuccess={onPaymentSuccess}
               />
             </Elements>
-          </>
-        )}
-
-        {/* ── PayPal step ── */}
-        {paymentStep === 'paypal' && (
-          <>
-            <div className="flex items-center gap-3">
-              <button onClick={() => setPaymentStep('method')} className="text-gray-400 hover:text-gray-600">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
-                </svg>
-              </button>
-              <h2 className="text-lg font-semibold text-gray-900 flex-1">Pay with PayPal</h2>
-              <button onClick={() => setShowPayment(false)} className="text-gray-400 hover:text-gray-600">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
-                </svg>
-              </button>
-            </div>
-
-            <div className="bg-gray-50 rounded-xl px-4 py-3 flex items-center justify-between">
-              <span className="text-sm text-gray-600 truncate">{course.title}</span>
-              <span className="text-base font-bold text-gray-900 ml-3 flex-shrink-0">${displayPrice.toFixed(2)}</span>
-            </div>
-
-            {paypalError && <p className="text-sm text-red-600">{paypalError}</p>}
-
-            <PayPalForm
-              paymentId={paymentId}
-              paypalOrderId={paypalOrderId}
-              onSuccess={onPaymentSuccess}
-              onError={(msg) => setPaypalError(msg)}
-            />
           </>
         )}
 

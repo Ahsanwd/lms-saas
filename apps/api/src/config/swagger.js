@@ -319,7 +319,7 @@ Errors:
       { name: 'Search',        description: 'Global search' },
       { name: 'Chat',          description: 'Direct messaging' },
       { name: 'Forum',         description: 'Course discussion forums' },
-      { name: 'Payments',      description: 'Stripe / PayPal payment initiation' },
+      { name: 'Payments',      description: 'Stripe payment initiation' },
       { name: 'Billing',       description: 'Subscription plans and invoices' },
     ],
   },
