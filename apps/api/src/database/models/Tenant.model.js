@@ -94,6 +94,26 @@ const tenantSchema = new mongoose.Schema(
       },
     },
 
+    // Bring-your-own payment gateway for course purchases (tenant is paid directly, platform takes no cut)
+    paymentGateway: {
+      activeProvider: { type: String, enum: ['stripe', 'safepay', null], default: null },
+
+      stripe: {
+        secretKeyEncrypted: { type: String,  default: null, select: false }, // AES-256 encrypted
+        publishableKey:     { type: String,  default: null }, // safe to expose to frontend
+        verified:           { type: Boolean, default: false },
+        verifiedAt:         { type: Date,    default: null },
+      },
+
+      safepay: {
+        apiKey:             { type: String,  default: null }, // merchant_api_key
+        secretKeyEncrypted: { type: String,  default: null, select: false }, // AES-256 encrypted
+        environment:        { type: String,  enum: ['sandbox', 'production'], default: 'sandbox' },
+        verified:           { type: Boolean, default: false },
+        verifiedAt:         { type: Date,    default: null },
+      },
+    },
+
     // Per-tenant Bunny.net Stream integration
     bunnyStream: {
       enabled:         { type: Boolean, default: false },

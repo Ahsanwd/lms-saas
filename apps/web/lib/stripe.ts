@@ -8,3 +8,15 @@ export function getStripePromise(): Promise<Stripe | null> {
   if (!stripePromise) stripePromise = loadStripe(key);
   return stripePromise;
 }
+
+// Each tenant brings their own Stripe publishable key (BYO gateway) — cache one
+// promise per key so switching between tenants/courses doesn't reload the SDK.
+const tenantStripePromises = new Map<string, Promise<Stripe | null>>();
+
+export function loadStripeWithKey(publishableKey: string | null | undefined): Promise<Stripe | null> {
+  if (!publishableKey) return Promise.resolve(null);
+  if (!tenantStripePromises.has(publishableKey)) {
+    tenantStripePromises.set(publishableKey, loadStripe(publishableKey));
+  }
+  return tenantStripePromises.get(publishableKey)!;
+}

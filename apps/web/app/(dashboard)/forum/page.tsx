@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { Button, Spinner } from '@/components/ui';
 import { cn } from '@/lib/utils';
@@ -24,6 +24,17 @@ interface AdminThread {
   courseId: { _id: string; title: string } | null;
 }
 
+interface FlaggedReply {
+  _id: string;
+  body: string;
+  authorName: string;
+  authorRole: 'student' | 'instructor' | 'tenant_admin';
+  flagCount: number;
+  createdAt: string;
+  courseId: { _id: string; title: string } | null;
+  threadId: { _id: string; title: string } | null;
+}
+
 function timeAgo(iso: string) {
   const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
   if (s < 60)    return 'just now';
@@ -34,10 +45,13 @@ function timeAgo(iso: string) {
 
 export default function ForumAdminPage() {
   const router = useRouter();
+  const qc = useQueryClient();
+  const [tab, setTab]           = useState<'threads' | 'flaggedReplies'>('threads');
   const [page, setPage]         = useState(1);
   const [courseFilter, setCourseFilter] = useState('');
   const [search, setSearch]     = useState('');
   const [searchInput, setSearchInput] = useState('');
+  const [repliesPage, setRepliesPage] = useState(1);
 
   const { data, isLoading, isError } = useQuery<{
     threads: AdminThread[];
@@ -51,6 +65,29 @@ export default function ForumAdminPage() {
       return data.data;
     },
   });
+
+  const { data: flaggedData, isLoading: flaggedLoading, isError: flaggedIsError } = useQuery<{
+    replies: FlaggedReply[];
+    pagination: { replies: { page: number; pages: number; total: number } };
+  }>({
+    queryKey: ['forum-admin-flagged-replies', repliesPage],
+    queryFn: async () => {
+      const { data } = await api.get(`/forum/admin/flagged?page=${repliesPage}&limit=20`);
+      return data.data;
+    },
+  });
+
+  const clearReplyFlagsMut = useMutation({
+    mutationFn: (replyId: string) => api.delete(`/forum/replies/${replyId}/flags`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['forum-admin-flagged-replies'] }),
+  });
+
+  const deleteReplyMut = useMutation({
+    mutationFn: (replyId: string) => api.delete(`/forum/replies/${replyId}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['forum-admin-flagged-replies'] }),
+  });
+
+  const flaggedReplies = flaggedData?.replies ?? [];
 
   // Derive unique courses from loaded threads for the filter dropdown
   const courseOptions = Array.from(
@@ -87,6 +124,27 @@ export default function ForumAdminPage() {
         )}
       </div>
 
+      {/* ── Tab switcher ── */}
+      <div className="flex gap-2 border-b border-gray-200">
+        <button onClick={() => setTab('threads')}
+          className={cn('px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors',
+            tab === 'threads' ? 'border-primary-600 text-primary-700' : 'border-transparent text-gray-500 hover:text-gray-700')}>
+          Threads
+        </button>
+        <button onClick={() => setTab('flaggedReplies')}
+          className={cn('px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors',
+            tab === 'flaggedReplies' ? 'border-primary-600 text-primary-700' : 'border-transparent text-gray-500 hover:text-gray-700')}>
+          Flagged Replies
+          {(flaggedData?.pagination.replies.total ?? 0) > 0 && (
+            <span className="ml-1.5 text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-bold">
+              {flaggedData!.pagination.replies.total}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {tab === 'threads' && (
+      <>
       {/* ── Filters ── */}
       <div className="flex flex-wrap gap-3">
         {/* Search */}
@@ -256,6 +314,97 @@ export default function ForumAdminPage() {
           <span className="text-sm text-gray-500">{page} / {data.pagination.pages}</span>
           <Button size="sm" variant="outline" disabled={page >= data.pagination.pages} onClick={() => setPage(p => p + 1)}>Next →</Button>
         </div>
+      )}
+      </>
+      )}
+
+      {/* ── Flagged Replies tab ── */}
+      {tab === 'flaggedReplies' && (
+        <>
+          {flaggedLoading ? (
+            <div className="flex justify-center py-20"><Spinner size="lg" /></div>
+          ) : flaggedIsError ? (
+            <div className="text-center py-12 bg-red-50 rounded-2xl border border-red-100">
+              <p className="text-sm text-red-500 font-medium">Failed to load flagged replies. Please try again.</p>
+            </div>
+          ) : flaggedReplies.length === 0 ? (
+            <div className="text-center py-20 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+              <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <p className="text-base font-semibold text-gray-700 mb-1">No flagged replies</p>
+              <p className="text-sm text-gray-400">Nothing needs moderation right now.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {flaggedReplies.map(reply => (
+                <div key={reply._id} className="bg-white border border-red-100 rounded-xl p-4">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="min-w-0">
+                      {reply.courseId && (
+                        <p className="text-[10px] font-semibold text-primary-600 uppercase tracking-wide mb-0.5">
+                          {reply.courseId.title}
+                        </p>
+                      )}
+                      {reply.threadId && (
+                        <p className="text-xs text-gray-400 truncate">on: {reply.threadId.title}</p>
+                      )}
+                    </div>
+                    <span className="flex-shrink-0 text-[10px] bg-red-50 text-red-600 border border-red-200 px-1.5 py-0.5 rounded font-medium whitespace-nowrap">
+                      🚩 {reply.flagCount} flag{reply.flagCount !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+
+                  <p className="text-sm text-gray-700 line-clamp-3 mb-3 leading-relaxed">{reply.body}</p>
+
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-3 text-[11px] text-gray-400">
+                      <span className={cn('font-semibold', reply.authorRole !== 'student' ? 'text-primary-600' : 'text-gray-600')}>
+                        {reply.authorName}
+                      </span>
+                      <span>{timeAgo(reply.createdAt)}</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs">
+                      {reply.courseId && reply.threadId && (
+                        <button
+                          onClick={() => router.push(`/courses/${reply.courseId!._id}/forum/${reply.threadId!._id}`)}
+                          className="text-primary-600 hover:text-primary-700 font-semibold transition-colors"
+                        >
+                          View in thread
+                        </button>
+                      )}
+                      <button
+                        onClick={() => clearReplyFlagsMut.mutate(reply._id)}
+                        disabled={clearReplyFlagsMut.isPending}
+                        className="text-gray-400 hover:text-gray-600 font-medium transition-colors"
+                      >
+                        Dismiss
+                      </button>
+                      <button
+                        onClick={() => deleteReplyMut.mutate(reply._id)}
+                        disabled={deleteReplyMut.isPending}
+                        className="text-red-500 hover:text-red-700 font-semibold transition-colors"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ── Pagination ── */}
+          {flaggedData?.pagination.replies && flaggedData.pagination.replies.pages > 1 && (
+            <div className="flex items-center justify-center gap-3 pt-2">
+              <Button size="sm" variant="outline" disabled={repliesPage === 1} onClick={() => setRepliesPage(p => p - 1)}>← Previous</Button>
+              <span className="text-sm text-gray-500">{repliesPage} / {flaggedData.pagination.replies.pages}</span>
+              <Button size="sm" variant="outline" disabled={repliesPage >= flaggedData.pagination.replies.pages} onClick={() => setRepliesPage(p => p + 1)}>Next →</Button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

@@ -48,7 +48,6 @@ router.use('/forum',                  require('../modules/forum/forum.routes'));
 router.use('/push',                   require('../modules/push/push.routes'));
 router.use('/live',                   require('../modules/live/live.routes'));
 router.use('/zoom',                   require('../modules/zoom/zoom.routes'));
-router.use('/stripe-connect',         require('../modules/stripeConnect/stripeConnect.routes'));
 router.use('/membership',             require('../modules/membership/membership.routes'));
 router.use('/refund-requests',        require('../modules/refundRequest/refundRequest.routes'));
 router.use('/analytics',              require('../modules/analytics/analytics.routes'));

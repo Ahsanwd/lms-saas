@@ -158,12 +158,18 @@ class ForumRepository {
 
   listFlaggedContent(tenantId, { page = 1, limit = 20 } = {}) {
     const skip = (Number(page) - 1) * Number(limit);
-    const threadQ = ForumThread.find({ tenantId, deletedAt: null, 'flags.0': { $exists: true } })
+    const filter = { tenantId, deletedAt: null, 'flags.0': { $exists: true } };
+
+    const threadQ = ForumThread.find(filter)
       .sort({ createdAt: -1 }).skip(skip).limit(limit)
       .populate('courseId', 'title').select('-likes -subscribers');
-    const replyQ = ForumReply.find({ tenantId, deletedAt: null, 'flags.0': { $exists: true } })
-      .sort({ createdAt: -1 }).skip(skip).limit(limit);
-    return Promise.all([threadQ, replyQ]);
+    const replyQ = ForumReply.find(filter)
+      .sort({ createdAt: -1 }).skip(skip).limit(limit)
+      .populate('courseId', 'title').populate('threadId', 'title');
+    const threadCount = ForumThread.countDocuments(filter);
+    const replyCount  = ForumReply.countDocuments(filter);
+
+    return Promise.all([threadQ, replyQ, threadCount, replyCount]);
   }
 }
 

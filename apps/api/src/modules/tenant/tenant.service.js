@@ -3,6 +3,7 @@ const planRepo   = require('../../database/repositories/plan.repository');
 const AppError   = require('../../utils/AppError');
 const { encrypt, decrypt } = require('../../utils/crypto');
 const { testSmtpConnection } = require('../../services/email/email.service');
+const { getTenantStripeClient } = require('../../services/stripe/stripe');
 const Tenant = require('../../database/models/Tenant.model');
 
 // ─── Get Own Tenant ───────────────────────────────────────────────────────────
@@ -205,6 +206,144 @@ async function testEmailSmtp(tenantId, { host, port, secure, user, password, fro
   return { verified: true, message: `Test email sent to ${toEmail}` };
 }
 
+// ─── Get Payment Gateway Settings (secrets masked) ────────────────────────────
+async function getPaymentGatewaySettings(tenantId) {
+  const tenant = await Tenant.findById(tenantId)
+    .select('paymentGateway +paymentGateway.stripe.secretKeyEncrypted +paymentGateway.safepay.secretKeyEncrypted')
+    .lean();
+  if (!tenant) throw new AppError('Tenant not found', 404);
+
+  const pg      = tenant.paymentGateway || {};
+  const stripe  = pg.stripe  || {};
+  const safepay = pg.safepay || {};
+
+  return {
+    activeProvider: pg.activeProvider || null,
+    stripe: {
+      hasSecretKey:   !!stripe.secretKeyEncrypted,
+      publishableKey: stripe.publishableKey || null,
+      verified:       stripe.verified || false,
+      verifiedAt:     stripe.verifiedAt || null,
+    },
+    safepay: {
+      apiKey:       safepay.apiKey || null,
+      hasSecretKey: !!safepay.secretKeyEncrypted,
+      environment:  safepay.environment || 'sandbox',
+      verified:     safepay.verified || false,
+      verifiedAt:   safepay.verifiedAt || null,
+    },
+  };
+}
+
+// ─── Save Stripe Gateway ───────────────────────────────────────────────────────
+async function saveStripeGateway(tenantId, { secretKey, publishableKey }) {
+  const update = { 'paymentGateway.activeProvider': 'stripe' };
+  if (publishableKey !== undefined) update['paymentGateway.stripe.publishableKey'] = publishableKey || null;
+
+  // Only re-verify/re-encrypt if a new non-empty secret key was submitted
+  if (secretKey && secretKey.trim()) {
+    const client = getTenantStripeClient(secretKey.trim());
+    try {
+      await client.balance.retrieve();
+    } catch (err) {
+      throw new AppError(`Stripe key rejected: ${err.message}`, 422, 'STRIPE_KEY_INVALID');
+    }
+    update['paymentGateway.stripe.secretKeyEncrypted'] = encrypt(secretKey.trim());
+    update['paymentGateway.stripe.verified']   = true;
+    update['paymentGateway.stripe.verifiedAt'] = new Date();
+  }
+
+  await Tenant.findByIdAndUpdate(tenantId, { $set: update });
+  return getPaymentGatewaySettings(tenantId);
+}
+
+// ─── Save Safepay Gateway ──────────────────────────────────────────────────────
+// No live verification call here (avoids creating a stray tracker on Safepay's side) —
+// `verified` flips true the first time a real payment through this tenant confirms
+// successfully (see markSafepayVerified, called from payment.service.js).
+async function saveSafepayGateway(tenantId, { apiKey, secretKey, environment }) {
+  const update = {
+    'paymentGateway.activeProvider':      'safepay',
+    'paymentGateway.safepay.apiKey':      apiKey || null,
+    'paymentGateway.safepay.environment': environment === 'production' ? 'production' : 'sandbox',
+  };
+
+  if (secretKey && secretKey.trim()) {
+    update['paymentGateway.safepay.secretKeyEncrypted'] = encrypt(secretKey.trim());
+    update['paymentGateway.safepay.verified']   = false;
+    update['paymentGateway.safepay.verifiedAt'] = null;
+  }
+
+  await Tenant.findByIdAndUpdate(tenantId, { $set: update });
+  return getPaymentGatewaySettings(tenantId);
+}
+
+// ─── Disconnect a Gateway ───────────────────────────────────────────────────────
+async function disconnectGateway(tenantId, provider) {
+  if (!['stripe', 'safepay'].includes(provider)) throw new AppError('Invalid provider', 400);
+
+  const tenant = await Tenant.findById(tenantId).select('paymentGateway.activeProvider').lean();
+  if (!tenant) throw new AppError('Tenant not found', 404);
+
+  const update = provider === 'stripe'
+    ? {
+        'paymentGateway.stripe.secretKeyEncrypted': null,
+        'paymentGateway.stripe.publishableKey':     null,
+        'paymentGateway.stripe.verified':           false,
+        'paymentGateway.stripe.verifiedAt':         null,
+      }
+    : {
+        'paymentGateway.safepay.apiKey':             null,
+        'paymentGateway.safepay.secretKeyEncrypted': null,
+        'paymentGateway.safepay.verified':           false,
+        'paymentGateway.safepay.verifiedAt':         null,
+      };
+
+  if (tenant.paymentGateway?.activeProvider === provider) {
+    update['paymentGateway.activeProvider'] = null;
+  }
+
+  await Tenant.findByIdAndUpdate(tenantId, { $set: update });
+  return getPaymentGatewaySettings(tenantId);
+}
+
+// ─── Internal: resolve tenant's active gateway with DECRYPTED credentials ─────
+// Used only by payment.service.js server-side — never exposed over HTTP.
+async function getActiveGateway(tenantId) {
+  const tenant = await Tenant.findById(tenantId)
+    .select('paymentGateway +paymentGateway.stripe.secretKeyEncrypted +paymentGateway.safepay.secretKeyEncrypted')
+    .lean();
+  if (!tenant) return { provider: null };
+
+  const pg = tenant.paymentGateway || {};
+
+  if (pg.activeProvider === 'stripe' && pg.stripe?.secretKeyEncrypted) {
+    return {
+      provider:       'stripe',
+      secretKey:      decrypt(pg.stripe.secretKeyEncrypted),
+      publishableKey: pg.stripe.publishableKey || null,
+    };
+  }
+
+  if (pg.activeProvider === 'safepay' && pg.safepay?.secretKeyEncrypted && pg.safepay?.apiKey) {
+    return {
+      provider:    'safepay',
+      apiKey:      pg.safepay.apiKey,
+      secretKey:   decrypt(pg.safepay.secretKeyEncrypted),
+      environment: pg.safepay.environment || 'sandbox',
+    };
+  }
+
+  return { provider: null };
+}
+
+// ─── Internal: flip Safepay verified flag after the tenant's first real payment ─
+async function markSafepayVerified(tenantId) {
+  await Tenant.findByIdAndUpdate(tenantId, {
+    $set: { 'paymentGateway.safepay.verified': true, 'paymentGateway.safepay.verifiedAt': new Date() },
+  });
+}
+
 // ─── Get Feature Flags ────────────────────────────────────────────────────────
 async function getFeatureFlags(tenantId) {
   const tenant = await tenantRepo.findById(tenantId);
@@ -238,6 +377,12 @@ module.exports = {
   getEmailSettings,
   saveEmailSettings,
   testEmailSmtp,
+  getPaymentGatewaySettings,
+  saveStripeGateway,
+  saveSafepayGateway,
+  disconnectGateway,
+  getActiveGateway,
+  markSafepayVerified,
   getFeatureFlags,
   updateFeatureFlags,
 };

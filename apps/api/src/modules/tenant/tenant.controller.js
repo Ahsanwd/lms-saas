@@ -135,6 +135,34 @@ async function testEmailSmtp(req, res, next) {
   } catch (err) { next(err); }
 }
 
+async function getPaymentGateway(req, res, next) {
+  try {
+    const data = await tenantService.getPaymentGatewaySettings(req.tenant.tenantId);
+    R.success(res, data);
+  } catch (err) { next(err); }
+}
+
+async function savePaymentGatewayStripe(req, res, next) {
+  try {
+    const data = await tenantService.saveStripeGateway(req.tenant.tenantId, req.body);
+    R.success(res, data, 'Stripe gateway saved');
+  } catch (err) { next(err); }
+}
+
+async function savePaymentGatewaySafepay(req, res, next) {
+  try {
+    const data = await tenantService.saveSafepayGateway(req.tenant.tenantId, req.body);
+    R.success(res, data, 'Safepay gateway saved');
+  } catch (err) { next(err); }
+}
+
+async function disconnectPaymentGateway(req, res, next) {
+  try {
+    const data = await tenantService.disconnectGateway(req.tenant.tenantId, req.params.provider);
+    R.success(res, data, 'Payment gateway disconnected');
+  } catch (err) { next(err); }
+}
+
 // ── Cloudflare Stream — shared platform-level account (config.cloudflareStream) ─
 // Tenants no longer bring their own keys; this just reports whether the
 // platform admin has Cloudflare Stream configured via env vars.
@@ -250,6 +278,10 @@ module.exports = {
   getEmailSettings,
   saveEmailSettings,
   testEmailSmtp,
+  getPaymentGateway,
+  savePaymentGatewayStripe,
+  savePaymentGatewaySafepay,
+  disconnectPaymentGateway,
   getCfStreamStatus,
   getBunnyStreamSettings,
   saveBunnyStreamSettings,

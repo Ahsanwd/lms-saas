@@ -371,70 +371,83 @@ function ZoomSection() {
   );
 }
 
-// ─── Admin: Stripe Connect ────────────────────────────────────────────────────
+// ─── Admin: Payment Gateway (BYO — Stripe or Safepay) ─────────────────────────
 
-interface StripeConnectStatus {
-  connected: boolean;
-  stripeAccountId?: string;
-  accountEmail?: string | null;
-  chargesEnabled?: boolean;
-  payoutsEnabled?: boolean;
-  connectedAt?: string;
+interface PaymentGatewayData {
+  activeProvider: 'stripe' | 'safepay' | null;
+  stripe: { hasSecretKey: boolean; publishableKey: string | null; verified: boolean; verifiedAt: string | null };
+  safepay: { apiKey: string | null; hasSecretKey: boolean; environment: 'sandbox' | 'production'; verified: boolean; verifiedAt: string | null };
 }
 
-function StripeConnectSection() {
-  const [banner, setBanner]       = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
-  const [connecting, setConnecting] = useState(false);
+function PaymentGatewaySection() {
+  const qc = useQueryClient();
+  const [tab, setTab]       = useState<'none' | 'stripe' | 'safepay'>('none');
+  const [banner, setBanner] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
 
-  const { data, isLoading, refetch } = useQuery<StripeConnectStatus>({
-    queryKey: ['stripe-connect-status'],
-    queryFn: () => api.get('/stripe-connect/status').then(r => r.data.data.connect),
-    staleTime: 30_000,
+  const [stripeSecretKey, setStripeSecretKey]           = useState('');
+  const [stripePublishableKey, setStripePublishableKey] = useState('');
+
+  const [safepayApiKey, setSafepayApiKey]       = useState('');
+  const [safepaySecretKey, setSafepaySecretKey] = useState('');
+  const [safepayEnv, setSafepayEnv]             = useState<'sandbox' | 'production'>('sandbox');
+
+  const { data, isLoading } = useQuery<PaymentGatewayData>({
+    queryKey: ['payment-gateway'],
+    queryFn: async () => { const { data } = await api.get('/tenant/payment-gateway'); return data.data; },
   });
 
-  // Handle ?stripe=connected / ?stripe=error from the OAuth redirect
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const sp = new URLSearchParams(window.location.search);
-    const param = sp.get('stripe');
-    if (!param) return;
-    if (param === 'connected') {
-      setBanner({ type: 'success', msg: 'Stripe account connected! Students can now pay you directly.' });
-      refetch();
-    } else if (param === 'error') {
-      setBanner({ type: 'error', msg: sp.get('msg') || 'Failed to connect Stripe.' });
-    }
-    const url = new URL(window.location.href);
-    url.searchParams.delete('stripe');
-    url.searchParams.delete('msg');
-    window.history.replaceState({}, '', url.toString());
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!data) return;
+    setTab(data.activeProvider ?? 'none');
+    setStripePublishableKey(data.stripe.publishableKey || '');
+    setSafepayApiKey(data.safepay.apiKey || '');
+    setSafepayEnv(data.safepay.environment || 'sandbox');
+  }, [data]);
+
+  const saveStripeMutation = useMutation({
+    mutationFn: () => api.put('/tenant/payment-gateway/stripe', {
+      secretKey: stripeSecretKey || undefined,
+      publishableKey: stripePublishableKey,
+    }),
+    onSuccess: (res) => {
+      qc.setQueryData(['payment-gateway'], res.data.data);
+      setStripeSecretKey('');
+      setBanner({ type: 'success', msg: 'Stripe connected — key verified.' });
+    },
+    onError: (err: any) => setBanner({ type: 'error', msg: err.response?.data?.message ?? 'Failed to save Stripe key' }),
+  });
+
+  const saveSafepayMutation = useMutation({
+    mutationFn: () => api.put('/tenant/payment-gateway/safepay', {
+      apiKey: safepayApiKey,
+      secretKey: safepaySecretKey || undefined,
+      environment: safepayEnv,
+    }),
+    onSuccess: (res) => {
+      qc.setQueryData(['payment-gateway'], res.data.data);
+      setSafepaySecretKey('');
+      setBanner({ type: 'success', msg: 'Safepay credentials saved — will verify automatically on your first live payment.' });
+    },
+    onError: (err: any) => setBanner({ type: 'error', msg: err.response?.data?.message ?? 'Failed to save Safepay credentials' }),
+  });
 
   const disconnectMutation = useMutation({
-    mutationFn: () => api.delete('/stripe-connect/disconnect'),
-    onSuccess: () => { refetch(); setBanner({ type: 'success', msg: 'Stripe account disconnected.' }); },
-    onError:   () => setBanner({ type: 'error', msg: 'Failed to disconnect Stripe.' }),
+    mutationFn: (provider: 'stripe' | 'safepay') => api.delete(`/tenant/payment-gateway/${provider}`),
+    onSuccess: (res) => {
+      qc.setQueryData(['payment-gateway'], res.data.data);
+      setBanner({ type: 'success', msg: 'Gateway disconnected.' });
+    },
+    onError: () => setBanner({ type: 'error', msg: 'Failed to disconnect gateway.' }),
   });
 
-  async function handleConnect() {
-    setConnecting(true);
-    try {
-      const res = await api.get('/stripe-connect/auth-url');
-      window.location.href = res.data.data.url;
-    } catch {
-      setConnecting(false);
-      setBanner({ type: 'error', msg: 'Failed to get Stripe authorization URL. Check STRIPE_CONNECT_CLIENT_ID in server config.' });
-    }
-  }
-
-  const StripeIcon = (
-    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.591-7.305z"/>
+  const CardIcon = (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h5M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
     </svg>
   );
 
   return (
-    <Section icon={StripeIcon} title="Stripe Payments" desc="Connect your Stripe account so students can pay you directly for courses. Platform commission is deducted automatically.">
+    <Section icon={CardIcon} title="Payment Gateway" desc="Bring your own Stripe or Safepay account — students pay you directly, the platform never touches the money.">
       {banner && (
         <div className={cn('flex items-start gap-3 rounded-xl px-4 py-3 text-sm',
           banner.type === 'success' ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700')}>
@@ -451,67 +464,122 @@ function StripeConnectSection() {
       )}
 
       {isLoading ? (
-        <div className="flex items-center gap-2 text-sm text-gray-400 py-1"><Spinner size="sm" /> Checking connection…</div>
-      ) : data?.connected ? (
-        <div className="space-y-4">
-          <div className="flex items-center gap-4 p-4 bg-[#f0efff] rounded-xl border border-[#635bff]/20">
-            <div className="w-10 h-10 rounded-xl bg-[#635bff] flex items-center justify-center flex-shrink-0">
-              <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.591-7.305z"/>
-              </svg>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-[#1a1061]">Stripe Connected</p>
-              <p className="text-xs text-[#635bff] truncate">{data.accountEmail ?? data.stripeAccountId}</p>
-            </div>
-            <span className="flex-shrink-0 text-xs bg-green-100 text-green-700 border border-green-200 font-semibold px-2.5 py-1 rounded-full">Active</span>
-          </div>
-
-          {/* Charges / payouts status */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className={cn('rounded-xl px-4 py-3 text-sm border', data.chargesEnabled ? 'bg-green-50 border-green-100' : 'bg-amber-50 border-amber-100')}>
-              <p className={cn('font-semibold', data.chargesEnabled ? 'text-green-700' : 'text-amber-700')}>
-                {data.chargesEnabled ? '✓ Charges enabled' : '⚠ Charges pending'}
-              </p>
-              <p className={cn('text-xs mt-0.5', data.chargesEnabled ? 'text-green-600' : 'text-amber-600')}>
-                {data.chargesEnabled ? 'Accepting course payments' : 'Complete Stripe verification to accept payments'}
-              </p>
-            </div>
-            <div className={cn('rounded-xl px-4 py-3 text-sm border', data.payoutsEnabled ? 'bg-green-50 border-green-100' : 'bg-amber-50 border-amber-100')}>
-              <p className={cn('font-semibold', data.payoutsEnabled ? 'text-green-700' : 'text-amber-700')}>
-                {data.payoutsEnabled ? '✓ Payouts enabled' : '⚠ Payouts pending'}
-              </p>
-              <p className={cn('text-xs mt-0.5', data.payoutsEnabled ? 'text-green-600' : 'text-amber-600')}>
-                {data.payoutsEnabled ? 'Revenue paid to your bank' : 'Add bank account in Stripe Dashboard'}
-              </p>
-            </div>
-          </div>
-
-          <p className="text-xs text-gray-400">
-            Student payments go directly to your Stripe account. The platform fee is deducted automatically per transaction.
-          </p>
-          <Button variant="outline" size="sm" onClick={() => disconnectMutation.mutate()} loading={disconnectMutation.isPending}>
-            Disconnect Stripe
-          </Button>
-        </div>
+        <div className="flex items-center gap-2 text-sm text-gray-400 py-1"><Spinner size="sm" /> Loading…</div>
       ) : (
-        <div className="space-y-4">
-          <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-xl border border-dashed border-gray-200">
-            <svg className="w-5 h-5 text-gray-300 mt-0.5 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.591-7.305z"/>
-            </svg>
-            <div>
-              <p className="text-sm font-semibold text-gray-700">No Stripe account connected</p>
-              <p className="text-xs text-gray-400 mt-0.5">
-                Connect your Stripe account so students can pay for your courses directly.
-                The platform automatically deducts its commission from each transaction.
-              </p>
-            </div>
+        <>
+          <div className="grid grid-cols-3 gap-2">
+            {(['none', 'stripe', 'safepay'] as const).map(p => {
+              const isActive = p !== 'none' && data?.activeProvider === p;
+              return (
+                <button key={p} type="button" onClick={() => setTab(p)}
+                  className={cn('px-3 py-2.5 rounded-xl border text-sm font-semibold transition-colors',
+                    tab === p ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-200 text-gray-500 hover:border-gray-300')}>
+                  {p === 'none' ? 'None' : p === 'stripe' ? 'Stripe' : 'Safepay'}
+                  {isActive && <span className="ml-1.5 text-[10px] text-green-600">● active</span>}
+                </button>
+              );
+            })}
           </div>
-          <Button onClick={handleConnect} loading={connecting} disabled={connecting}>
-            Connect Stripe Account
-          </Button>
-        </div>
+
+          {tab === 'none' && (
+            <p className="text-xs text-gray-400">
+              No gateway configured — course purchases run in demo mode (no real charge). Pick Stripe or Safepay above to accept real payments.
+            </p>
+          )}
+
+          {tab === 'stripe' && (
+            <div className="space-y-4 bg-gray-50 rounded-xl border border-gray-200 p-4">
+              {data?.stripe.verified ? (
+                <div className="flex items-center gap-2 text-xs font-semibold text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                  Verified · last checked {data.stripe.verifiedAt ? new Date(data.stripe.verifiedAt).toLocaleDateString() : ''}
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  Not verified yet — paste your keys and Save
+                </div>
+              )}
+              <div>
+                <label className={labelCls}>Publishable Key</label>
+                <input type="text" className={inputCls} value={stripePublishableKey}
+                  onChange={e => setStripePublishableKey(e.target.value)} placeholder="pk_live_..." />
+              </div>
+              <div>
+                <label className={labelCls}>
+                  Secret Key {data?.stripe.hasSecretKey && <span className="font-normal normal-case text-gray-400">(blank = keep existing)</span>}
+                </label>
+                <input type="password" className={inputCls} value={stripeSecretKey}
+                  onChange={e => setStripeSecretKey(e.target.value)}
+                  placeholder={data?.stripe.hasSecretKey ? '••••••••••••••••' : 'sk_live_...'} />
+              </div>
+              <div className="flex items-center gap-3">
+                <Button size="sm" loading={saveStripeMutation.isPending}
+                  disabled={!stripePublishableKey || (!stripeSecretKey && !data?.stripe.hasSecretKey)}
+                  onClick={() => { setBanner(null); saveStripeMutation.mutate(); }}>
+                  Save &amp; Verify
+                </Button>
+                {data?.activeProvider === 'stripe' && (
+                  <Button size="sm" variant="outline" onClick={() => disconnectMutation.mutate('stripe')} loading={disconnectMutation.isPending}>
+                    Disconnect
+                  </Button>
+                )}
+              </div>
+              <p className="text-xs text-gray-400">Student payments go directly to your Stripe account — the platform takes no cut.</p>
+            </div>
+          )}
+
+          {tab === 'safepay' && (
+            <div className="space-y-4 bg-gray-50 rounded-xl border border-gray-200 p-4">
+              {data?.safepay.verified ? (
+                <div className="flex items-center gap-2 text-xs font-semibold text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                  Verified · confirmed via a completed payment {data.safepay.verifiedAt ? `on ${new Date(data.safepay.verifiedAt).toLocaleDateString()}` : ''}
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  Saved — will verify automatically on your first live payment
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>Merchant API Key</label>
+                  <input type="text" className={inputCls} value={safepayApiKey}
+                    onChange={e => setSafepayApiKey(e.target.value)} placeholder="sec_..." />
+                </div>
+                <div>
+                  <label className={labelCls}>Environment</label>
+                  <select className={inputCls} value={safepayEnv} onChange={e => setSafepayEnv(e.target.value as 'sandbox' | 'production')}>
+                    <option value="sandbox">Sandbox</option>
+                    <option value="production">Production</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className={labelCls}>
+                  Secret Key {data?.safepay.hasSecretKey && <span className="font-normal normal-case text-gray-400">(blank = keep existing)</span>}
+                </label>
+                <input type="password" className={inputCls} value={safepaySecretKey}
+                  onChange={e => setSafepaySecretKey(e.target.value)}
+                  placeholder={data?.safepay.hasSecretKey ? '••••••••••••••••' : 'Secret key'} />
+              </div>
+              <div className="flex items-center gap-3">
+                <Button size="sm" loading={saveSafepayMutation.isPending}
+                  disabled={!safepayApiKey || (!safepaySecretKey && !data?.safepay.hasSecretKey)}
+                  onClick={() => { setBanner(null); saveSafepayMutation.mutate(); }}>
+                  Save
+                </Button>
+                {data?.activeProvider === 'safepay' && (
+                  <Button size="sm" variant="outline" onClick={() => disconnectMutation.mutate('safepay')} loading={disconnectMutation.isPending}>
+                    Disconnect
+                  </Button>
+                )}
+              </div>
+              <p className="text-xs text-gray-400">Student payments are collected via Safepay's hosted checkout and settle directly to your account.</p>
+            </div>
+          )}
+        </>
       )}
     </Section>
   );
@@ -2041,7 +2109,7 @@ function AdminSettings() {
       {activeTab === 'features' && <FeatureFlagsSection />}
       {activeTab === 'integrations' && (
         <>
-          <StripeConnectSection />
+          <PaymentGatewaySection />
           <ZoomSection />
         </>
       )}

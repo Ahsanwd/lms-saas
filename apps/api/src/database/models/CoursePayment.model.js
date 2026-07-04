@@ -23,10 +23,8 @@ const coursePaymentSchema = new mongoose.Schema(
     paymentIntentId:  { type: String, default: null },   // pi_xxx or mock_pi_xxx (Stripe)
     paypalOrderId:    { type: String, default: null },   // PayPal order ID
     paypalCaptureId:  { type: String, default: null },   // PayPal capture ID (needed for refunds)
-    provider:         { type: String, enum: ['mock', 'stripe', 'paypal'], default: 'mock' },
-    // Stripe Connect — the tenant's connected account that received this payment
-    // null = payment went to platform account
-    stripeAccountId:  { type: String, default: null },
+    safepayTracker:   { type: String, default: null },   // track_xxx — Safepay hosted-checkout session
+    provider:         { type: String, enum: ['mock', 'stripe', 'safepay', 'paypal'], default: 'mock' },
 
     paidAt:     { type: Date, default: null },
     refundedAt: { type: Date, default: null },

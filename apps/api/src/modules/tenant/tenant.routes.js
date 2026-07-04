@@ -34,6 +34,12 @@ router.get( '/email-settings',      requireRole('tenant_admin'), ctrl.getEmailSe
 router.put( '/email-settings',      requireRole('tenant_admin'), ctrl.saveEmailSettings);
 router.post('/email-settings/test', requireRole('tenant_admin'), ctrl.testEmailSmtp);
 
+// Payment gateway BYOK for course purchases — Stripe or Safepay (tenant admin only)
+router.get(   '/payment-gateway',           requireRole('tenant_admin'), ctrl.getPaymentGateway);
+router.put(   '/payment-gateway/stripe',    requireRole('tenant_admin'), ctrl.savePaymentGatewayStripe);
+router.put(   '/payment-gateway/safepay',   requireRole('tenant_admin'), ctrl.savePaymentGatewaySafepay);
+router.delete('/payment-gateway/:provider', requireRole('tenant_admin'), ctrl.disconnectPaymentGateway);
+
 // Cloudflare Stream — shared platform-level account, any authenticated user can
 // check availability (instructors need this when uploading lesson videos)
 router.get('/cloudflare-stream/status', ctrl.getCfStreamStatus);

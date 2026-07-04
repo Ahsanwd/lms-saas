@@ -9,11 +9,11 @@ import { useAuthStore } from '@/stores/auth.store';
 import { AxiosError } from 'axios';
 import { cn } from '@/lib/utils';
 import type { Course, Section, Lesson, LessonType, CourseLevel, Category } from '@/types';
-import { loadStripe } from '@stripe/stripe-js';
 import { toast } from 'sonner';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
-import { getStripePromise } from '@/lib/stripe';
+import { getStripePromise, loadStripeWithKey } from '@/lib/stripe';
 import { SmartContent } from '@/components/ui/SmartContent';
+import { useForumThreads, ThreadCard, CreateThreadModal } from '@/components/forum/shared';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -3579,161 +3579,6 @@ function EnrollmentRequestsTab({ courseId }: { courseId: string }) {
 
 // ─── Forum components ─────────────────────────────────────────────────────────
 
-interface ForumThread {
-  _id: string; authorName: string; authorRole: 'student' | 'instructor' | 'tenant_admin';
-  title: string; body: string; tags: string[];
-  isPinned: boolean; isResolved: boolean; isClosed: boolean;
-  replyCount: number; views: number; likeCount: number; isLikedByMe: boolean;
-  lastActivityAt: string; createdAt: string;
-}
-
-function forumTimeAgo(iso: string) {
-  const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-  if (s < 60)    return 'just now';
-  if (s < 3600)  return `${Math.floor(s / 60)}m ago`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-  return `${Math.floor(s / 86400)}d ago`;
-}
-
-function ThreadCard({ thread, onClick }: { thread: ForumThread; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className="w-full text-left bg-white rounded-xl border border-gray-200 hover:border-primary-300 hover:shadow-sm transition-all p-4 group"
-    >
-      <div className="flex items-start gap-3">
-        <div className={cn(
-          'w-2 h-2 rounded-full mt-2 flex-shrink-0',
-          thread.isPinned ? 'bg-amber-400' : thread.isResolved ? 'bg-green-400' : 'bg-gray-300'
-        )} />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start gap-2 mb-1.5">
-            <h3 className="text-sm font-semibold text-gray-900 group-hover:text-primary-700 transition-colors line-clamp-2 flex-1">
-              {thread.title}
-            </h3>
-            <div className="flex items-center gap-1 flex-shrink-0 flex-wrap">
-              {thread.isPinned   && <span className="text-[10px] bg-amber-50 text-amber-600 border border-amber-200 px-1.5 py-0.5 rounded font-medium">📌 Pinned</span>}
-              {thread.isResolved && <span className="text-[10px] bg-green-50 text-green-600 border border-green-200 px-1.5 py-0.5 rounded font-medium">✅ Resolved</span>}
-              {thread.isClosed   && <span className="text-[10px] bg-gray-100 text-gray-500 border border-gray-200 px-1.5 py-0.5 rounded font-medium">🔒 Closed</span>}
-            </div>
-          </div>
-          <p className="text-xs text-gray-500 line-clamp-1 mb-2">{thread.body}</p>
-          {thread.tags && thread.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1 mb-2">
-              {thread.tags.slice(0, 4).map(tag => (
-                <span key={tag} className="text-[10px] bg-primary-50 text-primary-600 border border-primary-100 px-1.5 py-0.5 rounded-full font-medium">
-                  {tag}
-                </span>
-              ))}
-            </div>
-          )}
-          <div className="flex items-center gap-3 text-[11px] text-gray-400">
-            <span className="flex items-center gap-1">
-              <span className={cn('font-semibold', thread.authorRole === 'student' ? 'text-gray-600' : 'text-primary-600')}>
-                {thread.authorName}
-              </span>
-              {thread.authorRole !== 'student' && (
-                <span className="bg-primary-100 text-primary-700 px-1 py-0.5 rounded text-[9px] font-bold uppercase">
-                  {thread.authorRole === 'tenant_admin' ? 'Admin' : 'Instructor'}
-                </span>
-              )}
-            </span>
-            <span>·</span>
-            <span>{forumTimeAgo(thread.createdAt)}</span>
-            <span className="ml-auto flex items-center gap-3">
-              <span className="flex items-center gap-1">
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                </svg>
-                {thread.replyCount}
-              </span>
-              <span className="flex items-center gap-1">
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                </svg>
-                {thread.views}
-              </span>
-              {thread.likeCount > 0 && (
-                <span className="flex items-center gap-1">
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5" />
-                  </svg>
-                  {thread.likeCount}
-                </span>
-              )}
-            </span>
-          </div>
-        </div>
-      </div>
-    </button>
-  );
-}
-
-function CreateThreadModal({
-  onClose, onCreate, title, setTitle, body, setBody, tags, setTags, error, isPending,
-}: {
-  onClose: () => void; onCreate: () => void;
-  title: string; setTitle: (v: string) => void;
-  body:  string; setBody:  (v: string) => void;
-  tags:  string; setTags:  (v: string) => void;
-  error: string; isPending: boolean;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <h3 className="text-base font-semibold text-gray-900">New Thread</h3>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        <div className="px-6 py-5 space-y-4">
-          <div>
-            <label className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-1.5 block">Title</label>
-            <input
-              autoFocus type="text" value={title}
-              onChange={e => setTitle(e.target.value)}
-              placeholder="What's your question or topic?"
-              className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-              maxLength={200}
-            />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-1.5 block">Body</label>
-            <textarea
-              rows={5} value={body} onChange={e => setBody(e.target.value)}
-              placeholder="Describe your question or thought in detail…"
-              className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
-              maxLength={5000}
-            />
-            <p className="text-[11px] text-gray-400 text-right mt-1">{body.length}/5000</p>
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-1.5 block">
-              Tags <span className="font-normal text-gray-400">(optional, comma-separated)</span>
-            </label>
-            <input
-              type="text" value={tags} onChange={e => setTags(e.target.value)}
-              placeholder="e.g. question, help, week-3"
-              className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-            />
-          </div>
-          {error && <p className="text-sm text-red-600">{error}</p>}
-        </div>
-        <div className="flex justify-end gap-2 px-6 py-4 border-t border-gray-100 bg-gray-50">
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button disabled={!title.trim() || !body.trim()} loading={isPending} onClick={onCreate}>
-            Post Thread
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function ForumTab({ courseId }: { courseId: string }) {
   const router = useRouter();
   const qc = useQueryClient();
@@ -3745,16 +3590,7 @@ function ForumTab({ courseId }: { courseId: string }) {
   const [createTags,  setCreateTags]  = useState('');
   const [createError, setCreateError] = useState('');
 
-  const { data, isLoading, isError } = useQuery<{
-    threads: ForumThread[];
-    pagination: { page: number; pages: number; total: number };
-  }>({
-    queryKey: ['forum-threads', courseId, sort, page],
-    queryFn: async () => {
-      const { data } = await api.get(`/forum/courses/${courseId}/threads?sort=${sort}&page=${page}&limit=15`);
-      return data.data;
-    },
-  });
+  const { data, isLoading, isError } = useForumThreads(courseId, sort, page, 15);
 
   const createMutation = useMutation({
     mutationFn: () => api.post(`/forum/courses/${courseId}/threads`, {
@@ -3821,7 +3657,7 @@ function ForumTab({ courseId }: { courseId: string }) {
       ) : (
         <div className="space-y-2.5">
           {data!.threads.map(thread => (
-            <ThreadCard key={thread._id} thread={thread}
+            <ThreadCard key={thread._id} thread={thread} compact
               onClick={() => router.push(`/courses/${courseId}/forum/${thread._id}`)} />
           ))}
         </div>
@@ -4271,7 +4107,7 @@ function StudentView() {
   const [paymentStep, setPaymentStep]           = useState<'method' | 'card' | 'done'>('method');
   const [paymentId, setPaymentId]               = useState<string | null>(null);
   const [clientSecret, setClientSecret]         = useState<string | null>(null);
-  const [stripeAccountId, setStripeAccountId]   = useState<string | null>(null);
+  const [publishableKey, setPublishableKey]     = useState<string | null>(null);
 
   const { data: course, isLoading } = useQuery({
     queryKey: ['course', courseId],
@@ -4363,9 +4199,13 @@ function StudentView() {
     }),
     onSuccess: (res) => {
       const d = res.data.data;
+      if (d.provider === 'safepay') {
+        window.location.href = d.redirectUrl; // hosted checkout — leaves the page
+        return;
+      }
       setPaymentId(d.paymentId);
       setClientSecret(d.clientSecret ?? null);
-      setStripeAccountId(d.stripeAccountId ?? null);
+      setPublishableKey(d.publishableKey ?? null);
       setPaymentStep('card');
       setShowPayment(true);
     },
@@ -4374,6 +4214,42 @@ function StudentView() {
       setTimeout(() => setEnrollError(''), 4000);
     },
   });
+
+  // Confirms a payment after returning from Safepay's hosted checkout redirect.
+  const confirmSafepayMutation = useMutation({
+    mutationFn: (pid: string) => api.post(`/payments/${pid}/confirm`),
+    onSuccess: () => {
+      setPaymentStep('done');
+      setShowPayment(true);
+      qc.invalidateQueries({ queryKey: ['my-enrollments'] });
+      qc.invalidateQueries({ queryKey: ['course-progress', courseId] });
+    },
+    onError: (err: AxiosError<{ message: string }>) => {
+      setEnrollError(err.response?.data?.message ?? 'Payment could not be confirmed');
+      setTimeout(() => setEnrollError(''), 5000);
+    },
+  });
+
+  // Handle ?safepayPaymentId=/?safepayCancelled= from the Safepay hosted-checkout redirect
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const sp = new URLSearchParams(window.location.search);
+    const pid = sp.get('safepayPaymentId');
+    const cancelled = sp.get('safepayCancelled');
+    if (!pid && !cancelled) return;
+
+    if (pid) {
+      confirmSafepayMutation.mutate(pid);
+    } else {
+      setEnrollError('Payment was cancelled.');
+      setTimeout(() => setEnrollError(''), 4000);
+    }
+
+    const url = new URL(window.location.href);
+    url.searchParams.delete('safepayPaymentId');
+    url.searchParams.delete('safepayCancelled');
+    window.history.replaceState({}, '', url.toString());
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const trialMutation = useMutation({
     mutationFn: () => api.post(`/payments/courses/${courseId}/trial`),
@@ -4592,11 +4468,7 @@ function StudentView() {
             </div>
 
             <Elements
-              stripe={
-                stripeAccountId && process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
-                  ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY, { stripeAccount: stripeAccountId })
-                  : getStripePromise()
-              }
+              stripe={publishableKey ? loadStripeWithKey(publishableKey) : getStripePromise()}
               options={clientSecret ? { clientSecret, appearance: { theme: 'stripe' } } : undefined}
             >
               <StripeCardForm

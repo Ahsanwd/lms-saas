@@ -409,10 +409,20 @@ async function clearReplyFlags(tenantId, replyId, user) {
 
 async function getFlaggedContent(tenantId, user, query) {
   if (!MOD_ROLES.includes(user.role)) throw new AppError('Forbidden', 403);
-  const [threads, replies] = await forumRepo.listFlaggedContent(tenantId, query);
+
+  const page  = Math.max(1, parseInt(query.page)  || 1);
+  const limit = Math.min(50, parseInt(query.limit) || 20);
+
+  const [threads, replies, threadsTotal, repliesTotal] =
+    await forumRepo.listFlaggedContent(tenantId, { page, limit });
+
   return {
     threads: threads.map(t => formatThread(t, user.sub)),
     replies: replies.map(r => formatReply(r, user.sub)),
+    pagination: {
+      threads: { page, limit, total: threadsTotal, pages: Math.ceil(threadsTotal / limit) },
+      replies: { page, limit, total: repliesTotal, pages: Math.ceil(repliesTotal / limit) },
+    },
   };
 }
 

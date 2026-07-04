@@ -11,10 +11,16 @@ function getStripe() {
   return _stripe;
 }
 
-// Returns an existing Stripe customer or creates a new one.
+// Fresh Stripe client for a tenant's own BYO secret key (course payments).
+// Not cached like getStripe() — each tenant has a different key.
+function getTenantStripeClient(secretKey) {
+  if (!secretKey) return null;
+  return new Stripe(secretKey, { apiVersion: '2024-11-20.acacia' });
+}
+
+// Returns an existing Stripe customer or creates a new one on the given client.
 // Persists stripeCustomerId back to the User document.
-async function createOrGetCustomer(userId, email, name, existingCustomerId) {
-  const stripe = getStripe();
+async function createOrGetCustomer(stripe, userId, email, name, existingCustomerId) {
   if (!stripe) return null; // mock mode
 
   if (existingCustomerId) {
@@ -39,4 +45,4 @@ async function createOrGetCustomer(userId, email, name, existingCustomerId) {
   return customer.id;
 }
 
-module.exports = { getStripe, createOrGetCustomer };
+module.exports = { getStripe, getTenantStripeClient, createOrGetCustomer };

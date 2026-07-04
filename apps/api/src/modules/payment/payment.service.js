@@ -4,22 +4,18 @@ const Course                      = require('../../database/models/Course.model'
 const Enrollment                  = require('../../database/models/Enrollment.model');
 const User                        = require('../../database/models/User.model');
 const AppError                    = require('../../utils/AppError');
-const { getStripe, createOrGetCustomer } = require('../../services/stripe/stripe');
+const { getTenantStripeClient, createOrGetCustomer } = require('../../services/stripe/stripe');
+const safepay                     = require('../../services/safepay/safepay');
 const tenantRepo                  = require('../../database/repositories/tenant.repository');
+const tenantService                = require('../tenant/tenant.service');
 
-// ─── Provider helpers ─────────────────────────────────────────────────────────
+// ─── Stripe provider helpers ───────────────────────────────────────────────────
+// `stripeClient` is null in mock mode (no gateway configured for this tenant yet) —
+// every call falls back to a fabricated mock response so the rest of the checkout
+// flow works identically for demo/unconfigured tenants.
 
-// Create a PaymentIntent.
-// If stripeAccountId is provided, the PI is created on the connected account and
-// application_fee_amount is collected by the platform automatically.
-async function providerCreateIntent(amount, currency, metadata, stripeAccountId = null, customerId = null) {
-  const stripe = getStripe();
-  if (stripe) {
-    const feePercent = parseFloat(process.env.STRIPE_PLATFORM_FEE_PERCENT || '0');
-    const feeAmount  = (stripeAccountId && feePercent > 0)
-      ? Math.max(1, Math.round(amount * feePercent / 100))
-      : 0;
-
+async function providerCreateIntent(stripeClient, amount, currency, metadata, customerId = null) {
+  if (stripeClient) {
     const intentParams = {
       amount,
       currency,
@@ -27,11 +23,8 @@ async function providerCreateIntent(amount, currency, metadata, stripeAccountId 
       automatic_payment_methods: { enabled: true },
       setup_future_usage: 'off_session', // save card for future purchases
       ...(customerId && { customer: customerId }),
-      ...(feeAmount > 0 && { application_fee_amount: feeAmount }),
     };
-
-    const stripeOptions = stripeAccountId ? { stripeAccount: stripeAccountId } : {};
-    return stripe.paymentIntents.create(intentParams, stripeOptions);
+    return stripeClient.paymentIntents.create(intentParams);
   }
 
   // Mock fallback
@@ -43,24 +36,16 @@ async function providerCreateIntent(amount, currency, metadata, stripeAccountId 
   };
 }
 
-// Retrieve a PaymentIntent (for server-side verification after client confirms).
-// Must pass stripeAccountId if the PI was created on a connected account.
-async function providerRetrieveIntent(paymentIntentId, stripeAccountId = null) {
-  const stripe = getStripe();
-  if (stripe) {
-    const stripeOptions = stripeAccountId ? { stripeAccount: stripeAccountId } : {};
-    return stripe.paymentIntents.retrieve(paymentIntentId, {}, stripeOptions);
-  }
+async function providerRetrieveIntent(stripeClient, paymentIntentId) {
+  if (stripeClient) return stripeClient.paymentIntents.retrieve(paymentIntentId);
   return { id: paymentIntentId, status: 'succeeded' }; // mock: always succeed
 }
 
-async function providerRefund(paymentIntentId, stripeAccountId = null, amountCents = null) {
-  const stripe = getStripe();
-  if (stripe) {
+async function providerRefund(stripeClient, paymentIntentId, amountCents = null) {
+  if (stripeClient) {
     const params = { payment_intent: paymentIntentId };
     if (amountCents) params.amount = amountCents; // partial refund
-    const stripeOptions = stripeAccountId ? { stripeAccount: stripeAccountId } : {};
-    return stripe.refunds.create(params, stripeOptions);
+    return stripeClient.refunds.create(params);
   }
   return { id: `mock_re_${uuidv4().replace(/-/g, '')}`, payment_intent: paymentIntentId, status: 'succeeded' };
 }
@@ -74,8 +59,16 @@ function calcExpiresAt(days) {
   return new Date(Date.now() + days * 24 * 60 * 60 * 1000);
 }
 
+function tenantBaseUrl(tenant) {
+  const rootDomain = process.env.ROOT_DOMAIN || 'coursel.space';
+  return tenant?.subdomain
+    ? `https://${tenant.subdomain}.${rootDomain}`
+    : (process.env.APP_URL || 'http://localhost:3000');
+}
+
 // ─── Initiate payment ─────────────────────────────────────────────────────────
-// Returns { paymentId, clientSecret, stripeAccountId, amount, currency, courseName }
+// Returns either a Stripe shape ({ clientSecret, publishableKey }) or a Safepay
+// shape ({ redirectUrl }) depending on which gateway the tenant has configured.
 async function initiatePayment(tenantId, courseId, userId, { couponCode } = {}) {
   const [course, tenant, user] = await Promise.all([
     Course.findOne({ _id: courseId, tenantId, deletedAt: null }),
@@ -108,24 +101,72 @@ async function initiatePayment(tenantId, courseId, userId, { couponCode } = {}) 
     }
   }
 
-  // ── Stripe ─────────────────────────────────────────────────────────────────
-  let stripeAccountId = null;
-  try {
-    const connectSvc = require('../stripeConnect/stripeConnect.service');
-    stripeAccountId  = await connectSvc.getConnectedAccountId(tenantId);
-  } catch { /* no connect record — fall back to platform account */ }
+  const gateway = await tenantService.getActiveGateway(tenantId);
 
-  // Create or retrieve the Stripe customer for this user (enables saved cards)
+  // ── Safepay: hosted-checkout redirect, no clientSecret ──────────────────────
+  if (gateway.provider === 'safepay') {
+    const payment = await CoursePayment.create({
+      tenantId, courseId, userId,
+      amount:        finalAmount,
+      currency,
+      discountAmount,
+      couponCode:    appliedCoupon,
+      provider:      'safepay',
+      receiptNumber: receiptNumber(),
+      status:        'pending',
+    });
+
+    const returnBase = `${tenantBaseUrl(tenant)}/courses/${courseId}`;
+
+    // NOTE: Safepay's public docs are inconsistent about whether `amount` is in the
+    // smallest currency unit (cents) or whole units — sending cents here to match
+    // the rest of this codebase's convention. Verify against a real sandbox account
+    // and adjust if Safepay charges 100x too much/little.
+    const { tracker } = await safepay.createSession({
+      apiKey:      gateway.apiKey,
+      environment: gateway.environment,
+      amount:      finalAmount,
+      currency:    currency.toUpperCase(),
+      metadata: {
+        paymentId: payment._id.toString(),
+        courseId:  courseId.toString(),
+        userId:    userId.toString(),
+        tenantId:  tenantId.toString(),
+      },
+    });
+
+    payment.safepayTracker = tracker;
+    await payment.save();
+
+    const redirectUrl = safepay.buildCheckoutUrl({
+      environment: gateway.environment,
+      tracker,
+      redirectUrl: `${returnBase}?safepayPaymentId=${payment._id}`,
+      cancelUrl:   `${returnBase}?safepayCancelled=1`,
+    });
+
+    return {
+      paymentId:  payment._id,
+      provider:   'safepay',
+      redirectUrl,
+      amount:     finalAmount,
+      currency,
+      courseName: course.title,
+    };
+  }
+
+  // ── Stripe (tenant's own key) or mock fallback ───────────────────────────────
+  const stripeClient = gateway.provider === 'stripe' ? getTenantStripeClient(gateway.secretKey) : null;
+
   const userName = user ? `${user.firstName} ${user.lastName}`.trim() : '';
-  const stripeCustomerId = await createOrGetCustomer(
-    userId, user?.email ?? '', userName, user?.stripeCustomerId ?? null
-  );
+  const stripeCustomerId = stripeClient
+    ? await createOrGetCustomer(stripeClient, userId, user?.email ?? '', userName, user?.stripeCustomerId ?? null)
+    : null;
 
-  const resolvedStripeProvider = getStripe() ? 'stripe' : 'mock';
+  const resolvedProvider = stripeClient ? 'stripe' : 'mock';
   const intent = await providerCreateIntent(
-    finalAmount, currency,
+    stripeClient, finalAmount, currency,
     { courseId: courseId.toString(), userId: userId.toString(), tenantId: tenantId.toString() },
-    stripeAccountId,
     stripeCustomerId
   );
 
@@ -136,8 +177,7 @@ async function initiatePayment(tenantId, courseId, userId, { couponCode } = {}) 
     discountAmount,
     couponCode:      appliedCoupon,
     paymentIntentId: intent.id,
-    stripeAccountId: stripeAccountId || null,
-    provider:        resolvedStripeProvider,
+    provider:        resolvedProvider,
     receiptNumber:   receiptNumber(),
     status:          'pending',
   });
@@ -149,26 +189,54 @@ async function initiatePayment(tenantId, courseId, userId, { couponCode } = {}) 
     amount:           finalAmount,
     currency,
     courseName:       course.title,
-    stripeAccountId:  stripeAccountId || null,
-    provider:         resolvedStripeProvider,
+    provider:         resolvedProvider,
+    publishableKey:   stripeClient ? gateway.publishableKey : null,
   };
 }
 
-// ─── Confirm payment (step 2 — after client confirms card) ────────────────────
+// ─── Confirm payment (step 2 — after client confirms card, or after Safepay redirect) ─
 async function confirmPayment(tenantId, paymentId, userId) {
   const payment = await CoursePayment.findOne({ _id: paymentId, tenantId, userId, status: 'pending' });
   if (!payment) throw new AppError('Payment not found or already processed', 404);
-
-  const intent = await providerRetrieveIntent(payment.paymentIntentId, payment.stripeAccountId);
-  if (intent.status !== 'succeeded') throw new AppError('Payment not confirmed by Stripe', 402, 'PAYMENT_FAILED');
-
-  return _activatePayment(payment);
+  return _confirmAndActivate(payment);
 }
 
-// ─── Webhook confirm (called from webhook handler — no userId check) ──────────
+// ─── Webhook confirm (platform-Stripe webhook only — see modules/webhook/stripe.webhook.js).
+// Tenant-owned Stripe accounts (BYO key) live outside the platform Stripe account, so no
+// webhook event ever arrives for them; this path only ever matters for mock-mode intents.
 async function confirmPaymentByIntentId(paymentIntentId) {
   const payment = await CoursePayment.findOne({ paymentIntentId, status: 'pending' });
   if (!payment) return null;
+  return _confirmAndActivate(payment);
+}
+
+// ─── Shared confirm — branches by provider, then activates enrollment ────────
+async function _confirmAndActivate(payment) {
+  if (payment.provider === 'safepay') {
+    const gateway = await tenantService.getActiveGateway(payment.tenantId);
+    if (gateway.provider !== 'safepay') throw new AppError('Safepay is no longer configured for this school', 409);
+
+    const status = await safepay.getPaymentStatus({
+      secretKey:   gateway.secretKey,
+      environment: gateway.environment,
+      tracker:     payment.safepayTracker,
+    });
+    if (status.state !== 'TRACKER_ENDED') throw new AppError('Payment not confirmed by Safepay', 402, 'PAYMENT_FAILED');
+
+    const result = await _activatePayment(payment);
+    tenantService.markSafepayVerified(payment.tenantId).catch(() => {});
+    return result;
+  }
+
+  let stripeClient = null;
+  if (payment.provider === 'stripe') {
+    const gateway = await tenantService.getActiveGateway(payment.tenantId);
+    stripeClient = gateway.provider === 'stripe' ? getTenantStripeClient(gateway.secretKey) : null;
+  }
+
+  const intent = await providerRetrieveIntent(stripeClient, payment.paymentIntentId);
+  if (intent.status !== 'succeeded') throw new AppError('Payment not confirmed by Stripe', 402, 'PAYMENT_FAILED');
+
   return _activatePayment(payment);
 }
 
@@ -233,8 +301,17 @@ async function refundPayment(tenantId, paymentId, actingUserId, { reason = '', a
 
   if (payment.provider === 'paypal') {
     throw new AppError('This was a PayPal payment — PayPal is no longer integrated. Process the refund manually in the PayPal dashboard.', 400);
+  } else if (payment.provider === 'safepay') {
+    // Safepay's refund endpoint isn't confirmed in public docs — don't guess at
+    // money-movement code. Admin refunds manually; we still don't mark it refunded
+    // here so our records stay honest about what actually happened.
+    throw new AppError('This was a Safepay payment — process the refund manually in the Safepay dashboard, then contact support to reconcile the record.', 400);
+  } else if (payment.provider === 'stripe') {
+    const gateway = await tenantService.getActiveGateway(tenantId);
+    const stripeClient = gateway.provider === 'stripe' ? getTenantStripeClient(gateway.secretKey) : null;
+    await providerRefund(stripeClient, payment.paymentIntentId, refundCents);
   } else {
-    await providerRefund(payment.paymentIntentId, payment.stripeAccountId, refundCents);
+    await providerRefund(null, payment.paymentIntentId, refundCents); // mock
   }
 
   // Partial refunds don't unenroll; only full refunds remove course access
@@ -295,14 +372,17 @@ async function getCoursePayments(tenantId, courseId, query = {}) {
 }
 
 // ─── Saved payment methods ────────────────────────────────────────────────────
+// Only available for tenants on the Stripe gateway — Safepay's hosted checkout
+// doesn't give us a saved-card concept in this integration.
 
 async function getPaymentMethods(userId, tenantId) {
-  const stripe = getStripe();
-  const user   = await User.findOne({ _id: userId, tenantId, deletedAt: null }).select('+stripeCustomerId');
-  if (!user?.stripeCustomerId || !stripe) return [];
+  const gateway = await tenantService.getActiveGateway(tenantId);
+  const stripeClient = gateway.provider === 'stripe' ? getTenantStripeClient(gateway.secretKey) : null;
+  const user = await User.findOne({ _id: userId, tenantId, deletedAt: null }).select('+stripeCustomerId');
+  if (!user?.stripeCustomerId || !stripeClient) return [];
 
   try {
-    const list = await stripe.paymentMethods.list({ customer: user.stripeCustomerId, type: 'card' });
+    const list = await stripeClient.paymentMethods.list({ customer: user.stripeCustomerId, type: 'card' });
     return list.data.map(pm => ({
       id:       pm.id,
       brand:    pm.card.brand,
@@ -314,17 +394,18 @@ async function getPaymentMethods(userId, tenantId) {
 }
 
 async function createSetupIntent(userId, tenantId) {
-  const stripe = getStripe();
-  if (!stripe) return { clientSecret: null }; // mock mode
+  const gateway = await tenantService.getActiveGateway(tenantId);
+  const stripeClient = gateway.provider === 'stripe' ? getTenantStripeClient(gateway.secretKey) : null;
+  if (!stripeClient) return { clientSecret: null }; // mock mode / non-Stripe gateway
 
   const user = await User.findOne({ _id: userId, tenantId, deletedAt: null }).select('+stripeCustomerId');
   if (!user) throw new AppError('User not found', 404);
 
   const customerId = await createOrGetCustomer(
-    userId, user.email, `${user.firstName} ${user.lastName}`.trim(), user.stripeCustomerId
+    stripeClient, userId, user.email, `${user.firstName} ${user.lastName}`.trim(), user.stripeCustomerId
   );
 
-  const si = await stripe.setupIntents.create({
+  const si = await stripeClient.setupIntents.create({
     customer: customerId,
     payment_method_types: ['card'],
     usage: 'off_session',
@@ -333,17 +414,18 @@ async function createSetupIntent(userId, tenantId) {
 }
 
 async function deletePaymentMethod(userId, tenantId, methodId) {
-  const stripe = getStripe();
-  if (!stripe) throw new AppError('Not available in mock mode', 400);
+  const gateway = await tenantService.getActiveGateway(tenantId);
+  const stripeClient = gateway.provider === 'stripe' ? getTenantStripeClient(gateway.secretKey) : null;
+  if (!stripeClient) throw new AppError('Not available in mock mode', 400);
 
   const user = await User.findOne({ _id: userId, tenantId, deletedAt: null }).select('+stripeCustomerId');
   if (!user?.stripeCustomerId) throw new AppError('No saved payment methods', 404);
 
   // Verify the method belongs to this customer before detaching
-  const pm = await stripe.paymentMethods.retrieve(methodId);
+  const pm = await stripeClient.paymentMethods.retrieve(methodId);
   if (pm.customer !== user.stripeCustomerId) throw new AppError('Payment method not found', 404);
 
-  await stripe.paymentMethods.detach(methodId);
+  await stripeClient.paymentMethods.detach(methodId);
   return { deleted: true };
 }
 
