@@ -38,6 +38,7 @@ router.use('/announcements', require('../modules/announcement/announcement.route
 router.use('/assignments',          require('../modules/assignment/assignment.routes'));
 router.use('/assignment-templates', require('../modules/assignmentTemplate/assignmentTemplate.routes'));
 router.use('/coupons',        require('../modules/coupon/coupon.routes'));
+router.use('/bundles',        require('../modules/bundle/bundle.routes'));
 router.use('/payments',       require('../modules/payment/payment.routes'));
 router.use('/groups',         require('../modules/group/group.routes'));
 router.use('/notifications',          require('../modules/notification/notification.routes'));

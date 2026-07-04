@@ -83,6 +83,11 @@ const CouponIcon = () => (
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
   </svg>
 );
+const BundleIcon = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+  </svg>
+);
 const MembershipIcon = () => (
   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 9a2 2 0 10-4 0v5a2 2 0 01-2 2h6m-6-4h4m8 0a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -140,6 +145,7 @@ const NAV_ITEMS: NavItem[] = [
   // ── Rewards & marketing ────────────────────────────────────────────────
   { href: '/certificate-builder', label: 'Certificates', icon: <CertBuilderIcon />, roles: ['tenant_admin'] },
   { href: '/coupons',             label: 'Coupons',       icon: <CouponIcon />,      roles: ['tenant_admin'] },
+  { href: '/bundles',             label: 'Bundles',       icon: <BundleIcon />,      roles: ['tenant_admin', 'instructor', 'student'] },
   { href: '/membership-plans',    label: 'Membership Plans', icon: <MembershipIcon />, roles: ['tenant_admin'] },
   { href: '/membership',          label: 'Membership',    icon: <MembershipIcon />,  roles: ['student'] },
   { href: '/my-payments',         label: 'Payment History', icon: <CreditCardIcon />, roles: ['student'] },

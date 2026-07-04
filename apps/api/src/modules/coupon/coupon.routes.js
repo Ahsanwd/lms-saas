@@ -131,6 +131,7 @@ router.use(authenticate);
 
 // Any authenticated user can validate a coupon before enrolling
 router.post('/validate', ctrl.validate);
+router.post('/validate-bundle', ctrl.validateBundle);
 
 // Admin / instructor management
 router.get('/',     requirePermission('course:manage'), ctrl.list);

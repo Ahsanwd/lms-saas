@@ -21,8 +21,13 @@ router.get('/courses/:courseId/trial',              ctrl.trialStatus);
 router.post('/courses/:courseId/trial/upgrade',     ctrl.upgradeTrial);
 router.post('/:paymentId/confirm',                  ctrl.confirm);
 
+// Bundle payment flow (student)
+router.post('/bundles/:bundleId/initiate',          ctrl.initiateBundle);
+router.post('/bundles/:paymentId/confirm',          ctrl.confirmBundle);
+
 // Admin
 router.get('/courses/:courseId',                    requirePermission('course:manage'), ctrl.coursePayments);
 router.post('/:paymentId/refund',                   requirePermission('course:manage'), ctrl.refund);
+router.post('/bundles/:paymentId/refund',           requirePermission('course:manage'), ctrl.refundBundle);
 
 module.exports = router;

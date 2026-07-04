@@ -40,4 +40,21 @@ async function validate(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { list, create, update, remove, validate };
+// POST /coupons/validate-bundle — student calls this before buying a bundle.
+// Resolves the bundle's real courseIds/price server-side — never trusts a
+// client-supplied price.
+async function validateBundle(req, res, next) {
+  try {
+    const { code, bundleId } = req.body;
+    if (!code || !bundleId) return R.error(res, 'code and bundleId are required', 400);
+
+    const CourseBundle = require('../../database/models/CourseBundle.model');
+    const bundle = await CourseBundle.findOne({ _id: bundleId, tenantId: req.tenant.tenantId, status: 'published' });
+    if (!bundle) return R.error(res, 'Bundle not found', 404);
+
+    const result = await couponService.validateBundleCoupon(req.tenant.tenantId, code, bundle.courseIds, bundle.price);
+    R.success(res, result);
+  } catch (err) { next(err); }
+}
+
+module.exports = { list, create, update, remove, validate, validateBundle };

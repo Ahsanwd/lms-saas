@@ -1,5 +1,6 @@
 const svc = require('./payment.service');
 const trialSvc = require('../course/trial.service');
+const bundleSvc = require('../bundle/bundle.service');
 const R = require('../../utils/response');
 
 async function initiate(req, res, next) {
@@ -92,6 +93,34 @@ async function deleteMethod(req, res, next) {
   } catch (err) { next(err); }
 }
 
+// ── Bundle checkout ───────────────────────────────────────────────────────────
+async function initiateBundle(req, res, next) {
+  try {
+    const result = await bundleSvc.initiateBundlePayment(
+      req.tenant.tenantId, req.params.bundleId, req.user.sub, req.body
+    );
+    R.success(res, result);
+  } catch (err) { next(err); }
+}
+
+async function confirmBundle(req, res, next) {
+  try {
+    const result = await bundleSvc.confirmBundlePayment(
+      req.tenant.tenantId, req.params.paymentId, req.user.sub
+    );
+    R.success(res, result, 'Payment confirmed — enrolled in all bundle courses');
+  } catch (err) { next(err); }
+}
+
+async function refundBundle(req, res, next) {
+  try {
+    const payment = await bundleSvc.refundBundlePayment(
+      req.tenant.tenantId, req.params.paymentId, req.user.sub, req.body
+    );
+    R.success(res, { payment }, 'Bundle payment refunded');
+  } catch (err) { next(err); }
+}
+
 async function receiptPdf(req, res, next) {
   try {
     await svc.generateReceiptPdf(
@@ -104,5 +133,6 @@ module.exports = {
   initiate, confirm, refund, myPayments, coursePayments,
   startTrial, upgradeTrial, trialStatus,
   listMethods, setupIntent, deleteMethod,
+  initiateBundle, confirmBundle, refundBundle,
   receiptPdf,
 };

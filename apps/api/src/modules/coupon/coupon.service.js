@@ -61,6 +61,64 @@ async function applyCoupon(tenantId, code, courseId, coursePrice) {
   return result;
 }
 
+// ─── Validate a coupon code for a bundle (multiple courses, one price) ────────
+async function validateBundleCoupon(tenantId, code, courseIds, bundlePrice) {
+  const coupon = await CourseCoupon.findOne({
+    tenantId,
+    code: code.trim().toUpperCase(),
+    isActive: true,
+    $and: [
+      { $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }] },
+      { $or: [{ maxUses: 0 }, { $expr: { $lt: ['$usedCount', '$maxUses'] } }] },
+    ],
+  });
+
+  if (!coupon) throw new AppError('Invalid or expired coupon code', 404, 'COUPON_INVALID');
+
+  // Applicable to the bundle only if every course in it is covered
+  // (empty applicableCourses = tenant-wide, trivially covers any bundle).
+  if (coupon.applicableCourses.length > 0) {
+    const applicableSet = new Set(coupon.applicableCourses.map(c => c.toString()));
+    const allCovered = courseIds.every(id => applicableSet.has(id.toString()));
+    if (!allCovered) throw new AppError('This coupon is not valid for all courses in this bundle', 400, 'COUPON_NOT_APPLICABLE');
+  }
+
+  const discountAmount = coupon.discountType === 'percentage'
+    ? Math.min((bundlePrice * coupon.discountValue) / 100, bundlePrice)
+    : Math.min(coupon.discountValue, bundlePrice);
+
+  return {
+    code: coupon.code,
+    discountType: coupon.discountType,
+    discountValue: coupon.discountValue,
+    discountAmount: Math.round(discountAmount * 100) / 100,
+    finalPrice: Math.max(0, Math.round((bundlePrice - discountAmount) * 100) / 100),
+  };
+}
+
+// ─── Apply bundle coupon (called internally during bundle checkout) ──────────
+async function applyBundleCoupon(tenantId, code, courseIds, bundlePrice) {
+  const result = await validateBundleCoupon(tenantId, code, courseIds, bundlePrice);
+
+  const updated = await CourseCoupon.findOneAndUpdate(
+    {
+      tenantId,
+      code: result.code,
+      isActive: true,
+      $and: [
+        { $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }] },
+        { $or: [{ maxUses: 0 }, { $expr: { $lt: ['$usedCount', '$maxUses'] } }] },
+      ],
+    },
+    { $inc: { usedCount: 1 } },
+    { new: true }
+  );
+
+  if (!updated) throw new AppError('Coupon is no longer valid or has reached its usage limit', 400, 'COUPON_EXHAUSTED');
+
+  return result;
+}
+
 // ─── List coupons ─────────────────────────────────────────────────────────────
 async function listCoupons(tenantId, { search, isActive, page = 1, limit = 20 } = {}) {
   const filter = { tenantId };
@@ -130,4 +188,8 @@ async function deleteCoupon(tenantId, couponId) {
   return coupon.save();
 }
 
-module.exports = { validateCoupon, applyCoupon, listCoupons, createCoupon, updateCoupon, deleteCoupon };
+module.exports = {
+  validateCoupon, applyCoupon,
+  validateBundleCoupon, applyBundleCoupon,
+  listCoupons, createCoupon, updateCoupon, deleteCoupon,
+};
