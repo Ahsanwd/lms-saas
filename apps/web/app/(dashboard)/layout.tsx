@@ -85,6 +85,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const effectiveRole: Role | undefined =
     user.role === 'super_admin' && impersonation ? 'tenant_admin' : undefined;
 
+  // Distraction-free routes render full-width, without the sidebar/header chrome —
+  // the page itself supplies its own minimal top bar (back button + title).
+  const FULL_SCREEN_ROUTES = ['/certificate-builder'];
+  if (FULL_SCREEN_ROUTES.includes(pathname)) {
+    return (
+      <div className="h-screen overflow-hidden bg-gray-50">
+        {children}
+        <Toaster position="bottom-right" richColors closeButton />
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50">
       <Sidebar

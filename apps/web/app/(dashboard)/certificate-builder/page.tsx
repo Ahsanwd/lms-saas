@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { Button, Spinner } from '@/components/ui';
@@ -182,6 +183,7 @@ const inputCls = 'w-full px-3 py-2 text-sm border border-gray-200 rounded-lg foc
 
 // ─── Builder Page ─────────────────────────────────────────────────────────────
 export default function CertificateBuilderPage() {
+  const router = useRouter();
   const qc = useQueryClient();
   const [form, setForm]           = useState<CertTemplate>(DEFAULTS);
   const [saved, setSaved]         = useState(false);
@@ -227,6 +229,12 @@ export default function CertificateBuilderPage() {
     onSuccess: () => { setForm(DEFAULTS); setLoaded(false); qc.invalidateQueries({ queryKey: ['cert-template'] }); },
   });
 
+  function handleReset() {
+    if (confirm('Reset the certificate template to default? This cannot be undone.')) {
+      resetMutation.mutate();
+    }
+  }
+
   const uploadMutation = useMutation({
     mutationFn: ({ field, file }: { field: 'logo' | 'background' | 'signature' | 'second-signature'; file: File }) => {
       const fd = new FormData();
@@ -248,20 +256,57 @@ export default function CertificateBuilderPage() {
   if (isLoading) return <div className="flex justify-center py-24"><Spinner size="lg" /></div>;
 
   return (
-    <div className="flex overflow-hidden" style={{ height: 'calc(100vh - 57px)' }}>
+    <div className="flex flex-col h-screen bg-gray-50">
 
-      {/* ── Left Panel ── */}
-      <div className="w-80 flex-shrink-0 bg-white border-r border-gray-200 flex flex-col overflow-hidden">
-
-        <div className="flex-shrink-0 flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h1 className="font-semibold text-gray-900 text-sm">Certificate Builder</h1>
-          <button onClick={() => resetMutation.mutate()}
-            className="text-xs text-gray-400 hover:text-red-500 transition-colors">
-            Reset
+      {/* ── Top toolbar ── */}
+      <div className="flex-shrink-0 h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4">
+        <div className="flex items-center gap-3 min-w-0">
+          <button onClick={() => router.push('/settings')}
+            className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors flex-shrink-0"
+            title="Back to Settings">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
           </button>
+          <div className="w-px h-8 bg-gray-200 flex-shrink-0" />
+          <div className="w-9 h-9 rounded-xl bg-primary-50 text-primary-600 flex items-center justify-center flex-shrink-0">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+            </svg>
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-gray-900 leading-tight">Certificate Builder</p>
+            <p className="text-[11px] text-gray-400 leading-tight truncate">Design the certificate students receive on course completion</p>
+          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+        <div className="flex items-center gap-3 flex-shrink-0">
+          {saveError && <span className="text-xs text-red-600 max-w-[220px] truncate">{saveError}</span>}
+          {saved && (
+            <span className="text-xs text-green-600 font-medium flex items-center gap-1">
+              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+              Saved
+            </span>
+          )}
+          <button onClick={handleReset} disabled={resetMutation.isPending}
+            className="text-xs text-gray-400 hover:text-red-500 px-2 transition-colors">
+            Reset
+          </button>
+          <Button size="sm" loading={saveMutation.isPending} onClick={() => saveMutation.mutate()}>
+            Save Template
+          </Button>
+        </div>
+      </div>
+
+      {/* ── Body: form + preview ── */}
+      <div className="flex-1 flex min-h-0 overflow-hidden">
+
+      {/* ── Left Panel ── */}
+      <div className="w-96 flex-shrink-0 bg-white border-r border-gray-200 flex flex-col overflow-hidden">
+
+        <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4">
 
           <Section title="Organization" />
           <div>
@@ -485,21 +530,7 @@ export default function CertificateBuilderPage() {
                 : 'No expiry — certificates are valid indefinitely.'}
             </p>
           </div>
-
-          <div className="pb-6 pt-2 space-y-2">
-            {saveError && <p className="text-xs text-red-600 bg-red-50 rounded px-2 py-1">{saveError}</p>}
-            {saved && (
-              <p className="text-xs text-green-600 font-medium flex items-center gap-1">
-                <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-                Template saved successfully
-              </p>
-            )}
-            <Button className="w-full" loading={saveMutation.isPending} onClick={() => saveMutation.mutate()}>
-              Save Template
-            </Button>
-          </div>
+          <div className="pb-6" />
         </div>
       </div>
 
@@ -509,11 +540,12 @@ export default function CertificateBuilderPage() {
           <p className="text-sm font-semibold text-gray-800">Live Preview</p>
           <p className="text-xs text-gray-400">Updates as you type — click Save to apply for students</p>
         </div>
-        <div className="flex-1 overflow-auto flex items-start justify-center p-8">
+        <div className="flex-1 overflow-auto flex items-start justify-center p-10">
           <div className="w-full max-w-2xl shadow-2xl rounded-sm">
             <CertPreview t={form} />
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

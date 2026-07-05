@@ -117,7 +117,7 @@ async function createCourse(tenantId, data, user) {
       requirements: data.requirements || [],
       objectives: data.objectives || [],
       capacity: data.capacity || 0,
-      certificateEnabled: data.certificateEnabled || false,
+      certificateEnabled: data.certificateEnabled !== false, // default true — matches Course.model.js's own schema default
       allowPreview: data.allowPreview || false,
       instructorId: data.instructorId || user.sub,
       status: 'draft',
@@ -1162,7 +1162,7 @@ async function cloneCourse(tenantId, courseId, user) {
     requirements: src.requirements || [],
     objectives: src.objectives || [],
     capacity: src.capacity || 0,
-    certificateEnabled: src.certificateEnabled || false,
+    certificateEnabled: src.certificateEnabled !== false,
     allowPreview: src.allowPreview || false,
     passingScore: src.passingScore || 70,
     accessDurationDays: src.accessDurationDays || 0,

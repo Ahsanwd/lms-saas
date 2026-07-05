@@ -254,7 +254,7 @@ export default function CertificatePage() {
 
             <p className="text-sm text-gray-500 mb-4">{t?.subheading ?? 'This certifies that'}</p>
 
-            <h1 className="font-bold text-gray-900 mb-4" style={{ fontFamily: FONT_MAP.serif, fontSize: nameFontSize }}>
+            <h1 className="font-bold text-gray-900 mb-4" style={{ fontFamily, fontSize: nameFontSize }}>
               {data.studentName}
             </h1>
 
