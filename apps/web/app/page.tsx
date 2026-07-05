@@ -4,6 +4,18 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import axios from 'axios';
 import { applyBrandColor, applySecondaryColor, applyFontFamily } from '@/lib/brandColor';
+import {
+  LandingNavBar,
+  HeroSection,
+  AboutSection,
+  CoursesGrid,
+  TestimonialsSection,
+  CTASection,
+  ContactSection,
+  LandingFooter,
+  DEFAULT_WEBSITE_CONTENT,
+  type WebsiteContent,
+} from '@/components/website/LandingPageSections';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -137,26 +149,46 @@ function TenantLandingPage({ subdomain }: { subdomain: string }) {
   const [courses, setCourses] = useState<PublicCourse[]>([]);
   const [tenantName, setTenantName] = useState('');
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [website, setWebsite] = useState<WebsiteContent>(DEFAULT_WEBSITE_CONTENT);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    axios
-      .get(`${process.env.NEXT_PUBLIC_API_URL}/api/courses/public`, {
-        headers: { 'X-Tenant-Subdomain': subdomain },
-      })
-      .then((res) => {
-        setCourses(res.data.data.courses ?? []);
-        setTenantName(res.data.data.tenantName ?? '');
-        setLogoUrl(res.data.data.branding?.logoUrl ?? null);
-        if (res.data.data.branding?.primaryColor) applyBrandColor(res.data.data.branding.primaryColor);
-        if (res.data.data.branding?.secondaryColor) applySecondaryColor(res.data.data.branding.secondaryColor);
-        applyFontFamily(res.data.data.branding?.fontFamily);
+    const headers = { 'X-Tenant-Subdomain': subdomain };
+    Promise.all([
+      axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/courses/public`, { headers }),
+      axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/tenant/website/public`, { headers }).catch(() => null),
+    ])
+      .then(([coursesRes, websiteRes]) => {
+        setCourses(coursesRes.data.data.courses ?? []);
+        setTenantName(coursesRes.data.data.tenantName ?? '');
+        setLogoUrl(coursesRes.data.data.branding?.logoUrl ?? null);
+        if (coursesRes.data.data.branding?.primaryColor) applyBrandColor(coursesRes.data.data.branding.primaryColor);
+        if (coursesRes.data.data.branding?.secondaryColor) applySecondaryColor(coursesRes.data.data.branding.secondaryColor);
+        applyFontFamily(coursesRes.data.data.branding?.fontFamily);
+        if (websiteRes?.data?.data?.isPublished) {
+          setWebsite({ ...DEFAULT_WEBSITE_CONTENT, ...websiteRes.data.data });
+        }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [subdomain]);
 
   const displayName = tenantName || subdomain;
+
+  if (website.isPublished) {
+    return (
+      <div className="min-h-screen bg-white text-gray-900">
+        <LandingNavBar logoUrl={logoUrl} displayName={displayName} />
+        <HeroSection hero={website.hero} displayName={displayName} />
+        <AboutSection about={website.about} />
+        <CoursesGrid courses={courses} loading={loading} coursesSection={website.coursesSection} />
+        <TestimonialsSection testimonials={website.testimonials} />
+        <CTASection cta={website.cta} />
+        <ContactSection contact={website.contact} />
+        <LandingFooter displayName={displayName} />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white text-gray-900">

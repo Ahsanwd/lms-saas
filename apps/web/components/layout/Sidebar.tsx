@@ -101,6 +101,11 @@ const BundleIcon = () => (
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
   </svg>
 );
+const WebsiteIcon = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12a9 9 0 1018 0 9 9 0 00-18 0zm0 0h18M12 3a14.5 14.5 0 010 18M12 3a14.5 14.5 0 000 18" />
+  </svg>
+);
 const MembershipIcon = () => (
   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 9a2 2 0 10-4 0v5a2 2 0 01-2 2h6m-6-4h4m8 0a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -174,6 +179,7 @@ const NAV_ENTRIES: NavEntry[] = [
     items: [
       { href: '/coupons',          label: 'Coupons',          icon: <CouponIcon />,     roles: ['tenant_admin'] },
       { href: '/membership-plans', label: 'Membership Plans', icon: <MembershipIcon />, roles: ['tenant_admin'] },
+      { href: '/website-builder',  label: 'Website Builder',  icon: <WebsiteIcon />,    roles: ['tenant_admin'] },
       { href: '/membership',       label: 'Membership',       icon: <MembershipIcon />, roles: ['student'] },
       { href: '/my-payments',      label: 'Payment History',  icon: <CreditCardIcon />, roles: ['student'] },
       { href: '/bookmarks',        label: 'Saved Courses',    icon: <BookmarkIcon />,   roles: ['student'] },

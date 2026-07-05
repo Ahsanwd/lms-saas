@@ -6,6 +6,8 @@ const { upload } = require('../../services/storage/storage.service');
 
 // Public — no auth needed (login/register/storefront pages fetch this for branding)
 router.get('/branding', ctrl.getPublicBranding);
+// Public — no auth needed (tenant subdomain landing page fetches this for website builder content)
+router.get('/website/public', ctrl.getPublicWebsiteContent);
 
 // All other tenant routes require authentication
 router.use(authenticate);
@@ -49,5 +51,10 @@ router.get(   '/bunny-stream',      requireRole('tenant_admin'), ctrl.getBunnySt
 router.post(  '/bunny-stream',      requireRole('tenant_admin'), ctrl.saveBunnyStreamSettings);
 router.delete('/bunny-stream',      requireRole('tenant_admin'), ctrl.disconnectBunnyStream);
 router.post(  '/bunny-stream/test', requireRole('tenant_admin'), ctrl.testBunnyStreamConnection);
+
+// Website Builder — public landing-page content (tenant admin only)
+router.get( '/website',       requireRole('tenant_admin'), ctrl.getWebsiteContent);
+router.put( '/website',       requireRole('tenant_admin'), ctrl.saveWebsiteContent);
+router.post('/website/image', requireRole('tenant_admin'), upload('thumbnail').single('image'), ctrl.uploadWebsiteImage);
 
 module.exports = router;

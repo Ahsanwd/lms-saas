@@ -259,6 +259,39 @@ async function getPublicBranding(req, res, next) {
   } catch (err) { next(err); }
 }
 
+// ── Website Builder ────────────────────────────────────────────────────────────
+async function getWebsiteContent(req, res, next) {
+  try {
+    const content = await tenantService.getWebsiteContent(req.tenant.tenantId);
+    R.success(res, { website: content });
+  } catch (err) { next(err); }
+}
+
+async function saveWebsiteContent(req, res, next) {
+  try {
+    const content = await tenantService.saveWebsiteContent(req.tenant.tenantId, req.body);
+    R.success(res, { website: content }, 'Website saved');
+  } catch (err) { next(err); }
+}
+
+// Public — no auth. Served on the tenant's subdomain landing page.
+async function getPublicWebsiteContent(req, res, next) {
+  try {
+    if (!req.tenant) return R.success(res, { isPublished: false });
+    const content = await tenantService.getPublicWebsiteContent(req.tenant.tenantId);
+    R.success(res, content);
+  } catch (err) { next(err); }
+}
+
+async function uploadWebsiteImage(req, res, next) {
+  try {
+    if (!req.file) return R.error(res, 'No file uploaded', 400);
+    const { getPublicUrl } = require('../../services/storage/storage.service');
+    const url = getPublicUrl(req.file.path);
+    R.success(res, { url }, 'Image uploaded');
+  } catch (err) { next(err); }
+}
+
 module.exports = {
   getMyTenant,
   getPublicBranding,
@@ -287,4 +320,8 @@ module.exports = {
   saveBunnyStreamSettings,
   disconnectBunnyStream,
   testBunnyStreamConnection,
+  getWebsiteContent,
+  saveWebsiteContent,
+  getPublicWebsiteContent,
+  uploadWebsiteImage,
 };

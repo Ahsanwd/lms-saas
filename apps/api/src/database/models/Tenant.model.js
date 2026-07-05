@@ -123,6 +123,48 @@ const tenantSchema = new mongoose.Schema(
       tokenAuthKeyEnc: { type: String,  default: null, select: false }, // AES-256 encrypted, optional
     },
 
+    // Public landing-page content builder (tenant subdomain homepage).
+    // isPublished=false (default) means every existing tenant keeps today's
+    // hardcoded landing page with zero behavior change until they opt in.
+    websiteContent: {
+      instituteType: { type: String, enum: ['school', 'academy', 'college', 'university', null], default: null },
+      isPublished:   { type: Boolean, default: false },
+
+      hero: {
+        headline:           { type: String, default: null },
+        subheadline:        { type: String, default: null },
+        ctaText:            { type: String, default: null },
+        ctaLink:            { type: String, default: null },
+        backgroundImageUrl: { type: String, default: null },
+      },
+      about: {
+        heading:  { type: String, default: null },
+        body:     { type: String, default: null },
+        imageUrl: { type: String, default: null },
+      },
+      coursesSection: {
+        heading:    { type: String, default: null },
+        subheading: { type: String, default: null },
+      },
+      testimonials: [{
+        name:      { type: String, default: null },
+        role:      { type: String, default: null },
+        quote:     { type: String, default: null },
+        avatarUrl: { type: String, default: null },
+      }],
+      cta: {
+        heading:    { type: String, default: null },
+        subtext:    { type: String, default: null },
+        buttonText: { type: String, default: null },
+        buttonLink: { type: String, default: null },
+      },
+      contact: {
+        email:   { type: String, default: null },
+        phone:   { type: String, default: null },
+        address: { type: String, default: null },
+      },
+    },
+
     contactEmail: { type: String, required: true, lowercase: true },
     storageUsedBytes: { type: Number, default: 0 },
 
