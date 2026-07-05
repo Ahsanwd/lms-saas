@@ -208,8 +208,12 @@ async function testEmailSmtp(tenantId, { host, port, secure, user, password, fro
 
 // ─── Get Payment Gateway Settings (secrets masked) ────────────────────────────
 async function getPaymentGatewaySettings(tenantId) {
+  // Note: don't also select the parent 'paymentGateway' path here — mixing a whole-object
+  // inclusion with a nested sub-path inclusion in the same projection makes MongoDB throw
+  // "Path collision". Selecting just the two normally-excluded leaf paths with '+' already
+  // returns the rest of the (non select:false) paymentGateway fields by default.
   const tenant = await Tenant.findById(tenantId)
-    .select('paymentGateway +paymentGateway.stripe.secretKeyEncrypted +paymentGateway.safepay.secretKeyEncrypted')
+    .select('+paymentGateway.stripe.secretKeyEncrypted +paymentGateway.safepay.secretKeyEncrypted')
     .lean();
   if (!tenant) throw new AppError('Tenant not found', 404);
 
@@ -310,8 +314,9 @@ async function disconnectGateway(tenantId, provider) {
 // ─── Internal: resolve tenant's active gateway with DECRYPTED credentials ─────
 // Used only by payment.service.js server-side — never exposed over HTTP.
 async function getActiveGateway(tenantId) {
+  // Same projection-collision fix as getPaymentGatewaySettings above.
   const tenant = await Tenant.findById(tenantId)
-    .select('paymentGateway +paymentGateway.stripe.secretKeyEncrypted +paymentGateway.safepay.secretKeyEncrypted')
+    .select('+paymentGateway.stripe.secretKeyEncrypted +paymentGateway.safepay.secretKeyEncrypted')
     .lean();
   if (!tenant) return { provider: null };
 
