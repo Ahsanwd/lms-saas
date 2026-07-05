@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -9,12 +9,25 @@ import api from '@/lib/api';
 import { connectSocket } from '@/lib/socket';
 import type { Role } from '@/types';
 
-interface NavItem {
+interface NavLeaf {
   href: string;
   label: string;
   icon: React.ReactNode;
   roles: Role[];
   badge?: 'notif-count' | 'chat-count';
+}
+
+interface NavGroup {
+  key: string;
+  label: string;
+  icon: React.ReactNode;
+  items: NavLeaf[];
+}
+
+type NavEntry = NavLeaf | NavGroup;
+
+function isGroup(entry: NavEntry): entry is NavGroup {
+  return 'items' in entry;
 }
 
 const BookIcon = () => (
@@ -129,48 +142,79 @@ const BellIcon = () => (
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
   </svg>
 );
+const ChevronIcon = ({ open }: { open: boolean }) => (
+  <svg className={cn('w-4 h-4 flex-shrink-0 text-gray-400 transition-transform duration-200', open && 'rotate-90')}
+    fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+  </svg>
+);
 
-const NAV_ITEMS: NavItem[] = [
-  // ── Dashboard ────────────────────────────────────────────────────────────
-  { href: '/dashboard',       label: 'Dashboard',     icon: <GridIcon />,        roles: ['tenant_admin', 'instructor', 'student'] },
-  { href: '/admin/dashboard', label: 'Dashboard',     icon: <GridIcon />,        roles: ['super_admin'] },
+const NAV_ENTRIES: NavEntry[] = [
+  // ── Dashboard (standalone) ────────────────────────────────────────────────
+  { href: '/dashboard',       label: 'Dashboard', icon: <GridIcon />, roles: ['tenant_admin', 'instructor', 'student'] },
+  { href: '/admin/dashboard', label: 'Dashboard', icon: <GridIcon />, roles: ['super_admin'] },
 
-  // ── Core learning ─────────────────────────────────────────────────────
-  { href: '/courses',         label: 'Courses',       icon: <BookIcon />,        roles: ['tenant_admin', 'instructor', 'student'] },
-  { href: '/my-learning',     label: 'My Learning',   icon: <GraduationCapIcon />, roles: ['student'] },
-  { href: '/assignments',     label: 'Assignments',   icon: <AssignmentIcon />,  roles: ['tenant_admin', 'instructor', 'student'] },
-  { href: '/certificates',    label: 'Certificates',  icon: <CertBuilderIcon />,  roles: ['student'] },
-  { href: '/quizzes',         label: 'Quizzes',       icon: <QuizIcon />,        roles: ['tenant_admin', 'instructor', 'student'] },
+  // ── Learning ───────────────────────────────────────────────────────────
+  {
+    key: 'learning', label: 'Learning', icon: <GraduationCapIcon />,
+    items: [
+      { href: '/courses',             label: 'Courses',      icon: <BookIcon />,          roles: ['tenant_admin', 'instructor', 'student'] },
+      { href: '/my-learning',         label: 'My Learning',  icon: <GraduationCapIcon />, roles: ['student'] },
+      { href: '/assignments',         label: 'Assignments',  icon: <AssignmentIcon />,    roles: ['tenant_admin', 'instructor', 'student'] },
+      { href: '/quizzes',             label: 'Quizzes',      icon: <QuizIcon />,          roles: ['tenant_admin', 'instructor', 'student'] },
+      { href: '/certificates',        label: 'Certificates', icon: <CertBuilderIcon />,   roles: ['student'] },
+      { href: '/certificate-builder', label: 'Certificates', icon: <CertBuilderIcon />,   roles: ['tenant_admin'] },
+      { href: '/bundles',             label: 'Bundles',      icon: <BundleIcon />,        roles: ['tenant_admin', 'instructor', 'student'] },
+    ],
+  },
 
-  // ── Rewards & marketing ────────────────────────────────────────────────
-  { href: '/certificate-builder', label: 'Certificates', icon: <CertBuilderIcon />, roles: ['tenant_admin'] },
-  { href: '/coupons',             label: 'Coupons',       icon: <CouponIcon />,      roles: ['tenant_admin'] },
-  { href: '/bundles',             label: 'Bundles',       icon: <BundleIcon />,      roles: ['tenant_admin', 'instructor', 'student'] },
-  { href: '/membership-plans',    label: 'Membership Plans', icon: <MembershipIcon />, roles: ['tenant_admin'] },
-  { href: '/membership',          label: 'Membership',    icon: <MembershipIcon />,  roles: ['student'] },
-  { href: '/my-payments',         label: 'Payment History', icon: <CreditCardIcon />, roles: ['student'] },
-  { href: '/bookmarks',           label: 'Saved Courses',   icon: <BookmarkIcon />,   roles: ['student'] },
+  // ── Monetization ───────────────────────────────────────────────────────
+  {
+    key: 'monetization', label: 'Monetization', icon: <CreditCardIcon />,
+    items: [
+      { href: '/coupons',          label: 'Coupons',          icon: <CouponIcon />,     roles: ['tenant_admin'] },
+      { href: '/membership-plans', label: 'Membership Plans', icon: <MembershipIcon />, roles: ['tenant_admin'] },
+      { href: '/membership',       label: 'Membership',       icon: <MembershipIcon />, roles: ['student'] },
+      { href: '/my-payments',      label: 'Payment History',  icon: <CreditCardIcon />, roles: ['student'] },
+      { href: '/bookmarks',        label: 'Saved Courses',    icon: <BookmarkIcon />,   roles: ['student'] },
+      { href: '/billing',          label: 'Billing',          icon: <CreditCardIcon />, roles: ['tenant_admin'] },
+      { href: '/admin/billing',    label: 'Billing',          icon: <CreditCardIcon />, roles: ['super_admin'] },
+      { href: '/admin/refunds',    label: 'Refund Requests',  icon: <RefundIcon />,     roles: ['tenant_admin'] },
+    ],
+  },
 
-  // ── Communication ─────────────────────────────────────────────────────
-  { href: '/notifications',   label: 'Notifications', icon: <BellIcon />,        roles: ['tenant_admin', 'instructor', 'student'], badge: 'notif-count' },
-  { href: '/chat',            label: 'Chat',          icon: <ChatIcon />,         roles: ['tenant_admin', 'instructor', 'student'], badge: 'chat-count' },
-  { href: '/announcements',   label: 'Announcements', icon: <MegaphoneIcon />,   roles: ['tenant_admin', 'instructor', 'student'] },
+  // ── Engage ─────────────────────────────────────────────────────────────
+  {
+    key: 'engage', label: 'Engage', icon: <ChatIcon />,
+    items: [
+      { href: '/notifications', label: 'Notifications', icon: <BellIcon />,      roles: ['tenant_admin', 'instructor', 'student'], badge: 'notif-count' },
+      { href: '/chat',          label: 'Chat',           icon: <ChatIcon />,      roles: ['tenant_admin', 'instructor', 'student'], badge: 'chat-count' },
+      { href: '/announcements', label: 'Announcements',  icon: <MegaphoneIcon />, roles: ['tenant_admin', 'instructor', 'student'] },
+      { href: '/groups',        label: 'Groups',         icon: <GroupIcon />,     roles: ['tenant_admin'] },
+      { href: '/cohorts',       label: 'Cohorts',        icon: <CohortIcon />,    roles: ['tenant_admin'] },
+    ],
+  },
 
-  // ── Community & insights ──────────────────────────────────────────────
-  { href: '/groups',          label: 'Groups',        icon: <GroupIcon />,       roles: ['tenant_admin'] },
-  { href: '/cohorts',         label: 'Cohorts',       icon: <CohortIcon />,      roles: ['tenant_admin'] },
-  { href: '/analytics',       label: 'Analytics',     icon: <ChartIcon />,       roles: ['tenant_admin', 'instructor'] },
+  // ── Insights ───────────────────────────────────────────────────────────
+  {
+    key: 'insights', label: 'Insights', icon: <ChartIcon />,
+    items: [
+      { href: '/analytics',   label: 'Analytics',   icon: <ChartIcon />, roles: ['tenant_admin', 'instructor'] },
+      { href: '/share-links', label: 'Share Links', icon: <ShareIcon />, roles: ['tenant_admin', 'instructor'] },
+    ],
+  },
 
-  // ── Growth ───────────────────────────────────────────────────────────
-  { href: '/share-links',     label: 'Share Links',   icon: <ShareIcon />,       roles: ['tenant_admin', 'instructor'] },
+  // ── Admin ──────────────────────────────────────────────────────────────
+  {
+    key: 'admin', label: 'Admin', icon: <UsersIcon />,
+    items: [
+      { href: '/users',         label: 'Users',   icon: <UsersIcon />,    roles: ['tenant_admin'] },
+      { href: '/admin/tenants', label: 'Tenants', icon: <BuildingIcon />, roles: ['super_admin'] },
+    ],
+  },
 
-  // ── Admin ─────────────────────────────────────────────────────────────
-  { href: '/users',           label: 'Users',         icon: <UsersIcon />,       roles: ['tenant_admin'] },
-  { href: '/admin/tenants',   label: 'Tenants',       icon: <BuildingIcon />,    roles: ['super_admin'] },
-  { href: '/billing',         label: 'Billing',       icon: <CreditCardIcon />,  roles: ['tenant_admin'] },
-  { href: '/admin/billing',   label: 'Billing',       icon: <CreditCardIcon />,  roles: ['super_admin'] },
-  { href: '/admin/refunds',   label: 'Refund Requests', icon: <RefundIcon />,    roles: ['tenant_admin'] },
-  { href: '/settings',        label: 'Settings',      icon: <SettingsIcon />,    roles: ['tenant_admin', 'instructor', 'student'] },
+  // ── Settings (standalone, bottom) ───────────────────────────────────────
+  { href: '/settings', label: 'Settings', icon: <SettingsIcon />, roles: ['tenant_admin', 'instructor', 'student'] },
 ];
 
 interface SidebarProps {
@@ -189,10 +233,40 @@ interface SidebarProps {
 export function Sidebar({ role, tenantName, logoUrl, isOpen = false, onClose, effectiveRole }: SidebarProps) {
   const pathname = usePathname();
   const navRole  = effectiveRole ?? role;
-  const items    = NAV_ITEMS.filter((item) => item.roles.includes(navRole));
   const queryClient = useQueryClient();
 
   const isImpersonating = !!effectiveRole && effectiveRole !== role;
+
+  // Filter by role — a group only survives if at least one of its children does,
+  // so e.g. a student never sees an empty "Admin" section header.
+  const entries: NavEntry[] = NAV_ENTRIES.reduce<NavEntry[]>((acc, entry) => {
+    if (isGroup(entry)) {
+      const visibleItems = entry.items.filter((i) => i.roles.includes(navRole));
+      if (visibleItems.length > 0) acc.push({ ...entry, items: visibleItems });
+    } else if (entry.roles.includes(navRole)) {
+      acc.push(entry);
+    }
+    return acc;
+  }, []);
+
+  const isActiveHref = (href: string) => pathname === href || pathname.startsWith(href + '/');
+
+  // Groups start expanded only if they contain the current route.
+  const [openGroups, setOpenGroups] = useState<Set<string>>(() => {
+    const initial = new Set<string>();
+    for (const entry of entries) {
+      if (isGroup(entry) && entry.items.some((i) => isActiveHref(i.href))) initial.add(entry.key);
+    }
+    return initial;
+  });
+
+  const toggleGroup = (key: string) => {
+    setOpenGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
 
   const { data: countData } = useQuery({
     queryKey: ['notif-count'],
@@ -217,6 +291,65 @@ export function Sidebar({ role, tenantName, logoUrl, isOpen = false, onClose, ef
     staleTime: 10_000,
   });
   const chatUnreadCount = chatCountData?.count ?? 0;
+
+  const getBadgeCount = (item: NavLeaf) =>
+    item.badge === 'notif-count' ? unreadCount : item.badge === 'chat-count' ? chatUnreadCount : 0;
+
+  const renderLeaf = (item: NavLeaf, nested = false) => {
+    const active = isActiveHref(item.href);
+    const badgeCount = getBadgeCount(item);
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        className={cn(
+          'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+          nested && 'pl-9',
+          active
+            ? 'bg-primary-50 text-primary-700'
+            : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+        )}
+      >
+        <span className={cn(active ? 'text-primary-600' : 'text-gray-400')}>
+          {item.icon}
+        </span>
+        <span className="flex-1">{item.label}</span>
+        {badgeCount > 0 && (
+          <span className="min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 leading-none">
+            {badgeCount > 99 ? '99+' : badgeCount}
+          </span>
+        )}
+      </Link>
+    );
+  };
+
+  const renderGroup = (group: NavGroup) => {
+    const open = openGroups.has(group.key);
+    const hasActive = group.items.some((i) => isActiveHref(i.href));
+    const hasBadge = group.items.some((i) => getBadgeCount(i) > 0);
+    return (
+      <div key={group.key}>
+        <button
+          type="button"
+          onClick={() => toggleGroup(group.key)}
+          className={cn(
+            'w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+            hasActive ? 'text-gray-900' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+          )}
+        >
+          <span className={cn(hasActive ? 'text-primary-600' : 'text-gray-400')}>{group.icon}</span>
+          <span className="flex-1 text-left">{group.label}</span>
+          {!open && hasBadge && <span className="w-2 h-2 rounded-full bg-red-500" />}
+          <ChevronIcon open={open} />
+        </button>
+        {open && (
+          <div className="mt-0.5 space-y-0.5">
+            {group.items.map((item) => renderLeaf(item, true))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   // Real-time: bump the chat badge the instant a message arrives, instead of
   // waiting on the 30s poll (see chat.service.js sendMessage -> chat_notification)
@@ -274,34 +407,14 @@ export function Sidebar({ role, tenantName, logoUrl, isOpen = false, onClose, ef
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        {items.map((item) => {
-          const active = pathname === item.href || pathname.startsWith(item.href + '/');
-          const badgeCount = item.badge === 'notif-count' ? unreadCount
-            : item.badge === 'chat-count' ? chatUnreadCount
-            : 0;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
-                active
-                  ? 'bg-primary-50 text-primary-700'
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-              )}
-            >
-              <span className={cn(active ? 'text-primary-600' : 'text-gray-400')}>
-                {item.icon}
-              </span>
-              <span className="flex-1">{item.label}</span>
-              {badgeCount > 0 && (
-                <span className="min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 leading-none">
-                  {badgeCount > 99 ? '99+' : badgeCount}
-                </span>
-              )}
-            </Link>
-          );
-        })}
+        {entries.map((entry, idx) => (
+          <div key={isGroup(entry) ? entry.key : entry.href}>
+            {idx === entries.length - 1 && entries.length > 1 && (
+              <div className="my-2 border-t border-gray-100" />
+            )}
+            {isGroup(entry) ? renderGroup(entry) : renderLeaf(entry)}
+          </div>
+        ))}
       </nav>
     </aside>
     </>

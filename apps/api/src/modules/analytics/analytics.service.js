@@ -6,6 +6,7 @@ const CourseProgress  = require('../../database/models/CourseProgress.model');
 const LessonProgress  = require('../../database/models/LessonProgress.model');
 const QuizAttempt     = require('../../database/models/QuizAttempt.model');
 const CoursePayment   = require('../../database/models/CoursePayment.model');
+const BundlePayment   = require('../../database/models/BundlePayment.model');
 const { getCached, setCached } = require('../../services/redis');
 
 const CACHE_TTL = 30 * 60; // 30 minutes
@@ -103,7 +104,10 @@ async function getRevenueReport(tenantId, { months = 12, from, to } = {}) {
   const { since, until } = resolveRange({ from, to, months });
   const dateFilter = { $gte: since, $lte: until };
 
-  const [totals, monthly, byCourse, byProvider] = await Promise.all([
+  const [
+    totals, monthly, byCourse, byProvider,
+    bundleTotals, bundleMonthly, byBundle, bundleByProvider,
+  ] = await Promise.all([
     CoursePayment.aggregate([
       { $match: { tenantId: tid, status: 'completed', createdAt: dateFilter } },
       { $group: { _id: null, total: { $sum: '$amount' }, count: { $sum: 1 } } },
@@ -129,20 +133,78 @@ async function getRevenueReport(tenantId, { months = 12, from, to } = {}) {
       { $match: { tenantId: tid, status: 'completed', createdAt: dateFilter } },
       { $group: { _id: '$provider', revenue: { $sum: '$amount' }, count: { $sum: 1 } } },
     ]),
+    // ── Bundle payments — merged into totals/monthly/byProvider below, and
+    // also broken out separately as byBundle (bundle sales aren't attributable
+    // to a single course, so they can't just be folded into byCourse). ──────
+    BundlePayment.aggregate([
+      { $match: { tenantId: tid, status: 'completed', createdAt: dateFilter } },
+      { $group: { _id: null, total: { $sum: '$amount' }, count: { $sum: 1 } } },
+    ]),
+    BundlePayment.aggregate([
+      { $match: { tenantId: tid, status: 'completed', createdAt: dateFilter } },
+      { $group: {
+        _id:     { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } },
+        revenue: { $sum: '$amount' },
+        count:   { $sum: 1 },
+      }},
+      { $sort: { '_id.year': 1, '_id.month': 1 } },
+    ]),
+    BundlePayment.aggregate([
+      { $match: { tenantId: tid, status: 'completed', createdAt: dateFilter } },
+      { $group: { _id: '$bundleId', revenue: { $sum: '$amount' }, sales: { $sum: 1 } } },
+      { $sort: { revenue: -1 } },
+      { $limit: 10 },
+      { $lookup: { from: 'coursebundles', localField: '_id', foreignField: '_id', as: 'bundle' } },
+      { $unwind: { path: '$bundle', preserveNullAndEmptyArrays: true } },
+    ]),
+    BundlePayment.aggregate([
+      { $match: { tenantId: tid, status: 'completed', createdAt: dateFilter } },
+      { $group: { _id: '$provider', revenue: { $sum: '$amount' }, count: { $sum: 1 } } },
+    ]),
   ]);
 
+  // ── Merge course + bundle revenue into the combined totals/monthly/byProvider ──
+  const totalRevenue = (totals[0]?.total ?? 0) + (bundleTotals[0]?.total ?? 0);
+  const totalSales   = (totals[0]?.count ?? 0) + (bundleTotals[0]?.count ?? 0);
+
+  const monthlyMap = new Map();
+  for (const m of monthly) monthlyMap.set(`${m._id.year}-${m._id.month}`, { _id: m._id, revenue: m.revenue, count: m.count });
+  for (const m of bundleMonthly) {
+    const key = `${m._id.year}-${m._id.month}`;
+    const existing = monthlyMap.get(key);
+    if (existing) { existing.revenue += m.revenue; existing.count += m.count; }
+    else monthlyMap.set(key, { _id: m._id, revenue: m.revenue, count: m.count });
+  }
+  const mergedMonthly = Array.from(monthlyMap.values())
+    .sort((a, b) => a._id.year - b._id.year || a._id.month - b._id.month);
+
+  const providerMap = new Map();
+  for (const p of byProvider) providerMap.set(p._id, { _id: p._id, revenue: p.revenue, count: p.count });
+  for (const p of bundleByProvider) {
+    const existing = providerMap.get(p._id);
+    if (existing) { existing.revenue += p.revenue; existing.count += p.count; }
+    else providerMap.set(p._id, { _id: p._id, revenue: p.revenue, count: p.count });
+  }
+  const mergedByProvider = Array.from(providerMap.values());
+
   const result = {
-    totalRevenue:  totals[0]?.total ?? 0,
-    totalSales:    totals[0]?.count ?? 0,
-    avgOrderValue: totals[0]?.count ? Math.round((totals[0].total / totals[0].count)) : 0,
-    monthly,
+    totalRevenue,
+    totalSales,
+    avgOrderValue: totalSales ? Math.round(totalRevenue / totalSales) : 0,
+    monthly: mergedMonthly,
     byCourse: byCourse.map(c => ({
       courseId: c._id,
       title:    c.course?.title ?? 'Unknown Course',
       revenue:  c.revenue,
       sales:    c.sales,
     })),
-    byProvider,
+    byBundle: byBundle.map(b => ({
+      bundleId: b._id,
+      title:    b.bundle?.title ?? 'Unknown Bundle',
+      revenue:  b.revenue,
+      sales:    b.sales,
+    })),
+    byProvider: mergedByProvider,
     range: { from: since.toISOString(), to: until.toISOString() },
   };
 

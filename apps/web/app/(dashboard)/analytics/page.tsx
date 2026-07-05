@@ -443,6 +443,36 @@ function RevenueTab() {
               </div>
             )}
           </Card>
+
+          <Card>
+            <div className="flex items-center justify-between mb-3">
+              <SectionTitle>Top Bundles by Revenue</SectionTitle>
+            </div>
+            {(data?.byBundle ?? []).length === 0 ? <Empty msg="No bundle sales yet." /> : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="border-b border-gray-100">
+                    <tr>
+                      <th className="py-2 text-left font-medium text-gray-500">#</th>
+                      <th className="py-2 text-left font-medium text-gray-500">Bundle</th>
+                      <th className="py-2 text-right font-medium text-gray-500">Sales</th>
+                      <th className="py-2 text-right font-medium text-gray-500">Revenue</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {data?.byBundle.map((b: any, i: number) => (
+                      <tr key={b.bundleId} className="hover:bg-gray-50">
+                        <td className="py-2.5 text-gray-300 font-bold text-xs w-6">{i + 1}</td>
+                        <td className="py-2.5 font-medium text-gray-900 max-w-xs truncate">{b.title}</td>
+                        <td className="py-2.5 text-right text-gray-600">{b.sales}</td>
+                        <td className="py-2.5 text-right font-semibold text-gray-900">{fmt$(b.revenue)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
         </>
       )}
     </div>
