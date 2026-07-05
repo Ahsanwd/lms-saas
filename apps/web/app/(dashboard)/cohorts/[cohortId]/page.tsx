@@ -240,7 +240,7 @@ function ReportTab({ cohortId }: { cohortId: string }) {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
       {/* Stat cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-4">
         {statCards.map(s => (
@@ -337,7 +337,7 @@ export default function CohortDetailPage() {
   if (!cohort)  return <div className="text-gray-500 p-6">Cohort not found.</div>;
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
       {/* Back + header */}
       <div>
         <button

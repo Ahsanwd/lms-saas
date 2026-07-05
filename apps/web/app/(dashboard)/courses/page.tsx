@@ -375,7 +375,7 @@ function StudentCatalog() {
   const enrolledCount = enrolledIds.size;
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
 
       {/* ── Hero header ── */}
       <div className="relative rounded-2xl overflow-hidden bg-gradient-to-r from-primary-600 via-primary-700 to-blue-700 px-8 py-8 shadow-lg">

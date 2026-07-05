@@ -81,7 +81,7 @@ export default function StudentDashboardPage() {
   const noActivity = (data?.enrollments?.total ?? 0) === 0;
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
       {/* Greeting */}
       <div className="flex items-center justify-between gap-4">
         <div>
