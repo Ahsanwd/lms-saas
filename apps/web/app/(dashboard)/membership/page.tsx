@@ -387,7 +387,7 @@ export default function MembershipPage() {
     : 0;
 
   return (
-    <div className="space-y-8">
+    <div className="p-6 space-y-8">
       {/* Header */}
       <div className="text-center">
         <h1 className="text-2xl font-bold text-gray-900">Membership Plans</h1>

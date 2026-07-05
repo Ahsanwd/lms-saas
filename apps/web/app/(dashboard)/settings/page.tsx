@@ -711,7 +711,7 @@ function StudentSettings() {
   }
 
   return (
-    <div className="max-w-2xl space-y-5">
+    <div className="p-6 max-w-2xl space-y-5">
       {/* Header with avatar upload */}
       <div className="flex items-center gap-4">
         <div className="relative flex-shrink-0">
@@ -1700,7 +1700,7 @@ function AdminSettings() {
   if (tenantLoading) return <div className="flex justify-center py-20"><Spinner size="lg" /></div>;
 
   return (
-    <div className="max-w-5xl space-y-6">
+    <div className="p-6 max-w-5xl space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2.5">
           <span className="w-9 h-9 rounded-xl bg-primary-50 text-primary-600 flex items-center justify-center">
@@ -1715,17 +1715,17 @@ function AdminSettings() {
       </div>
 
       {/* ── Tab bar ── */}
-      <div className="flex items-center gap-1 border-b border-gray-200 overflow-x-auto">
+      <div className="inline-flex items-center gap-1 bg-gray-100 rounded-xl p-1 overflow-x-auto max-w-full">
         {SETTINGS_TABS.map(t => (
           <button
             key={t.key}
             type="button"
             onClick={() => setActiveTab(t.key)}
             className={cn(
-              'px-3.5 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 -mb-px transition-colors',
+              'px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-all',
               activeTab === t.key
-                ? 'border-primary-600 text-primary-700'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                ? 'bg-white text-primary-700 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
             )}
           >
             {t.label}

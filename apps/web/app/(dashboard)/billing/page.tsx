@@ -729,7 +729,9 @@ function CurrentPlanCard({
   const buttonLabel = hasHigherPlan ? 'Upgrade Plan' : otherPlans.length > 0 ? 'Change Plan' : null;
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6">
+    <div className="bg-white rounded-xl border border-primary-100 shadow-sm overflow-hidden">
+      <div className="h-1.5 bg-gradient-to-r from-primary-500 to-primary-600" />
+      <div className="p-6">
       {/* Top row */}
       <div className="flex items-start justify-between gap-4 mb-5">
         <div>
@@ -805,6 +807,7 @@ function CurrentPlanCard({
             </Button>
           )}
         </div>
+      </div>
       </div>
     </div>
   );

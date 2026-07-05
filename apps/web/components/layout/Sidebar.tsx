@@ -251,21 +251,17 @@ export function Sidebar({ role, tenantName, logoUrl, isOpen = false, onClose, ef
 
   const isActiveHref = (href: string) => pathname === href || pathname.startsWith(href + '/');
 
-  // Groups start expanded only if they contain the current route.
-  const [openGroups, setOpenGroups] = useState<Set<string>>(() => {
-    const initial = new Set<string>();
+  // Accordion — only one group open at a time. Starts on whichever group
+  // contains the current route, so opening a different group auto-closes it.
+  const [openGroup, setOpenGroup] = useState<string | null>(() => {
     for (const entry of entries) {
-      if (isGroup(entry) && entry.items.some((i) => isActiveHref(i.href))) initial.add(entry.key);
+      if (isGroup(entry) && entry.items.some((i) => isActiveHref(i.href))) return entry.key;
     }
-    return initial;
+    return null;
   });
 
   const toggleGroup = (key: string) => {
-    setOpenGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key); else next.add(key);
-      return next;
-    });
+    setOpenGroup((prev) => (prev === key ? null : key));
   };
 
   const { data: countData } = useQuery({
@@ -324,7 +320,7 @@ export function Sidebar({ role, tenantName, logoUrl, isOpen = false, onClose, ef
   };
 
   const renderGroup = (group: NavGroup) => {
-    const open = openGroups.has(group.key);
+    const open = openGroup === group.key;
     const hasActive = group.items.some((i) => isActiveHref(i.href));
     const hasBadge = group.items.some((i) => getBadgeCount(i) > 0);
     return (
