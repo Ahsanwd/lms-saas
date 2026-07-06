@@ -175,6 +175,17 @@ function TenantLandingPage({ subdomain }: { subdomain: string }) {
 
   const displayName = tenantName || subdomain;
 
+  // Wait for branding + published-website state to resolve before rendering
+  // anything — otherwise the page briefly flashes the default/fallback
+  // layout before swapping to the tenant's real published content.
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="w-10 h-10 rounded-full border-4 border-gray-100 border-t-primary-600 animate-spin" />
+      </div>
+    );
+  }
+
   if (website.isPublished) {
     return (
       <div className="min-h-screen bg-white text-gray-900">
@@ -244,24 +255,11 @@ function TenantLandingPage({ subdomain }: { subdomain: string }) {
         <div className="max-w-6xl mx-auto">
           <div className="flex items-center justify-between mb-8">
             <h2 className="text-2xl font-bold text-gray-900">
-              {loading ? 'Loading courses…' : courses.length > 0 ? `All Courses (${courses.length})` : 'No courses yet'}
+              {courses.length > 0 ? `All Courses (${courses.length})` : 'No courses yet'}
             </h2>
           </div>
 
-          {loading ? (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="rounded-2xl border border-gray-100 overflow-hidden animate-pulse">
-                  <div className="aspect-video bg-gray-100" />
-                  <div className="p-4 space-y-2">
-                    <div className="h-3 bg-gray-100 rounded w-1/3" />
-                    <div className="h-4 bg-gray-100 rounded w-full" />
-                    <div className="h-3 bg-gray-100 rounded w-2/3" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : courses.length === 0 ? (
+          {courses.length === 0 ? (
             <div className="text-center py-20 text-gray-400">
               <svg className="w-16 h-16 mx-auto mb-4 text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
