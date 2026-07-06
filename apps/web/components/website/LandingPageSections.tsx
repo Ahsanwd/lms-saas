@@ -89,34 +89,46 @@ export function LandingNavBar({ logoUrl, displayName, linksDisabled }: { logoUrl
 // ─── Hero ─────────────────────────────────────────────────────────────────────
 
 export function HeroSection({ hero, displayName, linksDisabled }: { hero: WebsiteContent['hero']; displayName: string; linksDisabled?: boolean }) {
-  const bgStyle = hero.backgroundImageUrl
+  const hasBg = !!hero.backgroundImageUrl;
+  const bgStyle = hasBg
     ? { backgroundImage: `url(${hero.backgroundImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }
     : undefined;
   return (
     <section
-      className={bgStyle ? 'pt-20 pb-16 px-6 text-center relative' : 'pt-16 pb-12 px-6 text-center bg-gradient-to-b from-primary-50 to-white'}
+      className={
+        hasBg
+          ? 'min-h-screen flex flex-col items-center justify-center px-6 text-center relative'
+          : 'min-h-screen flex flex-col items-center justify-center px-6 text-center bg-gradient-to-b from-primary-50 via-white to-white'
+      }
       style={bgStyle}
     >
-      {bgStyle && <div className="absolute inset-0 bg-black/40" />}
-      <div className={bgStyle ? 'max-w-2xl mx-auto relative' : 'max-w-2xl mx-auto'}>
-        <h1 className={bgStyle ? 'text-4xl font-extrabold leading-tight mb-4 text-white' : 'text-4xl font-extrabold text-gray-900 leading-tight mb-4'}>
+      {hasBg && <div className="absolute inset-0 bg-black/50" />}
+      <div className={hasBg ? 'max-w-3xl mx-auto relative' : 'max-w-3xl mx-auto'}>
+        <h1 className={hasBg ? 'text-5xl sm:text-6xl font-extrabold leading-tight mb-6 text-white' : 'text-5xl sm:text-6xl font-extrabold text-gray-900 leading-tight mb-6'}>
           {hero.headline || <>Learn with <span className="text-primary-600 capitalize">{displayName}</span></>}
         </h1>
-        <p className={bgStyle ? 'text-base mb-6 max-w-lg mx-auto text-gray-100' : 'text-base text-gray-500 mb-6 max-w-lg mx-auto'}>
+        <p className={hasBg ? 'text-lg sm:text-xl mb-10 max-w-xl mx-auto text-gray-100' : 'text-lg sm:text-xl text-gray-500 mb-10 max-w-xl mx-auto'}>
           {hero.subheadline || 'Browse our courses below and start learning today. Sign up for free to enroll.'}
         </p>
         {linksDisabled ? (
-          <span className="inline-block bg-primary-600 text-white text-sm font-semibold px-7 py-3 rounded-xl shadow-lg shadow-primary-200 cursor-pointer">
+          <span className="inline-block bg-primary-600 text-white text-base font-semibold px-9 py-4 rounded-xl shadow-lg shadow-primary-200 cursor-pointer">
             {hero.ctaText || 'Create free account'}
           </span>
         ) : (
           <Link
             href={hero.ctaLink || '/register'}
-            className="inline-block bg-primary-600 text-white text-sm font-semibold px-7 py-3 rounded-xl hover:bg-primary-700 transition-colors shadow-lg shadow-primary-200"
+            className="inline-block bg-primary-600 text-white text-base font-semibold px-9 py-4 rounded-xl hover:bg-primary-700 transition-colors shadow-lg shadow-primary-200"
           >
             {hero.ctaText || 'Create free account'}
           </Link>
         )}
+      </div>
+
+      {/* Scroll cue */}
+      <div className={hasBg ? 'absolute bottom-8 left-1/2 -translate-x-1/2 text-white/80 animate-bounce' : 'absolute bottom-8 left-1/2 -translate-x-1/2 text-gray-300 animate-bounce'}>
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+        </svg>
       </div>
     </section>
   );
