@@ -32,7 +32,7 @@ export interface WebsiteContent {
   instituteType: 'school' | 'academy' | 'college' | 'university' | null;
   isPublished: boolean;
   hero: { headline: string; subheadline: string; ctaText: string; ctaLink: string; backgroundImageUrl: string | null };
-  about: { heading: string; body: string; imageUrl: string | null };
+  about: { heading: string; body: string; imageUrl: string | null; ctaText: string; ctaLink: string };
   coursesSection: { heading: string; subheading: string };
   testimonials: Testimonial[];
   cta: { heading: string; subtext: string; buttonText: string; buttonLink: string };
@@ -136,17 +136,35 @@ export function HeroSection({ hero, displayName, linksDisabled, heightClass = 'm
 
 // ─── About ────────────────────────────────────────────────────────────────────
 
-export function AboutSection({ about }: { about: WebsiteContent['about'] }) {
+export function AboutSection({ about, linksDisabled }: { about: WebsiteContent['about']; linksDisabled?: boolean }) {
   if (!about.heading && !about.body) return null;
   return (
-    <section className="py-14 px-6 bg-gray-50">
-      <div className="max-w-5xl mx-auto grid md:grid-cols-2 gap-10 items-center">
-        {about.imageUrl && (
-          <img src={about.imageUrl} alt={about.heading} className="w-full rounded-2xl object-cover aspect-video md:aspect-square" />
+    <section className="py-20 px-6 bg-gray-50">
+      <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-14 items-center min-h-[26rem]">
+        {about.imageUrl ? (
+          <div className="relative">
+            <div className="absolute -inset-4 bg-gradient-to-tr from-primary-100 to-secondary-100 rounded-3xl -z-10 hidden md:block" />
+            <img src={about.imageUrl} alt={about.heading} className="w-full h-full max-h-[32rem] rounded-2xl object-cover shadow-xl aspect-square md:aspect-auto" />
+          </div>
+        ) : (
+          <div className="hidden md:flex items-center justify-center h-full max-h-[32rem] rounded-2xl bg-gradient-to-br from-primary-50 to-secondary-50 aspect-square">
+            <svg className="w-20 h-20 text-primary-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M4 8h16M4 4h16v16H4V4z" />
+            </svg>
+          </div>
         )}
-        <div className={about.imageUrl ? '' : 'md:col-span-2 text-center max-w-2xl mx-auto'}>
-          {about.heading && <h2 className="text-2xl font-bold text-gray-900 mb-3">{about.heading}</h2>}
-          {about.body && <p className="text-gray-600 leading-relaxed whitespace-pre-line">{about.body}</p>}
+        <div>
+          {about.heading && <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-5 leading-tight">{about.heading}</h2>}
+          {about.body && <p className="text-gray-600 text-lg leading-relaxed whitespace-pre-line mb-8">{about.body}</p>}
+          {about.ctaText && (
+            <MaybeLink
+              href={about.ctaLink || '/register'}
+              disabled={linksDisabled}
+              className="inline-block bg-primary-600 text-white text-sm font-semibold px-7 py-3 rounded-xl hover:bg-primary-700 transition-colors shadow-lg shadow-primary-100 cursor-pointer"
+            >
+              {about.ctaText}
+            </MaybeLink>
+          )}
         </div>
       </div>
     </section>
@@ -370,7 +388,7 @@ export const DEFAULT_WEBSITE_CONTENT: WebsiteContent = {
   instituteType: null,
   isPublished: false,
   hero: { headline: '', subheadline: '', ctaText: '', ctaLink: '', backgroundImageUrl: null },
-  about: { heading: '', body: '', imageUrl: null },
+  about: { heading: '', body: '', imageUrl: null, ctaText: '', ctaLink: '' },
   coursesSection: { heading: '', subheading: '' },
   testimonials: [],
   cta: { heading: '', subtext: '', buttonText: '', buttonLink: '' },

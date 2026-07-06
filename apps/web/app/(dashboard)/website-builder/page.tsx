@@ -50,6 +50,8 @@ const TEMPLATES: Record<InstituteType, Omit<WebsiteContent, 'instituteType' | 'i
       heading: 'About Our School',
       body: 'We believe learning should be joyful and personal. Our teachers combine proven methods with modern tools to help every student build confidence, one lesson at a time.',
       imageUrl: null,
+      ctaText: 'Meet Our Teachers',
+      ctaLink: '/register',
     },
     coursesSection: { heading: 'Our Classes', subheading: 'Pick a class and start learning today.' },
     testimonials: [
@@ -71,6 +73,8 @@ const TEMPLATES: Record<InstituteType, Omit<WebsiteContent, 'instituteType' | 'i
       heading: 'About Our Academy',
       body: 'We focus on real-world skills over theory. Every course is built with input from working professionals, so what you learn today you can use tomorrow.',
       imageUrl: null,
+      ctaText: 'Meet Our Instructors',
+      ctaLink: '/register',
     },
     coursesSection: { heading: 'Explore Our Courses', subheading: 'From beginner to advanced — find your next skill.' },
     testimonials: [
@@ -92,6 +96,8 @@ const TEMPLATES: Record<InstituteType, Omit<WebsiteContent, 'instituteType' | 'i
       heading: 'About Our College',
       body: 'For years we’ve prepared students for meaningful careers. Our online programs bring the same rigor and mentorship to a flexible, digital-first classroom.',
       imageUrl: null,
+      ctaText: 'Learn About Our Faculty',
+      ctaLink: '/register',
     },
     coursesSection: { heading: 'Our Programs', subheading: 'Structured courses designed by experienced faculty.' },
     testimonials: [
@@ -113,6 +119,8 @@ const TEMPLATES: Record<InstituteType, Omit<WebsiteContent, 'instituteType' | 'i
       heading: 'About the University',
       body: 'Our mission is to deliver world-class education without boundaries. Backed by respected faculty and a research-driven curriculum, our online campus serves students everywhere.',
       imageUrl: null,
+      ctaText: 'Explore Our Faculty',
+      ctaLink: '/register',
     },
     coursesSection: { heading: 'Degree & Certificate Programs', subheading: 'Choose from a wide range of accredited-style programs.' },
     testimonials: [
@@ -408,6 +416,18 @@ export default function WebsiteBuilderPage() {
                   onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadMutation.mutate({ field: 'about', file: f }); e.target.value = ''; }} />
               </div>
             </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Button Text (optional)</label>
+                <input className={inputCls} value={form.about.ctaText}
+                  onChange={(e) => setNested('about', 'ctaText', e.target.value)} placeholder="Learn More" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Button Link</label>
+                <input className={inputCls} value={form.about.ctaLink}
+                  onChange={(e) => setNested('about', 'ctaLink', e.target.value)} placeholder="/register" />
+              </div>
+            </div>
 
             <Section title="Courses Section" />
             <div>
@@ -502,7 +522,7 @@ export default function WebsiteBuilderPage() {
             <div className="bg-white">
               <LandingNavBar logoUrl={null} displayName="Your School" linksDisabled />
               <HeroSection hero={form.hero} displayName="Your School" linksDisabled heightClass="h-[calc(100vh-7rem)]" />
-              <AboutSection about={form.about} />
+              <AboutSection about={form.about} linksDisabled />
               <CoursesGrid courses={SAMPLE_COURSES} loading={false} coursesSection={form.coursesSection} linksDisabled />
               <TestimonialsSection testimonials={form.testimonials} />
               <CTASection cta={form.cta} linksDisabled />

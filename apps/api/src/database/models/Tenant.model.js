@@ -138,9 +138,11 @@ const tenantSchema = new mongoose.Schema(
         backgroundImageUrl: { type: String, default: null },
       },
       about: {
-        heading:  { type: String, default: null },
-        body:     { type: String, default: null },
-        imageUrl: { type: String, default: null },
+        heading:    { type: String, default: null },
+        body:       { type: String, default: null },
+        imageUrl:   { type: String, default: null },
+        ctaText:    { type: String, default: null },
+        ctaLink:    { type: String, default: null },
       },
       coursesSection: {
         heading:    { type: String, default: null },
