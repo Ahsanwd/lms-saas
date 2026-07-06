@@ -140,8 +140,8 @@ function TenantLandingPage({ subdomain }: { subdomain: string }) {
       axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/courses/public`, { headers }),
       axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/tenant/website/public`, { headers }).catch(() => null),
     ])
-      .then(([coursesRes, websiteRes]) => {
-        setCourses(coursesRes.data.data.courses ?? []);
+      .then(async ([coursesRes, websiteRes]) => {
+        let finalCourses = coursesRes.data.data.courses ?? [];
         setTenantName(coursesRes.data.data.tenantName ?? '');
         setLogoUrl(coursesRes.data.data.branding?.logoUrl ?? null);
         if (coursesRes.data.data.branding?.primaryColor) applyBrandColor(coursesRes.data.data.branding.primaryColor);
@@ -149,7 +149,7 @@ function TenantLandingPage({ subdomain }: { subdomain: string }) {
         applyFontFamily(coursesRes.data.data.branding?.fontFamily);
         if (websiteRes?.data?.data?.isPublished) {
           const w = websiteRes.data.data;
-          setWebsite({
+          const merged: WebsiteContent = {
             ...DEFAULT_WEBSITE_CONTENT,
             ...w,
             hero: { ...DEFAULT_WEBSITE_CONTENT.hero, ...w.hero },
@@ -157,8 +157,21 @@ function TenantLandingPage({ subdomain }: { subdomain: string }) {
             coursesSection: { ...DEFAULT_WEBSITE_CONTENT.coursesSection, ...w.coursesSection },
             cta: { ...DEFAULT_WEBSITE_CONTENT.cta, ...w.cta },
             contact: { ...DEFAULT_WEBSITE_CONTENT.contact, ...w.contact },
-          });
+          };
+          setWebsite(merged);
+          // "Selected courses" is an explicit tenant curation — re-fetch by id so it
+          // isn't silently filtered out by unrelated Storefront category-hiding rules.
+          const cs = merged.coursesSection;
+          if (cs.displayMode === 'selected' && cs.courseIds.length > 0) {
+            try {
+              const idsRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/courses/public`, {
+                headers, params: { ids: cs.courseIds.join(',') },
+              });
+              finalCourses = idsRes.data.data.courses ?? [];
+            } catch { /* keep the general list as a fallback */ }
+          }
         }
+        setCourses(finalCourses);
       })
       .catch(() => {})
       .finally(() => setLoading(false));

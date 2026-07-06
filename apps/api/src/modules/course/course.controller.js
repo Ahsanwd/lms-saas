@@ -51,8 +51,16 @@ async function listPublicCourses(req, res, next) {
       tenantRepo.findById(req.tenant.tenantId),
       tenantRepo.getBranding(req.tenant.tenantId),
     ]);
-    const hiddenCategories = tenant?.settings?.storefront?.hiddenCategories ?? [];
-    const courses = await courseRepo.findPublishedPublic(req.tenant.tenantId, { hiddenCategories });
+
+    // Website Builder "Selected courses" mode: an explicit, tenant-curated ids
+    // list bypasses general storefront hiding (see findByIdsPublic).
+    const { ids } = req.query;
+    const courses = ids
+      ? await courseRepo.findByIdsPublic(req.tenant.tenantId, String(ids).split(',').filter(Boolean))
+      : await courseRepo.findPublishedPublic(req.tenant.tenantId, {
+          hiddenCategories: tenant?.settings?.storefront?.hiddenCategories ?? [],
+        });
+
     R.success(res, { courses, tenantName: branding.tenantName, branding: branding.branding });
   } catch (err) { next(err); }
 }

@@ -53,6 +53,18 @@ class CourseRepository {
       .sort({ createdAt: -1 })
       .lean();
   }
+
+  // Explicit, tenant-curated selection (Website Builder "Selected courses" mode) —
+  // intentionally bypasses hiddenCategories/showOnStorefront: an admin hand-picking
+  // a course for their landing page is an explicit override of general storefront
+  // visibility. Still requires the course to be actually published.
+  findByIdsPublic(tenantId, ids) {
+    return Course.find({ tenantId, _id: { $in: ids }, status: 'published', deletedAt: null })
+      .select('title slug shortDescription thumbnail price isFree level enrollmentCount rating totalLessons totalDurationSeconds instructorId categoryId showOnStorefront')
+      .populate('instructorId', 'firstName lastName avatar')
+      .populate('categoryId', 'name')
+      .lean();
+  }
 }
 
 module.exports = new CourseRepository();
