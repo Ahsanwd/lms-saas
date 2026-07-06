@@ -159,6 +159,18 @@ if (config.env !== 'production') {
   logger.info('API docs available at http://localhost:' + config.port + '/api-docs');
 }
 
+// This is a dynamic multi-tenant API — no GET response should ever be cached
+// or conditionally-revalidated by the browser. Without this, Express's default
+// ETag generation lets the browser cache-and-reuse a response via a 304, even
+// across auth-state changes (e.g. a race-condition request that went out
+// before the auth token was attached gets its 401 error body permanently
+// stuck in the browser cache and served back on every later, authenticated
+// retry to the same URL).
+app.use('/api', (req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store');
+  next();
+});
+
 app.use('/api', require('./routes'));
 
 app.use((err, req, res, next) => {
