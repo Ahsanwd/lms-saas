@@ -1,5 +1,6 @@
 'use client';
 
+import { useRef } from 'react';
 import Link from 'next/link';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -18,7 +19,7 @@ export interface PublicCourse {
   totalLessons: number;
   totalDurationSeconds: number;
   instructorId: { firstName: string; lastName: string; avatar: string | null } | null;
-  categoryId: { name: string } | null;
+  categoryId: { _id: string; name: string } | null;
 }
 
 export interface Testimonial {
@@ -33,7 +34,14 @@ export interface WebsiteContent {
   isPublished: boolean;
   hero: { headline: string; subheadline: string; ctaText: string; ctaLink: string; backgroundImageUrl: string | null };
   about: { heading: string; body: string; imageUrl: string | null; ctaText: string; ctaLink: string };
-  coursesSection: { heading: string; subheading: string };
+  coursesSection: {
+    heading: string;
+    subheading: string;
+    displayMode: 'all' | 'category' | 'selected';
+    categoryId: string | null;
+    courseIds: string[];
+    layout: 'grid' | 'slider';
+  };
   testimonials: Testimonial[];
   cta: { heading: string; subtext: string; buttonText: string; buttonLink: string };
   contact: { email: string; phone: string; address: string };
@@ -243,17 +251,76 @@ export function CourseCard({ course, linksDisabled }: { course: PublicCourse; li
   );
 }
 
+// Applies the builder's displayMode/categoryId/courseIds settings. 'all' (the
+// default for every tenant who hasn't touched this) returns the list untouched,
+// in the same order the API already sorts it — zero behavior change.
+function selectCourses(courses: PublicCourse[], cs: WebsiteContent['coursesSection']): PublicCourse[] {
+  if (cs.displayMode === 'category' && cs.categoryId) {
+    return courses.filter((c) => c.categoryId?._id === cs.categoryId);
+  }
+  if (cs.displayMode === 'selected' && cs.courseIds.length > 0) {
+    const byId = new Map(courses.map((c) => [c._id, c]));
+    return cs.courseIds.map((id) => byId.get(id)).filter((c): c is PublicCourse => !!c);
+  }
+  return courses;
+}
+
+function CoursesSlider({ courses, linksDisabled }: { courses: PublicCourse[]; linksDisabled?: boolean }) {
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const scrollBy = (dir: number) => scrollerRef.current?.scrollBy({ left: dir * 320, behavior: 'smooth' });
+  return (
+    <div className="relative">
+      <div
+        ref={scrollerRef}
+        className="flex gap-6 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-2"
+        style={{ scrollbarWidth: 'none' }}
+      >
+        {courses.map((course) => (
+          <div key={course._id} className="snap-start flex-shrink-0 w-72">
+            <CourseCard course={course} linksDisabled={linksDisabled} />
+          </div>
+        ))}
+      </div>
+      {courses.length > 3 && (
+        <>
+          <button
+            type="button"
+            onClick={() => scrollBy(-1)}
+            className="hidden sm:flex absolute -left-4 top-[35%] -translate-y-1/2 w-9 h-9 rounded-full bg-white shadow-md border border-gray-200 items-center justify-center text-gray-500 hover:text-primary-600 transition-colors"
+            aria-label="Scroll left"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={() => scrollBy(1)}
+            className="hidden sm:flex absolute -right-4 top-[35%] -translate-y-1/2 w-9 h-9 rounded-full bg-white shadow-md border border-gray-200 items-center justify-center text-gray-500 hover:text-primary-600 transition-colors"
+            aria-label="Scroll right"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
 export function CoursesGrid({
   courses, loading, coursesSection, linksDisabled,
 }: {
   courses: PublicCourse[]; loading: boolean; coursesSection: WebsiteContent['coursesSection']; linksDisabled?: boolean;
 }) {
+  const shown = selectCourses(courses, coursesSection);
   return (
     <section className="py-14 px-6 bg-white">
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-8">
           <h2 className="text-2xl font-bold text-gray-900">
-            {coursesSection.heading || (loading ? 'Loading courses…' : courses.length > 0 ? `All Courses (${courses.length})` : 'No courses yet')}
+            {coursesSection.heading || (loading ? 'Loading courses…' : shown.length > 0 ? `All Courses (${shown.length})` : 'No courses yet')}
           </h2>
           {coursesSection.subheading && <p className="text-gray-500 mt-2 max-w-lg mx-auto">{coursesSection.subheading}</p>}
         </div>
@@ -271,7 +338,7 @@ export function CoursesGrid({
               </div>
             ))}
           </div>
-        ) : courses.length === 0 ? (
+        ) : shown.length === 0 ? (
           <div className="text-center py-20 text-gray-400">
             <svg className="w-16 h-16 mx-auto mb-4 text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
@@ -279,9 +346,11 @@ export function CoursesGrid({
             <p className="text-lg font-medium">No published courses yet</p>
             <p className="text-sm mt-1">Check back soon!</p>
           </div>
+        ) : coursesSection.layout === 'slider' ? (
+          <CoursesSlider courses={shown} linksDisabled={linksDisabled} />
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {courses.map((course) => (
+            {shown.map((course) => (
               <CourseCard key={course._id} course={course} linksDisabled={linksDisabled} />
             ))}
           </div>
@@ -389,7 +458,7 @@ export const DEFAULT_WEBSITE_CONTENT: WebsiteContent = {
   isPublished: false,
   hero: { headline: '', subheadline: '', ctaText: '', ctaLink: '', backgroundImageUrl: null },
   about: { heading: '', body: '', imageUrl: null, ctaText: '', ctaLink: '' },
-  coursesSection: { heading: '', subheading: '' },
+  coursesSection: { heading: '', subheading: '', displayMode: 'all', categoryId: null, courseIds: [], layout: 'grid' },
   testimonials: [],
   cta: { heading: '', subtext: '', buttonText: '', buttonLink: '' },
   contact: { email: '', phone: '', address: '' },

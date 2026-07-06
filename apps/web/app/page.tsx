@@ -15,26 +15,8 @@ import {
   LandingFooter,
   DEFAULT_WEBSITE_CONTENT,
   type WebsiteContent,
+  type PublicCourse,
 } from '@/components/website/LandingPageSections';
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface PublicCourse {
-  _id: string;
-  title: string;
-  slug: string;
-  shortDescription: string | null;
-  thumbnail: string | null;
-  price: number;
-  isFree: boolean;
-  level: string;
-  enrollmentCount: number;
-  rating: { average: number; count: number };
-  totalLessons: number;
-  totalDurationSeconds: number;
-  instructorId: { firstName: string; lastName: string; avatar: string | null } | null;
-  categoryId: { name: string } | null;
-}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -166,7 +148,16 @@ function TenantLandingPage({ subdomain }: { subdomain: string }) {
         if (coursesRes.data.data.branding?.secondaryColor) applySecondaryColor(coursesRes.data.data.branding.secondaryColor);
         applyFontFamily(coursesRes.data.data.branding?.fontFamily);
         if (websiteRes?.data?.data?.isPublished) {
-          setWebsite({ ...DEFAULT_WEBSITE_CONTENT, ...websiteRes.data.data });
+          const w = websiteRes.data.data;
+          setWebsite({
+            ...DEFAULT_WEBSITE_CONTENT,
+            ...w,
+            hero: { ...DEFAULT_WEBSITE_CONTENT.hero, ...w.hero },
+            about: { ...DEFAULT_WEBSITE_CONTENT.about, ...w.about },
+            coursesSection: { ...DEFAULT_WEBSITE_CONTENT.coursesSection, ...w.coursesSection },
+            cta: { ...DEFAULT_WEBSITE_CONTENT.cta, ...w.cta },
+            contact: { ...DEFAULT_WEBSITE_CONTENT.contact, ...w.contact },
+          });
         }
       })
       .catch(() => {})

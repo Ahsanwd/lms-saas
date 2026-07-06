@@ -145,8 +145,15 @@ const tenantSchema = new mongoose.Schema(
         ctaLink:    { type: String, default: null },
       },
       coursesSection: {
-        heading:    { type: String, default: null },
-        subheading: { type: String, default: null },
+        heading:     { type: String, default: null },
+        subheading:  { type: String, default: null },
+        // 'all' (default) = every storefront-visible course, matches today's behavior.
+        // 'category'      = only courses in categoryId.
+        // 'selected'      = exactly courseIds, in that array order.
+        displayMode: { type: String, enum: ['all', 'category', 'selected'], default: 'all' },
+        categoryId:  { type: mongoose.Schema.Types.ObjectId, ref: 'Category', default: null },
+        courseIds:   [{ type: mongoose.Schema.Types.ObjectId, ref: 'Course' }],
+        layout:      { type: String, enum: ['grid', 'slider'], default: 'grid' },
       },
       testimonials: [{
         name:      { type: String, default: null },

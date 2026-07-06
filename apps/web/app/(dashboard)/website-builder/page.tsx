@@ -53,7 +53,7 @@ const TEMPLATES: Record<InstituteType, Omit<WebsiteContent, 'instituteType' | 'i
       ctaText: 'Meet Our Teachers',
       ctaLink: '/register',
     },
-    coursesSection: { heading: 'Our Classes', subheading: 'Pick a class and start learning today.' },
+    coursesSection: { heading: 'Our Classes', subheading: 'Pick a class and start learning today.', displayMode: 'all', categoryId: null, courseIds: [], layout: 'grid' },
     testimonials: [
       { name: 'Amina R.', role: 'Parent', quote: 'My daughter looks forward to class every single day.', avatarUrl: null },
       { name: 'Bilal K.', role: 'Student', quote: 'The teachers actually make learning fun.', avatarUrl: null },
@@ -76,7 +76,7 @@ const TEMPLATES: Record<InstituteType, Omit<WebsiteContent, 'instituteType' | 'i
       ctaText: 'Meet Our Instructors',
       ctaLink: '/register',
     },
-    coursesSection: { heading: 'Explore Our Courses', subheading: 'From beginner to advanced — find your next skill.' },
+    coursesSection: { heading: 'Explore Our Courses', subheading: 'From beginner to advanced — find your next skill.', displayMode: 'all', categoryId: null, courseIds: [], layout: 'grid' },
     testimonials: [
       { name: 'Sara M.', role: 'Graduate', quote: 'I landed a job two weeks after finishing the course.', avatarUrl: null },
       { name: 'Usman T.', role: 'Student', quote: 'The instructors actually respond and care about your progress.', avatarUrl: null },
@@ -99,7 +99,7 @@ const TEMPLATES: Record<InstituteType, Omit<WebsiteContent, 'instituteType' | 'i
       ctaText: 'Learn About Our Faculty',
       ctaLink: '/register',
     },
-    coursesSection: { heading: 'Our Programs', subheading: 'Structured courses designed by experienced faculty.' },
+    coursesSection: { heading: 'Our Programs', subheading: 'Structured courses designed by experienced faculty.', displayMode: 'all', categoryId: null, courseIds: [], layout: 'grid' },
     testimonials: [
       { name: 'Dr. Hina F.', role: 'Alumnus', quote: 'The quality of instruction here rivals any campus program.', avatarUrl: null },
       { name: 'Ali H.', role: 'Current Student', quote: 'Flexible enough to fit around my job, rigorous enough to matter.', avatarUrl: null },
@@ -122,7 +122,7 @@ const TEMPLATES: Record<InstituteType, Omit<WebsiteContent, 'instituteType' | 'i
       ctaText: 'Explore Our Faculty',
       ctaLink: '/register',
     },
-    coursesSection: { heading: 'Degree & Certificate Programs', subheading: 'Choose from a wide range of accredited-style programs.' },
+    coursesSection: { heading: 'Degree & Certificate Programs', subheading: 'Choose from a wide range of accredited-style programs.', displayMode: 'all', categoryId: null, courseIds: [], layout: 'grid' },
     testimonials: [
       { name: 'Prof. Zara N.', role: 'Faculty', quote: 'Our online cohort performs just as strongly as our on-campus students.', avatarUrl: null },
       { name: 'Hamza S.', role: 'Student', quote: 'The academic rigor here is unmatched by other online platforms.', avatarUrl: null },
@@ -138,23 +138,64 @@ const SAMPLE_COURSES: PublicCourse[] = [
     shortDescription: 'A hands-on beginner course covering all the fundamentals.',
     thumbnail: null, price: 49, isFree: false, level: 'beginner', enrollmentCount: 128,
     rating: { average: 4.8, count: 42 }, totalLessons: 24, totalDurationSeconds: 18000,
-    instructorId: { firstName: 'Jane', lastName: 'Doe', avatar: null }, categoryId: { name: 'Foundations' },
+    instructorId: { firstName: 'Jane', lastName: 'Doe', avatar: null }, categoryId: { _id: 'sample-cat-1', name: 'Foundations' },
   },
   {
     _id: 'sample-2', title: 'Advanced Concepts & Practice', slug: 'sample-2',
     shortDescription: 'Deepen your understanding with real-world projects.',
     thumbnail: null, price: 0, isFree: true, level: 'intermediate', enrollmentCount: 87,
     rating: { average: 4.6, count: 21 }, totalLessons: 18, totalDurationSeconds: 14400,
-    instructorId: { firstName: 'John', lastName: 'Smith', avatar: null }, categoryId: { name: 'Practice' },
+    instructorId: { firstName: 'John', lastName: 'Smith', avatar: null }, categoryId: { _id: 'sample-cat-2', name: 'Practice' },
   },
   {
     _id: 'sample-3', title: 'Mastery Track', slug: 'sample-3',
     shortDescription: 'For learners ready to go all the way.',
     thumbnail: null, price: 99, isFree: false, level: 'advanced', enrollmentCount: 53,
     rating: { average: 4.9, count: 15 }, totalLessons: 32, totalDurationSeconds: 27000,
-    instructorId: { firstName: 'Amina', lastName: 'Rahim', avatar: null }, categoryId: { name: 'Mastery' },
+    instructorId: { firstName: 'Amina', lastName: 'Rahim', avatar: null }, categoryId: { _id: 'sample-cat-3', name: 'Mastery' },
   },
 ];
+
+interface CategoryOption { _id: string; name: string }
+interface AdminCourseListItem {
+  _id: string;
+  title: string;
+  slug: string;
+  shortDescription: string | null;
+  thumbnail: string | null;
+  price: number;
+  isFree: boolean;
+  level: string;
+  enrollmentCount: number;
+  rating?: { average: number; count: number };
+  totalLessons?: number;
+  totalDurationSeconds?: number;
+  instructorId: { name: string; avatar: string | null } | null;
+  categoryId: { _id: string; name: string } | null;
+}
+
+// The builder's authenticated course list uses a single `name` field on the
+// instructor (vs the public endpoint's firstName/lastName) — split it so the
+// preview can reuse the same shared CourseCard as the real site.
+function toPublicCourse(c: AdminCourseListItem): PublicCourse {
+  const [firstName, ...rest] = (c.instructorId?.name ?? '').split(' ');
+  return {
+    _id: c._id,
+    title: c.title,
+    slug: c.slug,
+    shortDescription: c.shortDescription,
+    thumbnail: c.thumbnail,
+    price: c.price,
+    isFree: c.isFree,
+    level: c.level,
+    enrollmentCount: c.enrollmentCount,
+    rating: c.rating ?? { average: 0, count: 0 },
+    totalLessons: c.totalLessons ?? 0,
+    totalDurationSeconds: c.totalDurationSeconds ?? 0,
+    instructorId: c.instructorId ? { firstName: firstName || 'Instructor', lastName: rest.join(' '), avatar: c.instructorId.avatar } : null,
+    categoryId: c.categoryId,
+  };
+}
 
 const Section = ({ title }: { title: string }) => (
   <p className="text-xs font-bold text-gray-400 uppercase tracking-widest pt-2">{title}</p>
@@ -182,9 +223,38 @@ export default function WebsiteBuilderPage() {
     staleTime: 30_000,
   });
 
+  const { data: categoriesData } = useQuery({
+    queryKey: ['categories-website-builder'],
+    queryFn: async () => {
+      const { data } = await api.get('/courses/categories');
+      return (data.data?.categories ?? []) as CategoryOption[];
+    },
+    staleTime: 60_000,
+  });
+  const categories = categoriesData ?? [];
+
+  const { data: coursesData } = useQuery({
+    queryKey: ['courses-website-builder'],
+    queryFn: async () => {
+      const { data } = await api.get('/courses?limit=200&status=published');
+      return (data.data?.courses ?? []) as AdminCourseListItem[];
+    },
+    staleTime: 60_000,
+  });
+  const allCourses = coursesData ?? [];
+  const previewCourses = allCourses.length > 0 ? allCourses.map(toPublicCourse) : SAMPLE_COURSES;
+
   useEffect(() => {
     if (data && !loaded) {
-      setForm({ ...DEFAULT_WEBSITE_CONTENT, ...data });
+      setForm({
+        ...DEFAULT_WEBSITE_CONTENT,
+        ...data,
+        hero: { ...DEFAULT_WEBSITE_CONTENT.hero, ...data.hero },
+        about: { ...DEFAULT_WEBSITE_CONTENT.about, ...data.about },
+        coursesSection: { ...DEFAULT_WEBSITE_CONTENT.coursesSection, ...data.coursesSection },
+        cta: { ...DEFAULT_WEBSITE_CONTENT.cta, ...data.cta },
+        contact: { ...DEFAULT_WEBSITE_CONTENT.contact, ...data.contact },
+      });
       setLoaded(true);
     }
   }, [data, loaded]);
@@ -195,6 +265,23 @@ export default function WebsiteBuilderPage() {
   const setNested = <S extends 'hero' | 'about' | 'coursesSection' | 'cta' | 'contact'>(
     section: S, field: keyof WebsiteContent[S], value: string
   ) => setForm((prev) => ({ ...prev, [section]: { ...prev[section], [field]: value } }));
+
+  const setCoursesField = <K extends keyof WebsiteContent['coursesSection']>(field: K, value: WebsiteContent['coursesSection'][K]) =>
+    setForm((prev) => ({ ...prev, coursesSection: { ...prev.coursesSection, [field]: value } }));
+
+  function toggleCourseSelection(id: string) {
+    const ids = form.coursesSection.courseIds;
+    setCoursesField('courseIds', ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]);
+  }
+
+  function moveCourseSelection(id: string, dir: -1 | 1) {
+    const ids = [...form.coursesSection.courseIds];
+    const idx = ids.indexOf(id);
+    const swapWith = idx + dir;
+    if (idx === -1 || swapWith < 0 || swapWith >= ids.length) return;
+    [ids[idx], ids[swapWith]] = [ids[swapWith], ids[idx]];
+    setCoursesField('courseIds', ids);
+  }
 
   const saveMutation = useMutation({
     mutationFn: () => api.put('/tenant/website', form),
@@ -441,6 +528,95 @@ export default function WebsiteBuilderPage() {
                 onChange={(e) => setNested('coursesSection', 'subheading', e.target.value)} placeholder="Optional subheading" />
             </div>
 
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-2">Which Courses to Show</label>
+              <div className="grid grid-cols-3 gap-2">
+                {(['all', 'category', 'selected'] as const).map((mode) => (
+                  <button key={mode} onClick={() => setCoursesField('displayMode', mode)}
+                    className={`py-2 text-xs rounded-lg border font-medium transition-colors ${
+                      form.coursesSection.displayMode === mode
+                        ? 'border-primary-500 bg-primary-50 text-primary-700'
+                        : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                    }`}>
+                    {mode === 'all' ? 'All Courses' : mode === 'category' ? 'By Category' : 'Selected'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {form.coursesSection.displayMode === 'category' && (
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Category</label>
+                <select className={inputCls} value={form.coursesSection.categoryId ?? ''}
+                  onChange={(e) => setCoursesField('categoryId', e.target.value || null)}>
+                  <option value="">Select a category…</option>
+                  {categories.map((c) => <option key={c._id} value={c._id}>{c.name}</option>)}
+                </select>
+                {categories.length === 0 && <p className="text-xs text-gray-400 mt-1">No categories yet.</p>}
+              </div>
+            )}
+
+            {form.coursesSection.displayMode === 'selected' && (
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Choose Courses <span className="text-gray-400 font-normal">(check to add, arrows to reorder)</span>
+                </label>
+                {allCourses.length === 0 ? (
+                  <p className="text-xs text-gray-400 italic">No published courses yet</p>
+                ) : (
+                  <div className="border border-gray-200 rounded-xl max-h-60 overflow-y-auto divide-y divide-gray-50">
+                    {allCourses.map((c) => {
+                      const idx = form.coursesSection.courseIds.indexOf(c._id);
+                      const selected = idx !== -1;
+                      return (
+                        <div key={c._id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50">
+                          <input type="checkbox" checked={selected} onChange={() => toggleCourseSelection(c._id)}
+                            className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 flex-shrink-0" />
+                          <span className="text-sm text-gray-700 truncate flex-1">
+                            {selected ? `${idx + 1}. ` : ''}{c.title}
+                          </span>
+                          {selected && (
+                            <div className="flex items-center gap-0.5 flex-shrink-0">
+                              <button type="button" onClick={() => moveCourseSelection(c._id, -1)} disabled={idx === 0}
+                                className="p-1 text-gray-400 hover:text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed">
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+                                </svg>
+                              </button>
+                              <button type="button" onClick={() => moveCourseSelection(c._id, 1)} disabled={idx === form.coursesSection.courseIds.length - 1}
+                                className="p-1 text-gray-400 hover:text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed">
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                                </svg>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                <p className="text-xs text-gray-400 mt-1">{form.coursesSection.courseIds.length} selected</p>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-2">Layout</label>
+              <div className="grid grid-cols-2 gap-2">
+                {(['grid', 'slider'] as const).map((l) => (
+                  <button key={l} onClick={() => setCoursesField('layout', l)}
+                    className={`py-2 text-xs rounded-lg border capitalize font-medium transition-colors ${
+                      form.coursesSection.layout === l
+                        ? 'border-primary-500 bg-primary-50 text-primary-700'
+                        : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                    }`}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-gray-400 mt-1">Slider works well if you have many courses.</p>
+            </div>
+
             <div className="flex items-center justify-between">
               <Section title="Testimonials" />
               {form.testimonials.length < 6 && (
@@ -516,14 +692,16 @@ export default function WebsiteBuilderPage() {
         <div className="flex-1 bg-gray-100 flex flex-col overflow-hidden">
           <div className="flex-shrink-0 flex items-center justify-between px-6 py-3 bg-white border-b border-gray-200">
             <p className="text-sm font-semibold text-gray-800">Live Preview</p>
-            <p className="text-xs text-gray-400">Sample courses shown — your real, published courses appear live on your site</p>
+            <p className="text-xs text-gray-400">
+              {allCourses.length > 0 ? 'Your real published courses' : 'Sample courses shown — add courses to see them here'}
+            </p>
           </div>
           <div className="flex-1 overflow-y-auto">
             <div className="bg-white">
               <LandingNavBar logoUrl={null} displayName="Your School" linksDisabled />
               <HeroSection hero={form.hero} displayName="Your School" linksDisabled heightClass="h-[calc(100vh-7rem)]" />
               <AboutSection about={form.about} linksDisabled />
-              <CoursesGrid courses={SAMPLE_COURSES} loading={false} coursesSection={form.coursesSection} linksDisabled />
+              <CoursesGrid courses={previewCourses} loading={false} coursesSection={form.coursesSection} linksDisabled />
               <TestimonialsSection testimonials={form.testimonials} />
               <CTASection cta={form.cta} linksDisabled />
               <ContactSection contact={form.contact} />
