@@ -88,7 +88,7 @@ export function LandingNavBar({ logoUrl, displayName, linksDisabled }: { logoUrl
 
 // ─── Hero ─────────────────────────────────────────────────────────────────────
 
-export function HeroSection({ hero, displayName, linksDisabled }: { hero: WebsiteContent['hero']; displayName: string; linksDisabled?: boolean }) {
+export function HeroSection({ hero, displayName, linksDisabled, heightClass = 'min-h-screen' }: { hero: WebsiteContent['hero']; displayName: string; linksDisabled?: boolean; heightClass?: string }) {
   const hasBg = !!hero.backgroundImageUrl;
   const bgStyle = hasBg
     ? { backgroundImage: `url(${hero.backgroundImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }
@@ -97,8 +97,8 @@ export function HeroSection({ hero, displayName, linksDisabled }: { hero: Websit
     <section
       className={
         hasBg
-          ? 'min-h-screen flex flex-col items-center justify-center px-6 text-center relative'
-          : 'min-h-screen flex flex-col items-center justify-center px-6 text-center bg-gradient-to-b from-primary-50 via-white to-white'
+          ? `${heightClass} flex flex-col items-center justify-center px-6 text-center relative`
+          : `${heightClass} flex flex-col items-center justify-center px-6 text-center bg-gradient-to-b from-primary-50 via-white to-white`
       }
       style={bgStyle}
     >
