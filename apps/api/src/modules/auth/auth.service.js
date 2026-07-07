@@ -5,6 +5,7 @@ const QRCode = require('qrcode');
 const userRepo = require('../../database/repositories/user.repository');
 const sessionRepo = require('../../database/repositories/session.repository');
 const tenantRepo = require('../../database/repositories/tenant.repository');
+const tenantPageRepo = require('../../database/repositories/tenantPage.repository');
 const auditLogRepo = require('../../database/repositories/authAuditLog.repository');
 const Plan = require('../../database/models/Plan.model');
 const { signAccessToken, signRefreshToken, verifyRefreshToken, signTempToken, verifyTempToken } = require('../../utils/jwt');
@@ -164,6 +165,10 @@ async function registerTenant({ firstName, lastName, email, password, tenantName
     trialEndsAt,
     status: 'active',
   });
+
+  // Every tenant gets a Home page provisioned synchronously at signup
+  // (multi-page Website Builder) — not created lazily on first visit.
+  await tenantPageRepo.upsertHomePage(tenant._id, { title: 'Home' });
 
   const existingUser = await userRepo.findByEmail(tenant._id, email);
   if (existingUser) throw new AppError('Email already registered', 409, 'EMAIL_EXISTS');

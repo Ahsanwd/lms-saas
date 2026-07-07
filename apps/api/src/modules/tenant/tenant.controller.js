@@ -1,4 +1,5 @@
 const tenantService = require('./tenant.service');
+const tenantPageService = require('../tenantPage/tenantPage.service');
 const { validateUpdateSettings, validateCustomDomain } = require('../../validators/tenant.validator');
 const R = require('../../utils/response');
 
@@ -260,16 +261,20 @@ async function getPublicBranding(req, res, next) {
 }
 
 // ── Website Builder ────────────────────────────────────────────────────────────
+// Backed by TenantPage (the home page specifically) as of Phase 1a of the
+// multi-page builder migration — request/response shape is unchanged from
+// the original single-page implementation, so the builder UI needed no
+// changes for this cutover.
 async function getWebsiteContent(req, res, next) {
   try {
-    const content = await tenantService.getWebsiteContent(req.tenant.tenantId);
+    const content = await tenantPageService.getHomePageContent(req.tenant.tenantId);
     R.success(res, { website: content });
   } catch (err) { next(err); }
 }
 
 async function saveWebsiteContent(req, res, next) {
   try {
-    const content = await tenantService.saveWebsiteContent(req.tenant.tenantId, req.body);
+    const content = await tenantPageService.saveHomePageContent(req.tenant.tenantId, req.body);
     R.success(res, { website: content }, 'Website saved');
   } catch (err) { next(err); }
 }
@@ -278,7 +283,7 @@ async function saveWebsiteContent(req, res, next) {
 async function getPublicWebsiteContent(req, res, next) {
   try {
     if (!req.tenant) return R.success(res, { isPublished: false });
-    const content = await tenantService.getPublicWebsiteContent(req.tenant.tenantId);
+    const content = await tenantPageService.getPublicHomePageContent(req.tenant.tenantId);
     R.success(res, content);
   } catch (err) { next(err); }
 }

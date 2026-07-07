@@ -371,50 +371,13 @@ async function updateFeatureFlags(tenantId, flags) {
   return tenant.settings?.featureFlags ?? {};
 }
 
-// ─── Website Builder — public landing-page content ───────────────────────────
-const INSTITUTE_TYPES  = ['school', 'academy', 'college', 'university'];
-const MAX_TESTIMONIALS = 6;
-
-// Full content, for the editor (tenant_admin only)
-async function getWebsiteContent(tenantId) {
-  const tenant = await Tenant.findById(tenantId).select('websiteContent').lean();
-  if (!tenant) throw new AppError('Tenant not found', 404);
-  return tenant.websiteContent || {};
-}
-
-async function saveWebsiteContent(tenantId, data) {
-  const { instituteType, isPublished, hero, about, coursesSection, testimonials, cta, contact } = data;
-
-  if (instituteType !== undefined && instituteType !== null && !INSTITUTE_TYPES.includes(instituteType))
-    throw new AppError('Invalid institute type', 400);
-  if (testimonials && testimonials.length > MAX_TESTIMONIALS)
-    throw new AppError(`Maximum ${MAX_TESTIMONIALS} testimonials allowed`, 400);
-
-  const update = {};
-  if (instituteType !== undefined) update['websiteContent.instituteType'] = instituteType;
-  if (isPublished   !== undefined) update['websiteContent.isPublished']   = !!isPublished;
-  if (hero           !== undefined) update['websiteContent.hero']           = hero;
-  if (about          !== undefined) update['websiteContent.about']          = about;
-  if (coursesSection !== undefined) update['websiteContent.coursesSection'] = coursesSection;
-  if (testimonials   !== undefined) update['websiteContent.testimonials']   = testimonials;
-  if (cta            !== undefined) update['websiteContent.cta']            = cta;
-  if (contact        !== undefined) update['websiteContent.contact']        = contact;
-
-  if (!Object.keys(update).length) throw new AppError('No valid fields provided', 400);
-
-  await Tenant.findByIdAndUpdate(tenantId, { $set: update });
-  return getWebsiteContent(tenantId);
-}
-
-// Unauthenticated — served on the tenant's public subdomain landing page.
-// Returns { isPublished: false } for tenants who've never touched the builder,
-// so the frontend's fallback-to-hardcoded-page logic has a safe default.
-async function getPublicWebsiteContent(tenantId) {
-  if (!tenantId) return { isPublished: false };
-  const tenant = await Tenant.findById(tenantId).select('websiteContent').lean();
-  if (!tenant?.websiteContent) return { isPublished: false };
-  return tenant.websiteContent;
-}
+// Website Builder website-content logic (getWebsiteContent/saveWebsiteContent/
+// getPublicWebsiteContent) moved to ../tenantPage/tenantPage.service.js as of
+// the multi-page builder migration (Phase 1a) — storage moved from
+// Tenant.websiteContent to the TenantPage collection. tenant.controller.js's
+// getWebsiteContent/saveWebsiteContent/getPublicWebsiteContent now call that
+// module directly; the HTTP contract (routes, request/response shape) is
+// unchanged.
 
 module.exports = {
   getMyTenant,
@@ -435,7 +398,4 @@ module.exports = {
   markSafepayVerified,
   getFeatureFlags,
   updateFeatureFlags,
-  getWebsiteContent,
-  saveWebsiteContent,
-  getPublicWebsiteContent,
 };
