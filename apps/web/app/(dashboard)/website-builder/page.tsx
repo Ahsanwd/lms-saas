@@ -4,7 +4,8 @@ import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
-import { Button, Spinner } from '@/components/ui';
+import { Button, Spinner, ReorderControls } from '@/components/ui';
+import { moveArrayItem } from '@/lib/utils';
 import { AxiosError } from 'axios';
 import {
   LandingNavBar,
@@ -275,12 +276,10 @@ export default function WebsiteBuilderPage() {
   }
 
   function moveCourseSelection(id: string, dir: -1 | 1) {
-    const ids = [...form.coursesSection.courseIds];
+    const ids = form.coursesSection.courseIds;
     const idx = ids.indexOf(id);
-    const swapWith = idx + dir;
-    if (idx === -1 || swapWith < 0 || swapWith >= ids.length) return;
-    [ids[idx], ids[swapWith]] = [ids[swapWith], ids[idx]];
-    setCoursesField('courseIds', ids);
+    if (idx === -1) return;
+    setCoursesField('courseIds', moveArrayItem(ids, idx, dir));
   }
 
   const saveMutation = useMutation({
@@ -325,6 +324,10 @@ export default function WebsiteBuilderPage() {
 
   function removeTestimonial(index: number) {
     set('testimonials', form.testimonials.filter((_, i) => i !== index));
+  }
+
+  function moveTestimonial(index: number, dir: -1 | 1) {
+    set('testimonials', moveArrayItem(form.testimonials, index, dir));
   }
 
   if (isLoading) return <div className="flex justify-center py-24"><Spinner size="lg" /></div>;
@@ -576,20 +579,11 @@ export default function WebsiteBuilderPage() {
                             {selected ? `${idx + 1}. ` : ''}{c.title}
                           </span>
                           {selected && (
-                            <div className="flex items-center gap-0.5 flex-shrink-0">
-                              <button type="button" onClick={() => moveCourseSelection(c._id, -1)} disabled={idx === 0}
-                                className="p-1 text-gray-400 hover:text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed">
-                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
-                                </svg>
-                              </button>
-                              <button type="button" onClick={() => moveCourseSelection(c._id, 1)} disabled={idx === form.coursesSection.courseIds.length - 1}
-                                className="p-1 text-gray-400 hover:text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed">
-                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                                </svg>
-                              </button>
-                            </div>
+                            <ReorderControls
+                              index={idx}
+                              length={form.coursesSection.courseIds.length}
+                              onMove={(dir) => moveCourseSelection(c._id, dir)}
+                            />
                           )}
                         </div>
                       );
@@ -624,13 +618,19 @@ export default function WebsiteBuilderPage() {
               )}
             </div>
             {form.testimonials.map((t, i) => (
-              <div key={i} className="border border-gray-200 rounded-lg p-3 space-y-2 relative">
-                <button onClick={() => removeTestimonial(i)}
-                  className="absolute top-2 right-2 text-gray-300 hover:text-red-500 transition-colors" title="Remove">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+              <div key={i} className="border border-gray-200 rounded-lg p-3 space-y-2">
+                <div className="flex items-center justify-between -mt-0.5 -mr-0.5">
+                  <span className="text-xs font-medium text-gray-400">Testimonial {i + 1}</span>
+                  <div className="flex items-center gap-1">
+                    <ReorderControls index={i} length={form.testimonials.length} onMove={(dir) => moveTestimonial(i, dir)} />
+                    <button onClick={() => removeTestimonial(i)}
+                      className="p-1 text-gray-300 hover:text-red-500 transition-colors" title="Remove">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
                 <input className={inputCls} value={t.name}
                   onChange={(e) => updateTestimonial(i, 'name', e.target.value)} placeholder="Name" />
                 <input className={inputCls} value={t.role}

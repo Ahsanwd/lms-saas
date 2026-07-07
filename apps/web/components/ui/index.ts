@@ -9,3 +9,4 @@ export { Badge } from './Badge';
 export { RichTextEditor } from './RichTextEditor';
 export { HtmlContent } from './HtmlContent';
 export { SmartContent } from './SmartContent';
+export { ReorderControls } from './ReorderControls';

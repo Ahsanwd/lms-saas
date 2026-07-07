@@ -43,6 +43,16 @@ export function truncate(str: string, length: number): string {
   return str.length > length ? str.slice(0, length) + '…' : str;
 }
 
+// Swaps items[index] with its neighbor in the given direction. Returns the
+// same array reference (no-op) if the move would go out of bounds.
+export function moveArrayItem<T>(items: T[], index: number, direction: -1 | 1): T[] {
+  const target = index + direction;
+  if (index < 0 || index >= items.length || target < 0 || target >= items.length) return items;
+  const next = [...items];
+  [next[index], next[target]] = [next[target], next[index]];
+  return next;
+}
+
 const AVATAR_PALETTE = [
   'bg-indigo-100 text-indigo-700',
   'bg-emerald-100 text-emerald-700',
