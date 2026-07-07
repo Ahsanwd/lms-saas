@@ -56,12 +56,19 @@ function sectionsFromWebsiteContent(data) {
 
 // ─── Validation ───────────────────────────────────────────────────────────────
 
+// Not folded into FIXED_SECTION_TYPES on purpose — that constant is also used
+// by sectionsFromWebsiteContent() to map the legacy flat websiteContent shape,
+// which never had a contactForm field. Validated as its own 0-or-1-per-page
+// case instead, alongside 'custom'.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 function validateSections(sections) {
   if (sections.length > MAX_SECTIONS_PER_PAGE)
     throw new AppError(`A page can have at most ${MAX_SECTIONS_PER_PAGE} sections`, 400);
 
   const seenFixedTypes = new Set();
   let customCount = 0;
+  let contactFormCount = 0;
 
   for (const section of sections) {
     if (FIXED_SECTION_TYPES.includes(section.type)) {
@@ -75,6 +82,13 @@ function validateSections(sections) {
         if (String(value).length > MAX_CUSTOM_CODE_CHARS)
           throw new AppError(`Custom code ${field} exceeds the ${MAX_CUSTOM_CODE_CHARS.toLocaleString()} character limit`, 400);
       }
+    } else if (section.type === 'contactForm') {
+      contactFormCount += 1;
+      if (contactFormCount > 1)
+        throw new AppError('Only one "contactForm" section is allowed per page', 400);
+      const { recipientEmail } = section.data || {};
+      if (recipientEmail && (typeof recipientEmail !== 'string' || recipientEmail.length > 200 || !EMAIL_RE.test(recipientEmail)))
+        throw new AppError('Invalid recipient email override', 400);
     } else {
       throw new AppError(`Unknown section type "${section.type}"`, 400);
     }

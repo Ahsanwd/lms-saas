@@ -17,27 +17,13 @@ const resetPasswordTemplate = require('../../services/email/templates/resetPassw
 const accountLockedAdminTemplate = require('../../services/email/templates/accountLockedAdmin');
 const welcomeTenantTemplate = require('../../services/email/templates/welcomeTenant');
 const AppError = require('../../utils/AppError');
+const { verifyRecaptcha } = require('../../utils/recaptcha');
 const config = require('../../config');
 
 const ROOT_DOMAIN = process.env.ROOT_DOMAIN || 'coursel.space';
 function tenantBaseUrl(subdomain) {
   if (!subdomain) return config.app.url;
   return `https://${subdomain}.${ROOT_DOMAIN}`;
-}
-
-// Verify reCAPTCHA v3 token — soft-fail if secret not configured
-async function verifyRecaptcha(token) {
-  const secret = process.env.RECAPTCHA_SECRET_KEY;
-  if (!secret || !token) return; // skip if not configured
-  const res = await fetch('https://www.google.com/recaptcha/api/siteverify', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `secret=${secret}&response=${token}`,
-  });
-  const json = await res.json();
-  if (!json.success || (json.score !== undefined && json.score < 0.5)) {
-    throw new AppError('Bot protection check failed. Please try again.', 422, 'RECAPTCHA_FAILED');
-  }
 }
 
 const LOCK_DURATION_MS  = 30 * 60 * 1000;

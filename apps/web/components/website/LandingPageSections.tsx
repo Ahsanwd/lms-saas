@@ -2,6 +2,8 @@
 
 import { useRef, useState } from 'react';
 import Link from 'next/link';
+import axios from 'axios';
+import { executeRecaptcha } from '@/lib/recaptcha';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -605,6 +607,96 @@ export function CustomCodeSection({ data }: { data: CustomCodeData }) {
   );
 }
 
+// ─── Contact Form ─────────────────────────────────────────────────────────────
+// Distinct from ContactSection above (which just displays static info) — this
+// is a real, submittable form. The only interactive/network-calling section
+// in this file; everything else is display-only.
+
+export interface ContactFormData {
+  heading: string;
+  subheading: string;
+  fields: { name: boolean; phone: boolean; subject: boolean }; // email + message are always shown
+  recipientEmail: string | null;
+}
+
+export function ContactFormSection({
+  data, subdomain, pageId, linksDisabled,
+}: {
+  data: ContactFormData;
+  subdomain?: string;
+  pageId?: string;
+  linksDisabled?: boolean;
+}) {
+  const [form, setForm] = useState({ name: '', email: '', phone: '', subject: '', message: '' });
+  const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+
+  if (!data) return null;
+
+  const set = (field: keyof typeof form, value: string) => setForm((prev) => ({ ...prev, [field]: value }));
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (linksDisabled) return; // builder preview — inert
+    setStatus('submitting');
+    try {
+      const recaptchaToken = await executeRecaptcha('contact_form').catch(() => '');
+      await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/tenant/contact-submissions/submit`,
+        { ...form, pageId, recaptchaToken },
+        { headers: { 'X-Tenant-Subdomain': subdomain || '' } }
+      );
+      setStatus('success');
+      setForm({ name: '', email: '', phone: '', subject: '', message: '' });
+    } catch {
+      setStatus('error');
+    }
+  }
+
+  const inputCls = 'w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400';
+
+  return (
+    <section id="contact-form" className="py-14 px-6 bg-gray-50 scroll-mt-16">
+      <div className="max-w-xl mx-auto">
+        {(data.heading || data.subheading) && (
+          <div className="text-center mb-8">
+            {data.heading && <h2 className="text-2xl font-bold text-gray-900">{data.heading}</h2>}
+            {data.subheading && <p className="text-gray-500 mt-2">{data.subheading}</p>}
+          </div>
+        )}
+        {status === 'success' ? (
+          <div className="text-center py-10 bg-white rounded-2xl border border-gray-200">
+            <p className="text-lg font-semibold text-gray-900">Thanks — your message has been sent!</p>
+            <p className="text-sm text-gray-500 mt-1">We'll get back to you soon.</p>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4">
+            {data.fields?.name && (
+              <input required value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="Your name" className={inputCls} />
+            )}
+            <input required type="email" value={form.email} onChange={(e) => set('email', e.target.value)} placeholder="Your email" className={inputCls} />
+            {data.fields?.phone && (
+              <input value={form.phone} onChange={(e) => set('phone', e.target.value)} placeholder="Phone number" className={inputCls} />
+            )}
+            {data.fields?.subject && (
+              <input value={form.subject} onChange={(e) => set('subject', e.target.value)} placeholder="Subject" className={inputCls} />
+            )}
+            <textarea required rows={4} value={form.message} onChange={(e) => set('message', e.target.value)} placeholder="Your message" className={`${inputCls} resize-none`} />
+            {status === 'error' && <p className="text-sm text-red-600">Something went wrong — please try again.</p>}
+            <button
+              type="submit"
+              disabled={status === 'submitting'}
+              className="w-full bg-primary-600 text-white text-sm font-semibold py-3 rounded-xl hover:bg-primary-700 transition-colors disabled:opacity-60 cursor-pointer"
+            >
+              {status === 'submitting' ? 'Sending…' : 'Send Message'}
+            </button>
+            {linksDisabled && <p className="text-xs text-gray-400 text-center">Preview mode — submissions are disabled here.</p>}
+          </form>
+        )}
+      </div>
+    </section>
+  );
+}
+
 // ─── Footer ───────────────────────────────────────────────────────────────────
 
 export function LandingFooter({ displayName, linksDisabled }: { displayName: string; linksDisabled?: boolean }) {
@@ -629,7 +721,7 @@ export function LandingFooter({ displayName, linksDisabled }: { displayName: str
 
 export interface PageSection {
   _id?: string; // Mongoose-assigned; absent for a section not yet saved
-  type: 'hero' | 'about' | 'coursesSection' | 'testimonials' | 'cta' | 'contact' | 'custom';
+  type: 'hero' | 'about' | 'coursesSection' | 'testimonials' | 'cta' | 'contact' | 'custom' | 'contactForm';
   order: number;
   data: unknown;
 }
@@ -643,7 +735,7 @@ export interface CustomCodeData {
 }
 
 export function PageSectionsRenderer({
-  sections, courses, coursesLoading, displayName, logoUrl, linksDisabled, pages,
+  sections, courses, coursesLoading, displayName, logoUrl, linksDisabled, pages, subdomain, pageId,
 }: {
   sections: PageSection[];
   courses: PublicCourse[];
@@ -652,6 +744,8 @@ export function PageSectionsRenderer({
   logoUrl: string | null;
   linksDisabled?: boolean;
   pages?: NavPage[];
+  subdomain?: string;
+  pageId?: string;
 }) {
   const hasAbout = sections.some((s) => {
     if (s.type !== 'about') return false;
@@ -702,6 +796,8 @@ export function PageSectionsRenderer({
             return <ContactSection key={i} contact={section.data as WebsiteContent['contact']} />;
           case 'custom':
             return <CustomCodeSection key={i} data={section.data as CustomCodeData} />;
+          case 'contactForm':
+            return <ContactFormSection key={i} data={section.data as ContactFormData} subdomain={subdomain} pageId={pageId} linksDisabled={linksDisabled} />;
           default:
             return null;
         }

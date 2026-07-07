@@ -9,34 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Alert } from '@/components/ui/Alert';
 import { cn } from '@/lib/utils';
-
-// ─── reCAPTCHA v3 ─────────────────────────────────────────────────────────────
-
-const RECAPTCHA_SITE_KEY = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY ?? '';
-
-function loadRecaptchaScript() {
-  if (!RECAPTCHA_SITE_KEY || document.getElementById('recaptcha-script')) return;
-  const s = document.createElement('script');
-  s.id = 'recaptcha-script';
-  s.src = `https://www.google.com/recaptcha/api.js?render=${RECAPTCHA_SITE_KEY}`;
-  s.async = true;
-  document.head.appendChild(s);
-}
-
-async function executeRecaptcha(action: string): Promise<string> {
-  if (!RECAPTCHA_SITE_KEY) return '';
-  return new Promise((resolve) => {
-    const attempt = () => {
-      const gr = (window as any).grecaptcha;
-      if (gr?.ready) {
-        gr.ready(() => gr.execute(RECAPTCHA_SITE_KEY, { action }).then(resolve));
-      } else {
-        setTimeout(attempt, 300);
-      }
-    };
-    attempt();
-  });
-}
+import { loadRecaptchaScript, executeRecaptcha, RECAPTCHA_SITE_KEY } from '@/lib/recaptcha';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

@@ -14,18 +14,20 @@ import {
   type PublicCourse,
   type Testimonial,
   type CustomCodeData,
+  type ContactFormData,
 } from '@/components/website/LandingPageSections';
 
 // Fixed types: 0-or-1 per page. 'custom' is the one repeatable type — any
 // number of Custom Code sections are allowed per page.
-type FixedSectionType = 'hero' | 'about' | 'coursesSection' | 'testimonials' | 'cta' | 'contact';
+type FixedSectionType = 'hero' | 'about' | 'coursesSection' | 'testimonials' | 'cta' | 'contact' | 'contactForm';
 type SectionType = FixedSectionType | 'custom';
 type InstituteType = 'school' | 'academy' | 'college' | 'university';
 
-const SECTION_TYPE_ORDER: FixedSectionType[] = ['hero', 'about', 'coursesSection', 'testimonials', 'cta', 'contact'];
+const SECTION_TYPE_ORDER: FixedSectionType[] = ['hero', 'about', 'coursesSection', 'testimonials', 'cta', 'contact', 'contactForm'];
 const SECTION_LABELS: Record<SectionType, string> = {
   hero: 'Hero', about: 'About', coursesSection: 'Courses Section',
   testimonials: 'Testimonials', cta: 'Call To Action', contact: 'Contact', custom: 'Custom Code',
+  contactForm: 'Contact Form',
 };
 
 const DEFAULT_SECTION_DATA: Record<SectionType, unknown> = {
@@ -36,6 +38,7 @@ const DEFAULT_SECTION_DATA: Record<SectionType, unknown> = {
   cta: { heading: '', subtext: '', buttonText: '', buttonLink: '' },
   contact: { email: '', phone: '', address: '' },
   custom: { html: '', css: '', js: '', heightPx: 400, isEnabled: true } as CustomCodeData,
+  contactForm: { heading: 'Get in touch', subheading: '', fields: { name: true, phone: false, subject: true }, recipientEmail: null } as ContactFormData,
 };
 
 const INSTITUTE_LABELS: Record<InstituteType, string> = {
@@ -792,6 +795,51 @@ function PageEditorScreen({ pageId, onBack }: { pageId: string; onBack: () => vo
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">Address</label>
                         <input className={inputCls} value={contactData.address} onChange={(e) => setSectionFieldAt<WebsiteContent['contact']>(idx, 'address', e.target.value)} placeholder="123 Main St, City" />
+                      </div>
+                    </>
+                    );
+                  })()}
+
+                  {section.type === 'contactForm' && (() => {
+                    const formData = section.data as ContactFormData;
+                    return (
+                    <>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Heading</label>
+                        <input className={inputCls} value={formData.heading} onChange={(e) => setSectionFieldAt<ContactFormData>(idx, 'heading', e.target.value)} placeholder="Get in touch" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Subheading</label>
+                        <input className={inputCls} value={formData.subheading} onChange={(e) => setSectionFieldAt<ContactFormData>(idx, 'subheading', e.target.value)} placeholder="Optional subheading" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-2">Fields to Show</label>
+                        <div className="space-y-1.5">
+                          <label className="flex items-center gap-2 text-xs text-gray-400">
+                            <input type="checkbox" checked disabled className="w-4 h-4 rounded border-gray-300" />
+                            Email <span className="text-gray-300">(always shown)</span>
+                          </label>
+                          <label className="flex items-center gap-2 text-xs text-gray-400">
+                            <input type="checkbox" checked disabled className="w-4 h-4 rounded border-gray-300" />
+                            Message <span className="text-gray-300">(always shown)</span>
+                          </label>
+                          {(['name', 'phone', 'subject'] as const).map((f) => (
+                            <label key={f} className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
+                              <input type="checkbox" checked={formData.fields[f]}
+                                onChange={(e) => setSectionFieldAt<ContactFormData>(idx, 'fields', { ...formData.fields, [f]: e.target.checked })}
+                                className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+                              {f === 'name' ? 'Name' : f === 'phone' ? 'Phone' : 'Subject'}
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          Recipient Email <span className="text-gray-400 font-normal">(optional override)</span>
+                        </label>
+                        <input className={inputCls} value={formData.recipientEmail ?? ''}
+                          onChange={(e) => setSectionFieldAt<ContactFormData>(idx, 'recipientEmail', e.target.value || null)}
+                          placeholder="Defaults to your account's contact email" />
                       </div>
                     </>
                     );

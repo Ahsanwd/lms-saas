@@ -22,6 +22,7 @@ export default function TenantCustomPage() {
   const [tenantName, setTenantName] = useState('');
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [sections, setSections] = useState<PageSection[]>([]);
+  const [pageId, setPageId] = useState<string | undefined>(undefined);
   const [courses, setCourses] = useState<PublicCourse[]>([]);
   const [navPages, setNavPages] = useState<NavPage[]>([]);
 
@@ -48,6 +49,7 @@ export default function TenantCustomPage() {
 
         const generalCourses = coursesRes.data.data.courses ?? [];
         setSections(page.sections ?? []);
+        setPageId(page._id);
         setCourses(await resolveSectionCourses(headers, page.sections ?? [], generalCourses));
       })
       .catch(() => setNotPublished(true))
@@ -72,6 +74,8 @@ export default function TenantCustomPage() {
       displayName={tenantName || subdomain}
       logoUrl={logoUrl}
       pages={navPages}
+      subdomain={subdomain}
+      pageId={pageId}
     />
   );
 }

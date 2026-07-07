@@ -128,6 +128,7 @@ function TenantLandingPage({ subdomain }: { subdomain: string }) {
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [isPublished, setIsPublished] = useState(false);
   const [sections, setSections] = useState<PageSection[]>([]);
+  const [pageId, setPageId] = useState<string | undefined>(undefined);
   const [navPages, setNavPages] = useState<NavPage[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -151,6 +152,7 @@ function TenantLandingPage({ subdomain }: { subdomain: string }) {
         if (page?.isPublished) {
           setIsPublished(true);
           setSections(page.sections ?? []);
+          setPageId(page._id);
           finalCourses = await resolveSectionCourses(headers, page.sections ?? [], finalCourses);
         }
         setCourses(finalCourses);
@@ -181,6 +183,8 @@ function TenantLandingPage({ subdomain }: { subdomain: string }) {
         displayName={displayName}
         logoUrl={logoUrl}
         pages={navPages}
+        subdomain={subdomain}
+        pageId={pageId}
       />
     );
   }

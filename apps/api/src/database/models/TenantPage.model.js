@@ -5,7 +5,7 @@ const softDeletePlugin = require('../plugins/softDelete.plugin');
 // 'custom' sections don't get service-level max-count enforced by the schema —
 // see tenantPage.service.js for the 0-or-1-per-fixed-type and size/count caps
 // (Mixed data has no schema-level validation, so those checks live there).
-const SECTION_TYPES = ['hero', 'about', 'coursesSection', 'testimonials', 'cta', 'contact', 'custom'];
+const SECTION_TYPES = ['hero', 'about', 'coursesSection', 'testimonials', 'cta', 'contact', 'custom', 'contactForm'];
 
 const tenantPageSchema = new mongoose.Schema(
   {
