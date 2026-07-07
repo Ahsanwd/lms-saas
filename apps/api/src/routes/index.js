@@ -24,8 +24,13 @@ router.use(resolveTenant);
 // so the admin can log in and reactivate their subscription.
 router.use('/auth',    require('../modules/auth/auth.routes'));
 router.use('/billing', require('../modules/billing/billing.routes'));
-router.use('/tenant',  require('../modules/tenant/tenant.routes'));
+// /tenant/pages must be mounted BEFORE /tenant — Express matches prefixes in
+// registration order, and /tenant is a prefix of /tenant/pages/*. Mounted the
+// other way round, every /tenant/pages/* request (including the public,
+// unauthenticated ones) gets swallowed by tenant.routes.js's own
+// `router.use(authenticate)` before it ever reaches tenantPage.routes.js.
 router.use('/tenant/pages', require('../modules/tenantPage/tenantPage.routes'));
+router.use('/tenant',  require('../modules/tenant/tenant.routes'));
 
 // All other operational routes require an active (non-expired) plan.
 router.use(requireActivePlan);
