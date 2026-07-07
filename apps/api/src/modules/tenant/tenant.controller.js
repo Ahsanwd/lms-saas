@@ -1,5 +1,4 @@
 const tenantService = require('./tenant.service');
-const tenantPageService = require('../tenantPage/tenantPage.service');
 const { validateUpdateSettings, validateCustomDomain } = require('../../validators/tenant.validator');
 const R = require('../../utils/response');
 
@@ -260,43 +259,6 @@ async function getPublicBranding(req, res, next) {
   } catch (err) { next(err); }
 }
 
-// ── Website Builder ────────────────────────────────────────────────────────────
-// Backed by TenantPage (the home page specifically) as of Phase 1a of the
-// multi-page builder migration — request/response shape is unchanged from
-// the original single-page implementation, so the builder UI needed no
-// changes for this cutover.
-async function getWebsiteContent(req, res, next) {
-  try {
-    const content = await tenantPageService.getHomePageContent(req.tenant.tenantId);
-    R.success(res, { website: content });
-  } catch (err) { next(err); }
-}
-
-async function saveWebsiteContent(req, res, next) {
-  try {
-    const content = await tenantPageService.saveHomePageContent(req.tenant.tenantId, req.body);
-    R.success(res, { website: content }, 'Website saved');
-  } catch (err) { next(err); }
-}
-
-// Public — no auth. Served on the tenant's subdomain landing page.
-async function getPublicWebsiteContent(req, res, next) {
-  try {
-    if (!req.tenant) return R.success(res, { isPublished: false });
-    const content = await tenantPageService.getPublicHomePageContent(req.tenant.tenantId);
-    R.success(res, content);
-  } catch (err) { next(err); }
-}
-
-async function uploadWebsiteImage(req, res, next) {
-  try {
-    if (!req.file) return R.error(res, 'No file uploaded', 400);
-    const { getPublicUrl } = require('../../services/storage/storage.service');
-    const url = getPublicUrl(req.file.path);
-    R.success(res, { url }, 'Image uploaded');
-  } catch (err) { next(err); }
-}
-
 module.exports = {
   getMyTenant,
   getPublicBranding,
@@ -325,8 +287,4 @@ module.exports = {
   saveBunnyStreamSettings,
   disconnectBunnyStream,
   testBunnyStreamConnection,
-  getWebsiteContent,
-  saveWebsiteContent,
-  getPublicWebsiteContent,
-  uploadWebsiteImage,
 };

@@ -4,18 +4,13 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import axios from 'axios';
 import { applyBrandColor, applySecondaryColor, applyFontFamily } from '@/lib/brandColor';
+import { useTenantSubdomain } from '@/lib/useTenantSubdomain';
+import { resolveSectionCourses } from '@/lib/tenantPageFetch';
 import {
-  LandingNavBar,
-  HeroSection,
-  AboutSection,
-  CoursesGrid,
-  TestimonialsSection,
-  CTASection,
-  ContactSection,
-  LandingFooter,
-  DEFAULT_WEBSITE_CONTENT,
-  type WebsiteContent,
+  PageSectionsRenderer,
+  type PageSection,
   type PublicCourse,
+  type NavPage,
 } from '@/components/website/LandingPageSections';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -131,45 +126,32 @@ function TenantLandingPage({ subdomain }: { subdomain: string }) {
   const [courses, setCourses] = useState<PublicCourse[]>([]);
   const [tenantName, setTenantName] = useState('');
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  const [website, setWebsite] = useState<WebsiteContent>(DEFAULT_WEBSITE_CONTENT);
+  const [isPublished, setIsPublished] = useState(false);
+  const [sections, setSections] = useState<PageSection[]>([]);
+  const [navPages, setNavPages] = useState<NavPage[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const headers = { 'X-Tenant-Subdomain': subdomain };
     Promise.all([
       axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/courses/public`, { headers }),
-      axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/tenant/website/public`, { headers }).catch(() => null),
+      axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/tenant/pages/public/home`, { headers }).catch(() => null),
+      axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/tenant/pages/public`, { headers }).catch(() => null),
     ])
-      .then(async ([coursesRes, websiteRes]) => {
+      .then(async ([coursesRes, pageRes, navRes]) => {
         let finalCourses = coursesRes.data.data.courses ?? [];
         setTenantName(coursesRes.data.data.tenantName ?? '');
         setLogoUrl(coursesRes.data.data.branding?.logoUrl ?? null);
         if (coursesRes.data.data.branding?.primaryColor) applyBrandColor(coursesRes.data.data.branding.primaryColor);
         if (coursesRes.data.data.branding?.secondaryColor) applySecondaryColor(coursesRes.data.data.branding.secondaryColor);
         applyFontFamily(coursesRes.data.data.branding?.fontFamily);
-        if (websiteRes?.data?.data?.isPublished) {
-          const w = websiteRes.data.data;
-          const merged: WebsiteContent = {
-            ...DEFAULT_WEBSITE_CONTENT,
-            ...w,
-            hero: { ...DEFAULT_WEBSITE_CONTENT.hero, ...w.hero },
-            about: { ...DEFAULT_WEBSITE_CONTENT.about, ...w.about },
-            coursesSection: { ...DEFAULT_WEBSITE_CONTENT.coursesSection, ...w.coursesSection },
-            cta: { ...DEFAULT_WEBSITE_CONTENT.cta, ...w.cta },
-            contact: { ...DEFAULT_WEBSITE_CONTENT.contact, ...w.contact },
-          };
-          setWebsite(merged);
-          // "Selected courses" is an explicit tenant curation — re-fetch by id so it
-          // isn't silently filtered out by unrelated Storefront category-hiding rules.
-          const cs = merged.coursesSection;
-          if (cs.displayMode === 'selected' && cs.courseIds.length > 0) {
-            try {
-              const idsRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/courses/public`, {
-                headers, params: { ids: cs.courseIds.join(',') },
-              });
-              finalCourses = idsRes.data.data.courses ?? [];
-            } catch { /* keep the general list as a fallback */ }
-          }
+        setNavPages(navRes?.data?.data?.pages ?? []);
+
+        const page = pageRes?.data?.data;
+        if (page?.isPublished) {
+          setIsPublished(true);
+          setSections(page.sections ?? []);
+          finalCourses = await resolveSectionCourses(headers, page.sections ?? [], finalCourses);
         }
         setCourses(finalCourses);
       })
@@ -190,24 +172,16 @@ function TenantLandingPage({ subdomain }: { subdomain: string }) {
     );
   }
 
-  if (website.isPublished) {
+  if (isPublished) {
     return (
-      <div className="min-h-screen bg-white text-gray-900">
-        <LandingNavBar
-          logoUrl={logoUrl}
-          displayName={displayName}
-          hasAbout={!!(website.about.heading || website.about.body)}
-          hasTestimonials={website.testimonials.length > 0}
-          hasContact={!!(website.contact.email || website.contact.phone || website.contact.address)}
-        />
-        <HeroSection hero={website.hero} displayName={displayName} />
-        <AboutSection about={website.about} />
-        <CoursesGrid courses={courses} loading={loading} coursesSection={website.coursesSection} />
-        <TestimonialsSection testimonials={website.testimonials} />
-        <CTASection cta={website.cta} />
-        <ContactSection contact={website.contact} />
-        <LandingFooter displayName={displayName} />
-      </div>
+      <PageSectionsRenderer
+        sections={sections}
+        courses={courses}
+        coursesLoading={false}
+        displayName={displayName}
+        logoUrl={logoUrl}
+        pages={navPages}
+      />
     );
   }
 
@@ -578,17 +552,7 @@ function PlatformLandingPage() {
 // ─── Root Page — detects platform vs tenant ───────────────────────────────────
 
 export default function RootPage() {
-  const [subdomain, setSubdomain] = useState<string | null>(null);
-
-  useEffect(() => {
-    const host = window.location.hostname;
-    const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'coursel.space';
-    if (host !== rootDomain && host !== `www.${rootDomain}` && host.endsWith(`.${rootDomain}`)) {
-      setSubdomain(host.replace(`.${rootDomain}`, ''));
-    } else {
-      setSubdomain('');
-    }
-  }, []);
+  const subdomain = useTenantSubdomain();
 
   if (subdomain === null) return null; // brief flash prevention
 

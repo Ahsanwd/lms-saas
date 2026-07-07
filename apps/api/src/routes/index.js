@@ -25,6 +25,7 @@ router.use(resolveTenant);
 router.use('/auth',    require('../modules/auth/auth.routes'));
 router.use('/billing', require('../modules/billing/billing.routes'));
 router.use('/tenant',  require('../modules/tenant/tenant.routes'));
+router.use('/tenant/pages', require('../modules/tenantPage/tenantPage.routes'));
 
 // All other operational routes require an active (non-expired) plan.
 router.use(requireActivePlan);

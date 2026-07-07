@@ -65,22 +65,38 @@ const LEVEL_LABEL: Record<string, string> = {
 
 // Renders a real Link when enabled, or an inert span with the same classes when
 // disabled (used in the builder's preview, where nothing should navigate away).
-function MaybeLink({ href, disabled, className, children }: { href: string; disabled?: boolean; className: string; children: React.ReactNode }) {
-  if (disabled) return <span className={className}>{children}</span>;
-  return <Link href={href} className={className}>{children}</Link>;
+function MaybeLink({ href, disabled, className, children, onClick }: { href: string; disabled?: boolean; className: string; children: React.ReactNode; onClick?: () => void }) {
+  if (disabled) return <span className={className} onClick={onClick}>{children}</span>;
+  return <Link href={href} className={className} onClick={onClick}>{children}</Link>;
 }
 
 // ─── Nav Bar ──────────────────────────────────────────────────────────────────
 
+export interface NavPage {
+  slug: string;
+  title: string;
+  isHomePage: boolean;
+}
+
 export function LandingNavBar({
-  logoUrl, displayName, linksDisabled, hasAbout = true, hasTestimonials = true, hasContact = true,
+  logoUrl, displayName, linksDisabled, hasAbout = true, hasTestimonials = true, hasContact = true, pages,
 }: {
   logoUrl: string | null; displayName: string; linksDisabled?: boolean;
   hasAbout?: boolean; hasTestimonials?: boolean; hasContact?: boolean;
+  // When provided (the real multi-page site), the nav links to actual pages
+  // instead of same-page anchors. Omitted in the builder's single-page
+  // preview, which falls back to anchor-jumping within that one page.
+  pages?: NavPage[];
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const navLinks = [
+  const usingRealPages = !!pages && pages.length > 0;
+
+  const pageLinks = usingRealPages
+    ? pages!.map((p) => ({ href: p.isHomePage ? '/' : `/${p.slug}`, label: p.title }))
+    : [];
+
+  const anchorLinks = [
     { href: '#home', label: 'Home', show: true },
     { href: '#about', label: 'About', show: hasAbout },
     { href: '#courses', label: 'Courses', show: true },
@@ -99,11 +115,17 @@ export function LandingNavBar({
 
         {/* Desktop links */}
         <div className="hidden lg:flex items-center gap-7">
-          {navLinks.map((l) => (
-            <a key={l.href} href={l.href} className="text-sm font-medium text-gray-600 hover:text-primary-600 transition-colors">
-              {l.label}
-            </a>
-          ))}
+          {usingRealPages
+            ? pageLinks.map((l) => (
+                <MaybeLink key={l.href} href={l.href} disabled={linksDisabled} className="text-sm font-medium text-gray-600 hover:text-primary-600 transition-colors cursor-pointer">
+                  {l.label}
+                </MaybeLink>
+              ))
+            : anchorLinks.map((l) => (
+                <a key={l.href} href={l.href} className="text-sm font-medium text-gray-600 hover:text-primary-600 transition-colors">
+                  {l.label}
+                </a>
+              ))}
         </div>
 
         <div className="hidden lg:flex items-center gap-3 flex-shrink-0">
@@ -139,16 +161,23 @@ export function LandingNavBar({
       {menuOpen && (
         <div className="lg:hidden border-t border-gray-100 bg-white px-6 py-4">
           <div className="flex flex-col">
-            {navLinks.map((l) => (
-              <a
-                key={l.href}
-                href={l.href}
-                onClick={() => setMenuOpen(false)}
-                className="py-2.5 text-sm font-medium text-gray-600 hover:text-primary-600 transition-colors"
-              >
-                {l.label}
-              </a>
-            ))}
+            {usingRealPages
+              ? pageLinks.map((l) => (
+                  <MaybeLink key={l.href} href={l.href} disabled={linksDisabled} onClick={() => setMenuOpen(false)}
+                    className="py-2.5 text-sm font-medium text-gray-600 hover:text-primary-600 transition-colors cursor-pointer">
+                    {l.label}
+                  </MaybeLink>
+                ))
+              : anchorLinks.map((l) => (
+                  <a
+                    key={l.href}
+                    href={l.href}
+                    onClick={() => setMenuOpen(false)}
+                    className="py-2.5 text-sm font-medium text-gray-600 hover:text-primary-600 transition-colors"
+                  >
+                    {l.label}
+                  </a>
+                ))}
           </div>
           <div className="pt-3 mt-2 border-t border-gray-100 flex flex-col gap-2">
             <MaybeLink
@@ -562,6 +591,84 @@ export function LandingFooter({ displayName, linksDisabled }: { displayName: str
         </div>
       </div>
     </footer>
+  );
+}
+
+// ─── Generic multi-page section renderer ──────────────────────────────────────
+// Used by the new multi-page routes (app/[pageSlug]/page.tsx and, going
+// forward, the Home page too) — a TenantPage document's sections[] array,
+// rendered in order. 'custom' sections render nothing yet (Phase 2).
+
+export interface PageSection {
+  type: 'hero' | 'about' | 'coursesSection' | 'testimonials' | 'cta' | 'contact' | 'custom';
+  order: number;
+  data: unknown;
+}
+
+export function PageSectionsRenderer({
+  sections, courses, coursesLoading, displayName, logoUrl, linksDisabled, pages,
+}: {
+  sections: PageSection[];
+  courses: PublicCourse[];
+  coursesLoading: boolean;
+  displayName: string;
+  logoUrl: string | null;
+  linksDisabled?: boolean;
+  pages?: NavPage[];
+}) {
+  const hasAbout = sections.some((s) => {
+    if (s.type !== 'about') return false;
+    const d = s.data as WebsiteContent['about'];
+    return !!(d?.heading || d?.body);
+  });
+  const hasTestimonials = sections.some((s) => s.type === 'testimonials' && Array.isArray(s.data) && s.data.length > 0);
+  const hasContact = sections.some((s) => {
+    if (s.type !== 'contact') return false;
+    const d = s.data as WebsiteContent['contact'];
+    return !!(d?.email || d?.phone || d?.address);
+  });
+
+  const ordered = [...sections].sort((a, b) => a.order - b.order);
+
+  return (
+    <div className="min-h-screen bg-white text-gray-900">
+      <LandingNavBar
+        logoUrl={logoUrl}
+        displayName={displayName}
+        linksDisabled={linksDisabled}
+        hasAbout={hasAbout}
+        hasTestimonials={hasTestimonials}
+        hasContact={hasContact}
+        pages={pages}
+      />
+      {ordered.map((section, i) => {
+        switch (section.type) {
+          case 'hero':
+            return <HeroSection key={i} hero={section.data as WebsiteContent['hero']} displayName={displayName} linksDisabled={linksDisabled} />;
+          case 'about':
+            return <AboutSection key={i} about={section.data as WebsiteContent['about']} linksDisabled={linksDisabled} />;
+          case 'coursesSection':
+            return (
+              <CoursesGrid
+                key={i}
+                courses={courses}
+                loading={coursesLoading}
+                coursesSection={section.data as WebsiteContent['coursesSection']}
+                linksDisabled={linksDisabled}
+              />
+            );
+          case 'testimonials':
+            return <TestimonialsSection key={i} testimonials={section.data as Testimonial[]} />;
+          case 'cta':
+            return <CTASection key={i} cta={section.data as WebsiteContent['cta']} linksDisabled={linksDisabled} />;
+          case 'contact':
+            return <ContactSection key={i} contact={section.data as WebsiteContent['contact']} />;
+          default:
+            return null; // 'custom' — Phase 2
+        }
+      })}
+      <LandingFooter displayName={displayName} linksDisabled={linksDisabled} />
+    </div>
   );
 }
 

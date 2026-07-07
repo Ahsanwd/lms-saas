@@ -1,7 +1,6 @@
 const tenantPageRepo = require('../../database/repositories/tenantPage.repository');
 const AppError = require('../../utils/AppError');
 
-const INSTITUTE_TYPES = ['school', 'academy', 'college', 'university'];
 const MAX_TESTIMONIALS = 6;
 
 // Size/count caps — Mixed-typed section data gets zero Mongoose schema
@@ -21,11 +20,32 @@ const EMPTY_WEBSITE_CONTENT = {
   contact: { email: null, phone: null, address: null },
 };
 
-// ─── Shape adapters ───────────────────────────────────────────────────────────
-// Phase 1a keeps the existing GET/PUT /tenant/website request+response shape
-// identical (so the current builder UI needs zero changes), while storage
-// moves from Tenant.websiteContent to TenantPage.sections[] underneath.
+// Every existing top-level route under apps/web/app/ (route groups like
+// (auth)/(dashboard) don't add a URL segment, so their children collide with
+// tenant-page slugs at the same level) — a tenant page can't use any of these,
+// or Next.js's static-route-wins-over-dynamic-catch-all behavior would make it
+// permanently unreachable. Known lightweight risk: this list can drift if a
+// new top-level route is added later without updating it here (flagged in
+// the plan as a follow-up CI check, not blocking this feature).
+const RESERVED_SLUGS = new Set([
+  'home', 'api',
+  // (auth)
+  'login', 'register', 'register-tenant', 'accept-invite', 'forgot-password',
+  'google-callback', 'reset-password', 'signup', 'verify-email',
+  // (dashboard)
+  'activity', 'admin', 'analytics', 'announcements', 'assignments', 'billing',
+  'bookmarks', 'bundles', 'certificate-builder', 'certificates', 'chat',
+  'cohorts', 'coupons', 'courses', 'dashboard', 'forum', 'groups',
+  'membership', 'membership-plans', 'my-learning', 'my-payments',
+  'notifications', 'profile', 'quizzes', 'refunds', 'search', 'settings',
+  'share-links', 'users', 'website-builder',
+  // top-level
+  'join', 'privacy', 'refund-policy', 'terms', 'verify', 'zoom',
+]);
 
+// ─── Section conversion helper (used by the one-time migration backfill) ─────
+// Historical bridge from the retired flat `websiteContent` shape to the
+// sections[] array — only called by scripts/backfillTenantPages.js now.
 function sectionsFromWebsiteContent(data) {
   return FIXED_SECTION_TYPES.map((type, order) => ({
     type,
@@ -34,54 +54,7 @@ function sectionsFromWebsiteContent(data) {
   }));
 }
 
-function websiteContentFromPage(page) {
-  const content = { instituteType: page?.instituteType ?? null, isPublished: page?.isPublished ?? false };
-  for (const type of FIXED_SECTION_TYPES) {
-    const section = page?.sections?.find((s) => s.type === type);
-    content[type] = section ? section.data : EMPTY_WEBSITE_CONTENT[type];
-  }
-  return content;
-}
-
-// ─── Home page (single-page builder — existing /tenant/website contract) ─────
-
-async function getHomePageContent(tenantId) {
-  const page = await tenantPageRepo.upsertHomePage(tenantId, { title: 'Home' });
-  return websiteContentFromPage(page);
-}
-
-async function saveHomePageContent(tenantId, data) {
-  const { instituteType, isPublished, testimonials } = data;
-
-  if (instituteType !== undefined && instituteType !== null && !INSTITUTE_TYPES.includes(instituteType))
-    throw new AppError('Invalid institute type', 400);
-  if (testimonials && testimonials.length > MAX_TESTIMONIALS)
-    throw new AppError(`Maximum ${MAX_TESTIMONIALS} testimonials allowed`, 400);
-
-  const sections = sectionsFromWebsiteContent(data);
-  validateSections(sections);
-
-  const home = await tenantPageRepo.upsertHomePage(tenantId, { title: 'Home' });
-  const updated = await tenantPageRepo.updateById(tenantId, home._id, {
-    instituteType: instituteType ?? home.instituteType,
-    isPublished: isPublished !== undefined ? !!isPublished : home.isPublished,
-    sections,
-  });
-  return websiteContentFromPage(updated);
-}
-
-// Unauthenticated — served on the tenant's public subdomain landing page.
-// Returns { isPublished: false } for tenants who've never touched the builder,
-// so the frontend's fallback-to-hardcoded-page logic has a safe default.
-async function getPublicHomePageContent(tenantId) {
-  if (!tenantId) return { isPublished: false };
-  const page = await tenantPageRepo.findHomePage(tenantId);
-  if (!page) return { isPublished: false };
-  return websiteContentFromPage(page);
-}
-
-// ─── Validation (shared by the home-page contract above and, later, the
-// full multi-page CRUD) ────────────────────────────────────────────────────
+// ─── Validation ───────────────────────────────────────────────────────────────
 
 function validateSections(sections) {
   if (sections.length > MAX_SECTIONS_PER_PAGE)
@@ -102,19 +75,118 @@ function validateSections(sections) {
         if (String(value).length > MAX_CUSTOM_CODE_CHARS)
           throw new AppError(`Custom code ${field} exceeds the ${MAX_CUSTOM_CODE_CHARS.toLocaleString()} character limit`, 400);
       }
+    } else {
+      throw new AppError(`Unknown section type "${section.type}"`, 400);
     }
+    if (section.type === 'testimonials' && Array.isArray(section.data) && section.data.length > MAX_TESTIMONIALS)
+      throw new AppError(`Maximum ${MAX_TESTIMONIALS} testimonials allowed`, 400);
   }
 
   if (customCount > MAX_CUSTOM_SECTIONS_PER_PAGE)
     throw new AppError(`A page can have at most ${MAX_CUSTOM_SECTIONS_PER_PAGE} Custom Code sections`, 400);
 }
 
+function slugify(title) {
+  return String(title)
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60) || 'page';
+}
+
+async function assertSlugAvailable(tenantId, slug, excludePageId) {
+  if (RESERVED_SLUGS.has(slug)) throw new AppError(`"${slug}" is a reserved name and can't be used as a page URL`, 400);
+  const existing = await tenantPageRepo.findBySlug(tenantId, slug);
+  if (existing && String(existing._id) !== String(excludePageId))
+    throw new AppError('A page with this URL already exists', 409);
+}
+
+// ─── CRUD (tenant_admin, authenticated) ───────────────────────────────────────
+
+function listPages(tenantId) {
+  return tenantPageRepo.findAll(tenantId);
+}
+
+async function getPage(tenantId, id) {
+  const page = await tenantPageRepo.findById(tenantId, id);
+  if (!page) throw new AppError('Page not found', 404);
+  return page;
+}
+
+async function createPage(tenantId, { title, slug }) {
+  if (!title?.trim()) throw new AppError('Title is required', 400);
+  const finalSlug = slugify(slug || title);
+  await assertSlugAvailable(tenantId, finalSlug);
+
+  const existingPages = await tenantPageRepo.findAll(tenantId);
+  const navOrder = existingPages.length;
+
+  return tenantPageRepo.create({
+    tenantId, title: title.trim(), slug: finalSlug, navOrder, sections: [],
+  });
+}
+
+async function updatePage(tenantId, id, data) {
+  const page = await getPage(tenantId, id);
+  const update = {};
+
+  if (data.title !== undefined) {
+    if (!data.title.trim()) throw new AppError('Title is required', 400);
+    update.title = data.title.trim();
+  }
+  if (data.slug !== undefined && data.slug !== page.slug) {
+    if (page.isHomePage) throw new AppError('The home page\'s URL can\'t be changed', 400);
+    const finalSlug = slugify(data.slug);
+    await assertSlugAvailable(tenantId, finalSlug, page._id);
+    update.slug = finalSlug;
+  }
+  if (data.isPublished !== undefined) update.isPublished = !!data.isPublished;
+  if (data.instituteType !== undefined) update.instituteType = data.instituteType;
+  if (data.sections !== undefined) {
+    validateSections(data.sections);
+    update.sections = data.sections;
+  }
+
+  if (!Object.keys(update).length) throw new AppError('No valid fields provided', 400);
+  return tenantPageRepo.updateById(tenantId, id, update);
+}
+
+async function deletePage(tenantId, id, userId) {
+  const page = await getPage(tenantId, id);
+  if (page.isHomePage) throw new AppError('The home page can\'t be deleted', 400);
+  return tenantPageRepo.softDelete(tenantId, id, userId);
+}
+
+async function reorderPages(tenantId, orderedIds) {
+  await Promise.all(orderedIds.map((id, navOrder) => tenantPageRepo.updateById(tenantId, id, { navOrder })));
+  return listPages(tenantId);
+}
+
+// ─── Public (unauthenticated) ─────────────────────────────────────────────────
+
+async function getPublicPageBySlug(tenantId, slug) {
+  if (!tenantId) return { isPublished: false };
+  const page = await tenantPageRepo.findPublishedBySlug(tenantId, slug);
+  if (!page) return { isPublished: false };
+  return page;
+}
+
+function listPublishedPages(tenantId) {
+  if (!tenantId) return [];
+  return tenantPageRepo.findPublishedList(tenantId);
+}
+
 module.exports = {
-  getHomePageContent,
-  saveHomePageContent,
-  getPublicHomePageContent,
-  // exported for the backfill script and future multi-page CRUD (Phase 1b)
-  sectionsFromWebsiteContent,
-  websiteContentFromPage,
+  listPages,
+  getPage,
+  createPage,
+  updatePage,
+  deletePage,
+  reorderPages,
+  getPublicPageBySlug,
+  listPublishedPages,
   validateSections,
+  // exported for the one-time migration backfill script only
+  sectionsFromWebsiteContent,
 };
