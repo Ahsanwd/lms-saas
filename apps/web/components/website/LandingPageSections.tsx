@@ -72,16 +72,41 @@ function MaybeLink({ href, disabled, className, children }: { href: string; disa
 
 // ─── Nav Bar ──────────────────────────────────────────────────────────────────
 
-export function LandingNavBar({ logoUrl, displayName, linksDisabled }: { logoUrl: string | null; displayName: string; linksDisabled?: boolean }) {
+export function LandingNavBar({
+  logoUrl, displayName, linksDisabled, hasAbout = true, hasTestimonials = true, hasContact = true,
+}: {
+  logoUrl: string | null; displayName: string; linksDisabled?: boolean;
+  hasAbout?: boolean; hasTestimonials?: boolean; hasContact?: boolean;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const navLinks = [
+    { href: '#home', label: 'Home', show: true },
+    { href: '#about', label: 'About', show: hasAbout },
+    { href: '#courses', label: 'Courses', show: true },
+    { href: '#testimonials', label: 'Testimonials', show: hasTestimonials },
+    { href: '#contact', label: 'Contact', show: hasContact },
+  ].filter((l) => l.show);
+
   return (
     <nav className="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm">
       <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
         {logoUrl ? (
-          <img src={logoUrl} alt={displayName} className="h-9 object-contain" />
+          <img src={logoUrl} alt={displayName} className="h-9 object-contain flex-shrink-0" />
         ) : (
-          <span className="text-xl font-bold text-primary-600 tracking-tight capitalize">{displayName}</span>
+          <span className="text-xl font-bold text-primary-600 tracking-tight capitalize flex-shrink-0">{displayName}</span>
         )}
-        <div className="flex items-center gap-3">
+
+        {/* Desktop links */}
+        <div className="hidden lg:flex items-center gap-7">
+          {navLinks.map((l) => (
+            <a key={l.href} href={l.href} className="text-sm font-medium text-gray-600 hover:text-primary-600 transition-colors">
+              {l.label}
+            </a>
+          ))}
+        </div>
+
+        <div className="hidden lg:flex items-center gap-3 flex-shrink-0">
           <MaybeLink href="/login" disabled={linksDisabled} className="text-sm font-medium text-gray-600 hover:text-primary-600 transition-colors cursor-pointer">
             Sign in
           </MaybeLink>
@@ -89,7 +114,58 @@ export function LandingNavBar({ logoUrl, displayName, linksDisabled }: { logoUrl
             Sign up free
           </MaybeLink>
         </div>
+
+        {/* Mobile hamburger */}
+        <button
+          type="button"
+          onClick={() => setMenuOpen((v) => !v)}
+          className="lg:hidden p-2 -mr-2 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors flex-shrink-0"
+          aria-label="Toggle menu"
+          aria-expanded={menuOpen}
+        >
+          {menuOpen ? (
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          ) : (
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          )}
+        </button>
       </div>
+
+      {/* Mobile dropdown panel */}
+      {menuOpen && (
+        <div className="lg:hidden border-t border-gray-100 bg-white px-6 py-4">
+          <div className="flex flex-col">
+            {navLinks.map((l) => (
+              <a
+                key={l.href}
+                href={l.href}
+                onClick={() => setMenuOpen(false)}
+                className="py-2.5 text-sm font-medium text-gray-600 hover:text-primary-600 transition-colors"
+              >
+                {l.label}
+              </a>
+            ))}
+          </div>
+          <div className="pt-3 mt-2 border-t border-gray-100 flex flex-col gap-2">
+            <MaybeLink
+              href="/login" disabled={linksDisabled}
+              className="text-center text-sm font-medium text-gray-600 hover:text-primary-600 py-2.5 rounded-lg border border-gray-200 cursor-pointer"
+            >
+              Sign in
+            </MaybeLink>
+            <MaybeLink
+              href="/register" disabled={linksDisabled}
+              className="text-center text-sm font-semibold bg-secondary-600 text-white py-2.5 rounded-lg hover:bg-secondary-700 transition-colors cursor-pointer"
+            >
+              Sign up free
+            </MaybeLink>
+          </div>
+        </div>
+      )}
     </nav>
   );
 }
@@ -103,10 +179,11 @@ export function HeroSection({ hero, displayName, linksDisabled, heightClass = 'm
     : undefined;
   return (
     <section
+      id="home"
       className={
         hasBg
-          ? `${heightClass} flex flex-col items-center justify-center px-6 text-center relative`
-          : `${heightClass} flex flex-col items-center justify-center px-6 text-center bg-gradient-to-b from-primary-50 via-white to-white`
+          ? `${heightClass} flex flex-col items-center justify-center px-6 text-center relative scroll-mt-16`
+          : `${heightClass} flex flex-col items-center justify-center px-6 text-center bg-gradient-to-b from-primary-50 via-white to-white scroll-mt-16`
       }
       style={bgStyle}
     >
@@ -147,7 +224,7 @@ export function HeroSection({ hero, displayName, linksDisabled, heightClass = 'm
 export function AboutSection({ about, linksDisabled }: { about: WebsiteContent['about']; linksDisabled?: boolean }) {
   if (!about.heading && !about.body) return null;
   return (
-    <section className="py-20 px-6 bg-gray-50">
+    <section id="about" className="py-20 px-6 bg-gray-50 scroll-mt-16">
       <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-14 items-center min-h-[26rem]">
         {about.imageUrl ? (
           <div className="relative">
@@ -351,7 +428,7 @@ export function CoursesGrid({
 }) {
   const shown = selectCourses(courses, coursesSection);
   return (
-    <section className="py-14 px-6 bg-white">
+    <section id="courses" className="py-14 px-6 bg-white scroll-mt-16">
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-8">
           <h2 className="text-2xl font-bold text-gray-900">
@@ -400,7 +477,7 @@ export function CoursesGrid({
 export function TestimonialsSection({ testimonials }: { testimonials: Testimonial[] }) {
   if (!testimonials || testimonials.length === 0) return null;
   return (
-    <section className="py-14 px-6 bg-gray-50">
+    <section id="testimonials" className="py-14 px-6 bg-gray-50 scroll-mt-16">
       <div className="max-w-6xl mx-auto">
         <h2 className="text-2xl font-bold text-gray-900 text-center mb-10">What our students say</h2>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -458,7 +535,7 @@ export function CTASection({ cta, linksDisabled }: { cta: WebsiteContent['cta'];
 export function ContactSection({ contact }: { contact: WebsiteContent['contact'] }) {
   if (!contact.email && !contact.phone && !contact.address) return null;
   return (
-    <section className="py-14 px-6 bg-white border-t border-gray-100">
+    <section id="contact" className="py-14 px-6 bg-white border-t border-gray-100 scroll-mt-16">
       <div className="max-w-3xl mx-auto text-center">
         <h2 className="text-2xl font-bold text-gray-900 mb-6">Get in touch</h2>
         <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-sm text-gray-600">

@@ -193,7 +193,13 @@ function TenantLandingPage({ subdomain }: { subdomain: string }) {
   if (website.isPublished) {
     return (
       <div className="min-h-screen bg-white text-gray-900">
-        <LandingNavBar logoUrl={logoUrl} displayName={displayName} />
+        <LandingNavBar
+          logoUrl={logoUrl}
+          displayName={displayName}
+          hasAbout={!!(website.about.heading || website.about.body)}
+          hasTestimonials={website.testimonials.length > 0}
+          hasContact={!!(website.contact.email || website.contact.phone || website.contact.address)}
+        />
         <HeroSection hero={website.hero} displayName={displayName} />
         <AboutSection about={website.about} />
         <CoursesGrid courses={courses} loading={loading} coursesSection={website.coursesSection} />

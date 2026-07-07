@@ -698,7 +698,14 @@ export default function WebsiteBuilderPage() {
           </div>
           <div className="flex-1 overflow-y-auto">
             <div className="bg-white">
-              <LandingNavBar logoUrl={null} displayName="Your School" linksDisabled />
+              <LandingNavBar
+                logoUrl={null}
+                displayName="Your School"
+                linksDisabled
+                hasAbout={!!(form.about.heading || form.about.body)}
+                hasTestimonials={form.testimonials.length > 0}
+                hasContact={!!(form.contact.email || form.contact.phone || form.contact.address)}
+              />
               <HeroSection hero={form.hero} displayName="Your School" linksDisabled heightClass="h-[calc(100vh-7rem)]" />
               <AboutSection about={form.about} linksDisabled />
               <CoursesGrid courses={previewCourses} loading={false} coursesSection={form.coursesSection} linksDisabled />
