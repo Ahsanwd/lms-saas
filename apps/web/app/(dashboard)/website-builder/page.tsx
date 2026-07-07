@@ -13,15 +13,19 @@ import {
   type WebsiteContent,
   type PublicCourse,
   type Testimonial,
+  type CustomCodeData,
 } from '@/components/website/LandingPageSections';
 
-type SectionType = 'hero' | 'about' | 'coursesSection' | 'testimonials' | 'cta' | 'contact';
+// Fixed types: 0-or-1 per page. 'custom' is the one repeatable type — any
+// number of Custom Code sections are allowed per page.
+type FixedSectionType = 'hero' | 'about' | 'coursesSection' | 'testimonials' | 'cta' | 'contact';
+type SectionType = FixedSectionType | 'custom';
 type InstituteType = 'school' | 'academy' | 'college' | 'university';
 
-const SECTION_TYPE_ORDER: SectionType[] = ['hero', 'about', 'coursesSection', 'testimonials', 'cta', 'contact'];
+const SECTION_TYPE_ORDER: FixedSectionType[] = ['hero', 'about', 'coursesSection', 'testimonials', 'cta', 'contact'];
 const SECTION_LABELS: Record<SectionType, string> = {
   hero: 'Hero', about: 'About', coursesSection: 'Courses Section',
-  testimonials: 'Testimonials', cta: 'Call To Action', contact: 'Contact',
+  testimonials: 'Testimonials', cta: 'Call To Action', contact: 'Contact', custom: 'Custom Code',
 };
 
 const DEFAULT_SECTION_DATA: Record<SectionType, unknown> = {
@@ -31,6 +35,7 @@ const DEFAULT_SECTION_DATA: Record<SectionType, unknown> = {
   testimonials: [] as Testimonial[],
   cta: { heading: '', subtext: '', buttonText: '', buttonLink: '' },
   contact: { email: '', phone: '', address: '' },
+  custom: { html: '', css: '', js: '', heightPx: 400, isEnabled: true } as CustomCodeData,
 };
 
 const INSTITUTE_LABELS: Record<InstituteType, string> = {
@@ -142,10 +147,6 @@ interface TenantPageSummary {
 interface TenantPageFull extends TenantPageSummary {
   instituteType: InstituteType | null;
   sections: PageSection[];
-}
-
-function getSectionData<T>(sections: PageSection[], type: SectionType): T | undefined {
-  return sections.find((s) => s.type === type)?.data as T | undefined;
 }
 
 const Section = ({ title }: { title: string }) => (
@@ -352,7 +353,10 @@ function PageEditorScreen({ pageId, onBack }: { pageId: string; onBack: () => vo
 
   useEffect(() => {
     if (pageData && !loaded) {
-      setSections(pageData.sections ?? []);
+      // Sections state is always kept in display order (array index === .order)
+      // from here on — every mutation below preserves that invariant, so a
+      // plain .map() renders correctly with no separate sort step needed.
+      setSections([...(pageData.sections ?? [])].sort((a, b) => a.order - b.order));
       setTitle(pageData.title);
       setIsPublished(pageData.isPublished);
       setInstituteType(pageData.instituteType);
@@ -378,62 +382,52 @@ function PageEditorScreen({ pageId, onBack }: { pageId: string; onBack: () => vo
       return api.post('/tenant/pages/image', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
     },
     onSuccess: (res, vars) => {
-      if (vars.field === 'hero') setSectionField<WebsiteContent['hero']>('hero', 'backgroundImageUrl', res.data.data.url);
-      if (vars.field === 'about') setSectionField<WebsiteContent['about']>('about', 'imageUrl', res.data.data.url);
+      // Hero/About are still 0-or-1 per page, so looking up by type is safe here.
+      const idx = sections.findIndex((s) => s.type === vars.field);
+      if (idx === -1) return;
+      if (vars.field === 'hero') setSectionFieldAt<WebsiteContent['hero']>(idx, 'backgroundImageUrl', res.data.data.url);
+      if (vars.field === 'about') setSectionFieldAt<WebsiteContent['about']>(idx, 'imageUrl', res.data.data.url);
     },
     onError: (e: AxiosError<{ message: string }>) => setSaveError(e.response?.data?.message ?? 'Upload failed'),
   });
 
-  function setSectionField<T extends Record<string, unknown>>(type: SectionType, field: keyof T, value: unknown) {
+  // All section mutations are index-based (not type-based) — Custom Code
+  // sections are repeatable, so `type` alone can't identify a specific one.
+  function setSectionFieldAt<T extends object>(index: number, field: keyof T, value: unknown) {
     setSections((prev) => {
-      const idx = prev.findIndex((s) => s.type === type);
-      if (idx === -1) return prev;
-      const current = prev[idx].data as T;
+      const current = prev[index].data as T;
       const next = [...prev];
-      next[idx] = { ...next[idx], data: { ...current, [field]: value } };
+      next[index] = { ...next[index], data: { ...current, [field]: value } };
       return next;
     });
   }
 
-  function setSectionWhole(type: SectionType, data: unknown) {
+  function setSectionWholeAt(index: number, data: unknown) {
     setSections((prev) => {
-      const idx = prev.findIndex((s) => s.type === type);
-      if (idx === -1) return prev;
       const next = [...prev];
-      next[idx] = { ...next[idx], data };
+      next[index] = { ...next[index], data };
       return next;
     });
   }
 
-  function hasSection(type: SectionType) { return sections.some((s) => s.type === type); }
+  function hasSection(type: FixedSectionType) { return sections.some((s) => s.type === type); }
 
   function addSection(type: SectionType) {
     setSections((prev) => [...prev, { type, order: prev.length, data: DEFAULT_SECTION_DATA[type] }]);
   }
 
-  function removeSection(type: SectionType) {
-    setSections((prev) => prev.filter((s) => s.type !== type).map((s, i) => ({ ...s, order: i })));
+  function removeSectionAt(index: number) {
+    setSections((prev) => prev.filter((_, i) => i !== index).map((s, i) => ({ ...s, order: i })));
   }
 
-  function moveSection(type: SectionType, dir: -1 | 1) {
-    setSections((prev) => {
-      const idx = prev.findIndex((s) => s.type === type);
-      if (idx === -1) return prev;
-      return moveArrayItem(prev, idx, dir).map((s, i) => ({ ...s, order: i }));
-    });
+  function moveSectionAt(index: number, dir: -1 | 1) {
+    setSections((prev) => moveArrayItem(prev, index, dir).map((s, i) => ({ ...s, order: i })));
   }
 
   function pickInstituteType(type: InstituteType) {
     setInstituteType(type);
     setSections(TEMPLATES[type]);
   }
-
-  const hero = getSectionData<WebsiteContent['hero']>(sections, 'hero');
-  const about = getSectionData<WebsiteContent['about']>(sections, 'about');
-  const coursesSection = getSectionData<WebsiteContent['coursesSection']>(sections, 'coursesSection');
-  const testimonials = getSectionData<Testimonial[]>(sections, 'testimonials') ?? [];
-  const cta = getSectionData<WebsiteContent['cta']>(sections, 'cta');
-  const contact = getSectionData<WebsiteContent['contact']>(sections, 'contact');
 
   if (isLoading || !loaded) return <div className="flex justify-center py-24"><Spinner size="lg" /></div>;
 
@@ -537,17 +531,24 @@ function PageEditorScreen({ pageId, onBack }: { pageId: string; onBack: () => vo
                       + {SECTION_LABELS[t]}
                     </button>
                   ))}
+                  <button onClick={() => addSection('custom')}
+                    className="text-xs px-2.5 py-1 rounded-full border border-dashed border-gray-300 text-gray-500 hover:border-primary-400 hover:text-primary-600 transition-colors">
+                    + Custom Code
+                  </button>
                 </div>
               </div>
             )}
 
-            {[...sections].sort((a, b) => a.order - b.order).map((section, idx) => (
-              <div key={section.type} className="border border-gray-200 rounded-xl overflow-hidden">
+            {sections.map((section, idx) => (
+              <div key={section._id ?? idx} className="border border-gray-200 rounded-xl overflow-hidden">
                 <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-b border-gray-200">
-                  <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">{SECTION_LABELS[section.type as SectionType]}</span>
+                  <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">
+                    {SECTION_LABELS[section.type as SectionType]}
+                    {section.type === 'custom' && ` #${sections.slice(0, idx + 1).filter((s) => s.type === 'custom').length}`}
+                  </span>
                   <div className="flex items-center gap-1">
-                    <ReorderControls index={idx} length={sections.length} onMove={(dir) => moveSection(section.type as SectionType, dir)} />
-                    <button onClick={() => removeSection(section.type as SectionType)} className="p-1 text-gray-300 hover:text-red-500 transition-colors" title="Remove section">
+                    <ReorderControls index={idx} length={sections.length} onMove={(dir) => moveSectionAt(idx, dir)} />
+                    <button onClick={() => removeSectionAt(idx)} className="p-1 text-gray-300 hover:text-red-500 transition-colors" title="Remove section">
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                       </svg>
@@ -555,59 +556,64 @@ function PageEditorScreen({ pageId, onBack }: { pageId: string; onBack: () => vo
                   </div>
                 </div>
                 <div className="p-3 space-y-3">
-                  {section.type === 'hero' && hero && (
+                  {section.type === 'hero' && (() => {
+                    const heroData = section.data as WebsiteContent['hero'];
+                    return (
                     <>
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">Headline</label>
-                        <input className={inputCls} value={hero.headline} onChange={(e) => setSectionField<WebsiteContent['hero']>('hero', 'headline', e.target.value)} placeholder="Your headline" />
+                        <input className={inputCls} value={heroData.headline} onChange={(e) => setSectionFieldAt<WebsiteContent['hero']>(idx, 'headline', e.target.value)} placeholder="Your headline" />
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">Subheadline</label>
-                        <textarea className={textareaCls} rows={2} value={hero.subheadline} onChange={(e) => setSectionField<WebsiteContent['hero']>('hero', 'subheadline', e.target.value)} placeholder="A short supporting sentence" />
+                        <textarea className={textareaCls} rows={2} value={heroData.subheadline} onChange={(e) => setSectionFieldAt<WebsiteContent['hero']>(idx, 'subheadline', e.target.value)} placeholder="A short supporting sentence" />
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <div>
                           <label className="block text-xs font-medium text-gray-600 mb-1">Button Text</label>
-                          <input className={inputCls} value={hero.ctaText} onChange={(e) => setSectionField<WebsiteContent['hero']>('hero', 'ctaText', e.target.value)} placeholder="Get Started" />
+                          <input className={inputCls} value={heroData.ctaText} onChange={(e) => setSectionFieldAt<WebsiteContent['hero']>(idx, 'ctaText', e.target.value)} placeholder="Get Started" />
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-gray-600 mb-1">Button Link</label>
-                          <input className={inputCls} value={hero.ctaLink} onChange={(e) => setSectionField<WebsiteContent['hero']>('hero', 'ctaLink', e.target.value)} placeholder="/register" />
+                          <input className={inputCls} value={heroData.ctaLink} onChange={(e) => setSectionFieldAt<WebsiteContent['hero']>(idx, 'ctaLink', e.target.value)} placeholder="/register" />
                         </div>
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">Background Image</label>
                         <div className="flex items-center gap-2 flex-wrap">
-                          {hero.backgroundImageUrl && <img src={hero.backgroundImageUrl} alt="hero bg" className="h-8 w-12 rounded border border-gray-200 object-cover" />}
+                          {heroData.backgroundImageUrl && <img src={heroData.backgroundImageUrl} alt="hero bg" className="h-8 w-12 rounded border border-gray-200 object-cover" />}
                           <button onClick={() => heroImgRef.current?.click()} className="text-xs px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-600 transition-colors">
-                            {hero.backgroundImageUrl ? 'Change' : 'Upload Image'}
+                            {heroData.backgroundImageUrl ? 'Change' : 'Upload Image'}
                           </button>
-                          {hero.backgroundImageUrl && <button onClick={() => setSectionField<WebsiteContent['hero']>('hero', 'backgroundImageUrl', '')} className="text-xs text-red-400 hover:text-red-600">Remove</button>}
+                          {heroData.backgroundImageUrl && <button onClick={() => setSectionFieldAt<WebsiteContent['hero']>(idx, 'backgroundImageUrl', '')} className="text-xs text-red-400 hover:text-red-600">Remove</button>}
                           <input ref={heroImgRef} type="file" accept="image/*" className="hidden"
                             onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadMutation.mutate({ field: 'hero', file: f }); e.target.value = ''; }} />
                         </div>
                       </div>
                     </>
-                  )}
+                    );
+                  })()}
 
-                  {section.type === 'about' && about && (
+                  {section.type === 'about' && (() => {
+                    const aboutData = section.data as WebsiteContent['about'];
+                    return (
                     <>
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">Heading</label>
-                        <input className={inputCls} value={about.heading} onChange={(e) => setSectionField<WebsiteContent['about']>('about', 'heading', e.target.value)} placeholder="About Us" />
+                        <input className={inputCls} value={aboutData.heading} onChange={(e) => setSectionFieldAt<WebsiteContent['about']>(idx, 'heading', e.target.value)} placeholder="About Us" />
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">Body</label>
-                        <textarea className={textareaCls} rows={4} value={about.body} onChange={(e) => setSectionField<WebsiteContent['about']>('about', 'body', e.target.value)} placeholder="Tell visitors about your institute" />
+                        <textarea className={textareaCls} rows={4} value={aboutData.body} onChange={(e) => setSectionFieldAt<WebsiteContent['about']>(idx, 'body', e.target.value)} placeholder="Tell visitors about your institute" />
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">Image</label>
                         <div className="flex items-center gap-2 flex-wrap">
-                          {about.imageUrl && <img src={about.imageUrl} alt="about" className="h-8 w-12 rounded border border-gray-200 object-cover" />}
+                          {aboutData.imageUrl && <img src={aboutData.imageUrl} alt="about" className="h-8 w-12 rounded border border-gray-200 object-cover" />}
                           <button onClick={() => aboutImgRef.current?.click()} className="text-xs px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-600 transition-colors">
-                            {about.imageUrl ? 'Change' : 'Upload Image'}
+                            {aboutData.imageUrl ? 'Change' : 'Upload Image'}
                           </button>
-                          {about.imageUrl && <button onClick={() => setSectionField<WebsiteContent['about']>('about', 'imageUrl', '')} className="text-xs text-red-400 hover:text-red-600">Remove</button>}
+                          {aboutData.imageUrl && <button onClick={() => setSectionFieldAt<WebsiteContent['about']>(idx, 'imageUrl', '')} className="text-xs text-red-400 hover:text-red-600">Remove</button>}
                           <input ref={aboutImgRef} type="file" accept="image/*" className="hidden"
                             onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadMutation.mutate({ field: 'about', file: f }); e.target.value = ''; }} />
                         </div>
@@ -615,51 +621,54 @@ function PageEditorScreen({ pageId, onBack }: { pageId: string; onBack: () => vo
                       <div className="grid grid-cols-2 gap-2">
                         <div>
                           <label className="block text-xs font-medium text-gray-600 mb-1">Button Text (optional)</label>
-                          <input className={inputCls} value={about.ctaText} onChange={(e) => setSectionField<WebsiteContent['about']>('about', 'ctaText', e.target.value)} placeholder="Learn More" />
+                          <input className={inputCls} value={aboutData.ctaText} onChange={(e) => setSectionFieldAt<WebsiteContent['about']>(idx, 'ctaText', e.target.value)} placeholder="Learn More" />
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-gray-600 mb-1">Button Link</label>
-                          <input className={inputCls} value={about.ctaLink} onChange={(e) => setSectionField<WebsiteContent['about']>('about', 'ctaLink', e.target.value)} placeholder="/register" />
+                          <input className={inputCls} value={aboutData.ctaLink} onChange={(e) => setSectionFieldAt<WebsiteContent['about']>(idx, 'ctaLink', e.target.value)} placeholder="/register" />
                         </div>
                       </div>
                     </>
-                  )}
+                    );
+                  })()}
 
-                  {section.type === 'coursesSection' && coursesSection && (
+                  {section.type === 'coursesSection' && (() => {
+                    const coursesSectionData = section.data as WebsiteContent['coursesSection'];
+                    return (
                     <>
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">Heading</label>
-                        <input className={inputCls} value={coursesSection.heading} onChange={(e) => setSectionField<WebsiteContent['coursesSection']>('coursesSection', 'heading', e.target.value)} placeholder="Our Courses" />
+                        <input className={inputCls} value={coursesSectionData.heading} onChange={(e) => setSectionFieldAt<WebsiteContent['coursesSection']>(idx, 'heading', e.target.value)} placeholder="Our Courses" />
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">Subheading</label>
-                        <input className={inputCls} value={coursesSection.subheading} onChange={(e) => setSectionField<WebsiteContent['coursesSection']>('coursesSection', 'subheading', e.target.value)} placeholder="Optional subheading" />
+                        <input className={inputCls} value={coursesSectionData.subheading} onChange={(e) => setSectionFieldAt<WebsiteContent['coursesSection']>(idx, 'subheading', e.target.value)} placeholder="Optional subheading" />
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-2">Which Courses to Show</label>
                         <div className="grid grid-cols-3 gap-2">
                           {(['all', 'category', 'selected'] as const).map((mode) => (
-                            <button key={mode} onClick={() => setSectionField<WebsiteContent['coursesSection']>('coursesSection', 'displayMode', mode)}
+                            <button key={mode} onClick={() => setSectionFieldAt<WebsiteContent['coursesSection']>(idx, 'displayMode', mode)}
                               className={`py-2 text-xs rounded-lg border font-medium transition-colors ${
-                                coursesSection.displayMode === mode ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                                coursesSectionData.displayMode === mode ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                               }`}>
                               {mode === 'all' ? 'All Courses' : mode === 'category' ? 'By Category' : 'Selected'}
                             </button>
                           ))}
                         </div>
                       </div>
-                      {coursesSection.displayMode === 'category' && (
+                      {coursesSectionData.displayMode === 'category' && (
                         <div>
                           <label className="block text-xs font-medium text-gray-600 mb-1">Category</label>
-                          <select className={inputCls} value={coursesSection.categoryId ?? ''}
-                            onChange={(e) => setSectionField<WebsiteContent['coursesSection']>('coursesSection', 'categoryId', e.target.value || null)}>
+                          <select className={inputCls} value={coursesSectionData.categoryId ?? ''}
+                            onChange={(e) => setSectionFieldAt<WebsiteContent['coursesSection']>(idx, 'categoryId', e.target.value || null)}>
                             <option value="">Select a category…</option>
                             {categories.map((c) => <option key={c._id} value={c._id}>{c.name}</option>)}
                           </select>
                           {categories.length === 0 && <p className="text-xs text-gray-400 mt-1">No categories yet.</p>}
                         </div>
                       )}
-                      {coursesSection.displayMode === 'selected' && (
+                      {coursesSectionData.displayMode === 'selected' && (
                         <div>
                           <label className="block text-xs font-medium text-gray-600 mb-1">
                             Choose Courses <span className="text-gray-400 font-normal">(check to add, arrows to reorder)</span>
@@ -669,34 +678,34 @@ function PageEditorScreen({ pageId, onBack }: { pageId: string; onBack: () => vo
                           ) : (
                             <div className="border border-gray-200 rounded-xl max-h-60 overflow-y-auto divide-y divide-gray-50">
                               {allCourses.map((c) => {
-                                const ids = coursesSection.courseIds;
+                                const ids = coursesSectionData.courseIds;
                                 const idx2 = ids.indexOf(c._id);
                                 const selected = idx2 !== -1;
                                 return (
                                   <div key={c._id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50">
                                     <input type="checkbox" checked={selected}
-                                      onChange={() => setSectionField<WebsiteContent['coursesSection']>('coursesSection', 'courseIds', selected ? ids.filter((x) => x !== c._id) : [...ids, c._id])}
+                                      onChange={() => setSectionFieldAt<WebsiteContent['coursesSection']>(idx, 'courseIds', selected ? ids.filter((x) => x !== c._id) : [...ids, c._id])}
                                       className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 flex-shrink-0" />
                                     <span className="text-sm text-gray-700 truncate flex-1">{selected ? `${idx2 + 1}. ` : ''}{c.title}</span>
                                     {selected && (
                                       <ReorderControls index={idx2} length={ids.length}
-                                        onMove={(dir) => setSectionField<WebsiteContent['coursesSection']>('coursesSection', 'courseIds', moveArrayItem(ids, idx2, dir))} />
+                                        onMove={(dir) => setSectionFieldAt<WebsiteContent['coursesSection']>(idx, 'courseIds', moveArrayItem(ids, idx2, dir))} />
                                     )}
                                   </div>
                                 );
                               })}
                             </div>
                           )}
-                          <p className="text-xs text-gray-400 mt-1">{coursesSection.courseIds.length} selected</p>
+                          <p className="text-xs text-gray-400 mt-1">{coursesSectionData.courseIds.length} selected</p>
                         </div>
                       )}
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-2">Layout</label>
                         <div className="grid grid-cols-2 gap-2">
                           {(['grid', 'slider'] as const).map((l) => (
-                            <button key={l} onClick={() => setSectionField<WebsiteContent['coursesSection']>('coursesSection', 'layout', l)}
+                            <button key={l} onClick={() => setSectionFieldAt<WebsiteContent['coursesSection']>(idx, 'layout', l)}
                               className={`py-2 text-xs rounded-lg border capitalize font-medium transition-colors ${
-                                coursesSection.layout === l ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                                coursesSectionData.layout === l ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                               }`}>
                               {l}
                             </button>
@@ -705,78 +714,121 @@ function PageEditorScreen({ pageId, onBack }: { pageId: string; onBack: () => vo
                         <p className="text-xs text-gray-400 mt-1">Slider works well if you have many courses.</p>
                       </div>
                     </>
-                  )}
+                    );
+                  })()}
 
-                  {section.type === 'testimonials' && (
+                  {section.type === 'testimonials' && (() => {
+                    const testimonialsData = section.data as Testimonial[];
+                    return (
                     <>
                       <div className="flex items-center justify-between">
-                        <span className="text-xs text-gray-400">{testimonials.length} / 6</span>
-                        {testimonials.length < 6 && (
-                          <button onClick={() => setSectionWhole('testimonials', [...testimonials, { name: '', role: '', quote: '', avatarUrl: null }])}
+                        <span className="text-xs text-gray-400">{testimonialsData.length} / 6</span>
+                        {testimonialsData.length < 6 && (
+                          <button onClick={() => setSectionWholeAt(idx, [...testimonialsData, { name: '', role: '', quote: '', avatarUrl: null }])}
                             className="text-xs text-primary-600 font-medium hover:text-primary-700">+ Add</button>
                         )}
                       </div>
-                      {testimonials.map((t, i) => (
+                      {testimonialsData.map((t, i) => (
                         <div key={i} className="border border-gray-200 rounded-lg p-3 space-y-2">
                           <div className="flex items-center justify-between -mt-0.5 -mr-0.5">
                             <span className="text-xs font-medium text-gray-400">Testimonial {i + 1}</span>
                             <div className="flex items-center gap-1">
-                              <ReorderControls index={i} length={testimonials.length} onMove={(dir) => setSectionWhole('testimonials', moveArrayItem(testimonials, i, dir))} />
-                              <button onClick={() => setSectionWhole('testimonials', testimonials.filter((_, j) => j !== i))} className="p-1 text-gray-300 hover:text-red-500 transition-colors" title="Remove">
+                              <ReorderControls index={i} length={testimonialsData.length} onMove={(dir) => setSectionWholeAt(idx, moveArrayItem(testimonialsData, i, dir))} />
+                              <button onClick={() => setSectionWholeAt(idx, testimonialsData.filter((_, j) => j !== i))} className="p-1 text-gray-300 hover:text-red-500 transition-colors" title="Remove">
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                 </svg>
                               </button>
                             </div>
                           </div>
-                          <input className={inputCls} value={t.name} onChange={(e) => setSectionWhole('testimonials', testimonials.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} placeholder="Name" />
-                          <input className={inputCls} value={t.role} onChange={(e) => setSectionWhole('testimonials', testimonials.map((x, j) => j === i ? { ...x, role: e.target.value } : x))} placeholder="Role (e.g. Student)" />
-                          <textarea className={textareaCls} rows={2} value={t.quote} onChange={(e) => setSectionWhole('testimonials', testimonials.map((x, j) => j === i ? { ...x, quote: e.target.value } : x))} placeholder="Quote" />
+                          <input className={inputCls} value={t.name} onChange={(e) => setSectionWholeAt(idx, testimonialsData.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} placeholder="Name" />
+                          <input className={inputCls} value={t.role} onChange={(e) => setSectionWholeAt(idx, testimonialsData.map((x, j) => j === i ? { ...x, role: e.target.value } : x))} placeholder="Role (e.g. Student)" />
+                          <textarea className={textareaCls} rows={2} value={t.quote} onChange={(e) => setSectionWholeAt(idx, testimonialsData.map((x, j) => j === i ? { ...x, quote: e.target.value } : x))} placeholder="Quote" />
                         </div>
                       ))}
-                      {testimonials.length === 0 && <p className="text-xs text-gray-400">No testimonials yet — add up to 6.</p>}
+                      {testimonialsData.length === 0 && <p className="text-xs text-gray-400">No testimonials yet — add up to 6.</p>}
                     </>
-                  )}
+                    );
+                  })()}
 
-                  {section.type === 'cta' && cta && (
+                  {section.type === 'cta' && (() => {
+                    const ctaData = section.data as WebsiteContent['cta'];
+                    return (
                     <>
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">Heading</label>
-                        <input className={inputCls} value={cta.heading} onChange={(e) => setSectionField<WebsiteContent['cta']>('cta', 'heading', e.target.value)} placeholder="Ready to get started?" />
+                        <input className={inputCls} value={ctaData.heading} onChange={(e) => setSectionFieldAt<WebsiteContent['cta']>(idx, 'heading', e.target.value)} placeholder="Ready to get started?" />
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">Subtext</label>
-                        <input className={inputCls} value={cta.subtext} onChange={(e) => setSectionField<WebsiteContent['cta']>('cta', 'subtext', e.target.value)} placeholder="Optional supporting text" />
+                        <input className={inputCls} value={ctaData.subtext} onChange={(e) => setSectionFieldAt<WebsiteContent['cta']>(idx, 'subtext', e.target.value)} placeholder="Optional supporting text" />
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <div>
                           <label className="block text-xs font-medium text-gray-600 mb-1">Button Text</label>
-                          <input className={inputCls} value={cta.buttonText} onChange={(e) => setSectionField<WebsiteContent['cta']>('cta', 'buttonText', e.target.value)} placeholder="Get Started" />
+                          <input className={inputCls} value={ctaData.buttonText} onChange={(e) => setSectionFieldAt<WebsiteContent['cta']>(idx, 'buttonText', e.target.value)} placeholder="Get Started" />
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-gray-600 mb-1">Button Link</label>
-                          <input className={inputCls} value={cta.buttonLink} onChange={(e) => setSectionField<WebsiteContent['cta']>('cta', 'buttonLink', e.target.value)} placeholder="/register" />
+                          <input className={inputCls} value={ctaData.buttonLink} onChange={(e) => setSectionFieldAt<WebsiteContent['cta']>(idx, 'buttonLink', e.target.value)} placeholder="/register" />
                         </div>
                       </div>
                     </>
-                  )}
+                    );
+                  })()}
 
-                  {section.type === 'contact' && contact && (
+                  {section.type === 'contact' && (() => {
+                    const contactData = section.data as WebsiteContent['contact'];
+                    return (
                     <>
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">Email</label>
-                        <input className={inputCls} value={contact.email} onChange={(e) => setSectionField<WebsiteContent['contact']>('contact', 'email', e.target.value)} placeholder="info@example.com" />
+                        <input className={inputCls} value={contactData.email} onChange={(e) => setSectionFieldAt<WebsiteContent['contact']>(idx, 'email', e.target.value)} placeholder="info@example.com" />
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">Phone</label>
-                        <input className={inputCls} value={contact.phone} onChange={(e) => setSectionField<WebsiteContent['contact']>('contact', 'phone', e.target.value)} placeholder="+1 555 000 0000" />
+                        <input className={inputCls} value={contactData.phone} onChange={(e) => setSectionFieldAt<WebsiteContent['contact']>(idx, 'phone', e.target.value)} placeholder="+1 555 000 0000" />
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">Address</label>
-                        <input className={inputCls} value={contact.address} onChange={(e) => setSectionField<WebsiteContent['contact']>('contact', 'address', e.target.value)} placeholder="123 Main St, City" />
+                        <input className={inputCls} value={contactData.address} onChange={(e) => setSectionFieldAt<WebsiteContent['contact']>(idx, 'address', e.target.value)} placeholder="123 Main St, City" />
                       </div>
                     </>
-                  )}
+                    );
+                  })()}
+
+                  {section.type === 'custom' && (() => {
+                    const customData = section.data as CustomCodeData;
+                    return (
+                    <>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">HTML</label>
+                        <textarea className={`${textareaCls} font-mono text-xs`} rows={5} value={customData.html}
+                          onChange={(e) => setSectionFieldAt<CustomCodeData>(idx, 'html', e.target.value)} placeholder="<div>...</div>" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">CSS</label>
+                        <textarea className={`${textareaCls} font-mono text-xs`} rows={4} value={customData.css}
+                          onChange={(e) => setSectionFieldAt<CustomCodeData>(idx, 'css', e.target.value)} placeholder=".my-class { ... }" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">JavaScript</label>
+                        <textarea className={`${textareaCls} font-mono text-xs`} rows={4} value={customData.js}
+                          onChange={(e) => setSectionFieldAt<CustomCodeData>(idx, 'js', e.target.value)} placeholder="console.log('hello');" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          Height <span className="text-gray-400 font-normal">(px)</span>
+                        </label>
+                        <input type="number" min={50} max={4000} className={inputCls} value={customData.heightPx}
+                          onChange={(e) => setSectionFieldAt<CustomCodeData>(idx, 'heightPx', Math.max(50, Number(e.target.value) || 400))} />
+                      </div>
+                      <p className="text-xs text-gray-400">
+                        Runs in a sandboxed frame — it can't access your site's cookies, login sessions, or other tenants' data.
+                      </p>
+                    </>
+                    );
+                  })()}
                 </div>
               </div>
             ))}

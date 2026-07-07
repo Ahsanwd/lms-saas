@@ -577,6 +577,34 @@ export function ContactSection({ contact }: { contact: WebsiteContent['contact']
   );
 }
 
+// ─── Custom Code ──────────────────────────────────────────────────────────────
+// Renders tenant-supplied HTML/CSS/JS inside a sandboxed iframe. Deliberately
+// NOT sanitized — the sandbox attribute (allow-scripts only, no
+// allow-same-origin) is the security boundary, not input filtering. Never add
+// allow-same-origin, allow-top-navigation, or allow-popups here: the iframe
+// must keep a unique opaque origin with no access to the parent window,
+// cookies, localStorage, or same-origin fetches carrying ambient credentials.
+// This protects the platform and other tenants; it does not protect a
+// tenant's own visitors from that tenant's own content (same trust model as
+// CodePen/Webflow custom-code blocks — a Trust & Safety concern, not a
+// technical one). isEnabled is a support/ops kill-switch for abuse reports.
+export function CustomCodeSection({ data }: { data: CustomCodeData }) {
+  if (data.isEnabled === false) return null;
+  if (!data.html && !data.css && !data.js) return null;
+
+  const srcDoc = `<!doctype html><html><head><meta charset="utf-8" /><style>body{margin:0;}${data.css || ''}</style></head><body>${data.html || ''}<script>${data.js || ''}<\/script></body></html>`;
+
+  return (
+    <iframe
+      srcDoc={srcDoc}
+      sandbox="allow-scripts"
+      referrerPolicy="no-referrer"
+      style={{ width: '100%', height: `${data.heightPx || 400}px`, border: 'none', display: 'block' }}
+      title="Custom section"
+    />
+  );
+}
+
 // ─── Footer ───────────────────────────────────────────────────────────────────
 
 export function LandingFooter({ displayName, linksDisabled }: { displayName: string; linksDisabled?: boolean }) {
@@ -600,9 +628,18 @@ export function LandingFooter({ displayName, linksDisabled }: { displayName: str
 // rendered in order. 'custom' sections render nothing yet (Phase 2).
 
 export interface PageSection {
+  _id?: string; // Mongoose-assigned; absent for a section not yet saved
   type: 'hero' | 'about' | 'coursesSection' | 'testimonials' | 'cta' | 'contact' | 'custom';
   order: number;
   data: unknown;
+}
+
+export interface CustomCodeData {
+  html: string;
+  css: string;
+  js: string;
+  heightPx: number;
+  isEnabled: boolean;
 }
 
 export function PageSectionsRenderer({
@@ -663,8 +700,10 @@ export function PageSectionsRenderer({
             return <CTASection key={i} cta={section.data as WebsiteContent['cta']} linksDisabled={linksDisabled} />;
           case 'contact':
             return <ContactSection key={i} contact={section.data as WebsiteContent['contact']} />;
+          case 'custom':
+            return <CustomCodeSection key={i} data={section.data as CustomCodeData} />;
           default:
-            return null; // 'custom' — Phase 2
+            return null;
         }
       })}
       <LandingFooter displayName={displayName} linksDisabled={linksDisabled} />
