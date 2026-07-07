@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import Link from 'next/link';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -267,11 +267,28 @@ function selectCourses(courses: PublicCourse[], cs: WebsiteContent['coursesSecti
 
 function CoursesSlider({ courses, linksDisabled }: { courses: PublicCourse[]; linksDisabled?: boolean }) {
   const scrollerRef = useRef<HTMLDivElement>(null);
-  const scrollBy = (dir: number) => scrollerRef.current?.scrollBy({ left: dir * 320, behavior: 'smooth' });
+  const [activeIndex, setActiveIndex] = useState(0);
+  const CARD_STEP = 320; // card width (288/w-72) + gap-6 (24)
+
+  const scrollBy = (dir: number) => scrollerRef.current?.scrollBy({ left: dir * CARD_STEP, behavior: 'smooth' });
+  const scrollToIndex = (i: number) => scrollerRef.current?.scrollTo({ left: i * CARD_STEP, behavior: 'smooth' });
+
+  const handleScroll = () => {
+    if (!scrollerRef.current) return;
+    setActiveIndex(Math.round(scrollerRef.current.scrollLeft / CARD_STEP));
+  };
+
+  const showControls = courses.length > 1;
+  const showDots = showControls && courses.length <= 8;
+
   return (
     <div className="relative">
+      {/* Right-edge fade — a visual cue that there's more to scroll, especially on mobile */}
+      {showControls && <div className="pointer-events-none absolute right-0 top-0 bottom-2 w-10 bg-gradient-to-l from-white to-transparent z-10" />}
+
       <div
         ref={scrollerRef}
+        onScroll={handleScroll}
         className="flex gap-6 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-2"
         style={{ scrollbarWidth: 'none' }}
       >
@@ -281,12 +298,13 @@ function CoursesSlider({ courses, linksDisabled }: { courses: PublicCourse[]; li
           </div>
         ))}
       </div>
-      {courses.length > 3 && (
+
+      {showControls && (
         <>
           <button
             type="button"
             onClick={() => scrollBy(-1)}
-            className="hidden sm:flex absolute -left-4 top-[35%] -translate-y-1/2 w-9 h-9 rounded-full bg-white shadow-md border border-gray-200 items-center justify-center text-gray-500 hover:text-primary-600 transition-colors"
+            className="flex absolute left-1 top-[35%] -translate-y-1/2 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/95 shadow-md border border-gray-200 items-center justify-center text-gray-500 hover:text-primary-600 active:scale-95 transition-all z-20"
             aria-label="Scroll left"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -296,7 +314,7 @@ function CoursesSlider({ courses, linksDisabled }: { courses: PublicCourse[]; li
           <button
             type="button"
             onClick={() => scrollBy(1)}
-            className="hidden sm:flex absolute -right-4 top-[35%] -translate-y-1/2 w-9 h-9 rounded-full bg-white shadow-md border border-gray-200 items-center justify-center text-gray-500 hover:text-primary-600 transition-colors"
+            className="flex absolute right-1 top-[35%] -translate-y-1/2 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/95 shadow-md border border-gray-200 items-center justify-center text-gray-500 hover:text-primary-600 active:scale-95 transition-all z-20"
             aria-label="Scroll right"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -304,6 +322,23 @@ function CoursesSlider({ courses, linksDisabled }: { courses: PublicCourse[]; li
             </svg>
           </button>
         </>
+      )}
+
+      {/* Dot indicators — the clearest "this is swipeable" signal on mobile */}
+      {showDots && (
+        <div className="flex items-center justify-center gap-1.5 mt-4">
+          {courses.map((course, i) => (
+            <button
+              key={course._id}
+              type="button"
+              onClick={() => scrollToIndex(i)}
+              aria-label={`Go to course ${i + 1}`}
+              className={`h-1.5 rounded-full transition-all ${
+                i === activeIndex ? 'w-5 bg-primary-600' : 'w-1.5 bg-gray-300'
+              }`}
+            />
+          ))}
+        </div>
       )}
     </div>
   );
