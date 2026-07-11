@@ -5,6 +5,20 @@ const skipRedis = !process.env.REDIS_HOST ||
   process.env.REDIS_HOST === 'localhost' ||
   process.env.SKIP_REDIS === 'true';
 
+// Lets specific email sources (currently just Contact Form submissions) find
+// out whether their notification actually reached the provider, not just
+// whether it was queued. A no-op for any job whose data has no
+// contactSubmissionId — every other email source is unaffected.
+async function markContactDeliveryOutcome(data, delivered) {
+  if (!data?.contactSubmissionId) return;
+  try {
+    const contactSubmissionRepo = require('../database/repositories/contactSubmission.repository');
+    await contactSubmissionRepo.markEmailDelivered(data.contactSubmissionId, delivered);
+  } catch (err) {
+    logger.error('Failed to update contact submission delivery status', { error: err.message });
+  }
+}
+
 if (!skipEmail && !skipRedis) {
   const { emailQueue }  = require('./queue');
   const { sendMail }    = require('../services/email/email.service');
@@ -26,12 +40,15 @@ if (!skipEmail && !skipRedis) {
 
     await sendMail({ to, subject, html, tenantEmailSettings });
     logger.info(`Email job ${job.id} processed for ${to}`);
+    await markContactDeliveryOutcome(job.data, true);
   });
 
   // Dead-letter handler: fires after all retry attempts are exhausted
   emailQueue().on('failed', async (job, err) => {
     const maxAttempts = job.opts?.attempts || 3;
     if (job.attemptsMade < maxAttempts) return; // Will be retried — skip until final failure
+
+    await markContactDeliveryOutcome(job.data, false);
 
     const tenantId = job.data.tenantId || null;
 
@@ -84,9 +101,13 @@ function queueEmail(data) {
     const { sendMail } = require('../services/email/email.service');
     logger.info(`[DIRECT] Sending email to ${data.to} subject="${data.subject}"`);
     return sendMail({ to: data.to, subject: data.subject, html: data.html })
-      .then(info => logger.info(`[DIRECT] Email sent OK to ${data.to} messageId=${info?.messageId}`))
-      .catch(err => {
+      .then(async info => {
+        logger.info(`[DIRECT] Email sent OK to ${data.to} messageId=${info?.messageId}`);
+        await markContactDeliveryOutcome(data, true);
+      })
+      .catch(async err => {
         logger.error(`[DIRECT] Email FAILED to ${data.to}: ${err.message}`);
+        await markContactDeliveryOutcome(data, false);
         throw err;
       });
   }

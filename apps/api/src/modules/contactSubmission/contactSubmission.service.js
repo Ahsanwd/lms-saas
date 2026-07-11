@@ -56,9 +56,16 @@ async function submit(tenantId, pageId, data, meta) {
       submittedAt: new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }),
       tenantName, appUrl: config.app.url, branding,
     });
-    queueEmail({ to: recipientEmail, tenantId: tenantId.toString(), ...template })
-      .then(() => contactSubmissionRepo.markEmailDelivered(submission._id, true))
-      .catch(() => {}); // non-critical — the DB record already exists regardless
+    // Delivery outcome (success or failure) is recorded by the email job
+    // itself once the send actually completes — see markContactDeliveryOutcome
+    // in email.job.js. This call is fire-and-forget; the DB record already
+    // exists regardless of the email outcome.
+    queueEmail({
+      to: recipientEmail,
+      tenantId: tenantId.toString(),
+      contactSubmissionId: submission._id.toString(),
+      ...template,
+    }).catch(() => {});
   }
 
   return submission;
