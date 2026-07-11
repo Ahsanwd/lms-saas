@@ -1,10 +1,7 @@
-const { liveReminderQueue } = require('./queue');
 const logger = require('../utils/logger');
 
-liveReminderQueue().process(async (job) => {
-  if (job.data.type !== 'live-reminder') return;
-
-  const { tenantId, lessonId, scheduledAt } = job.data;
+async function handleLiveReminder(payload) {
+  const { tenantId, lessonId, scheduledAt } = payload;
 
   const Lesson = require('../database/models/Lesson.model');
   const doc = await Lesson.findOne({ _id: lessonId, tenantId, type: 'live', deletedAt: null });
@@ -43,4 +40,6 @@ liveReminderQueue().process(async (job) => {
   );
 
   logger.info(`Live reminder sent for lesson ${lessonId} to ${studentIds.length} students`);
-});
+}
+
+module.exports = { handleLiveReminder };

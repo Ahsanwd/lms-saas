@@ -191,12 +191,16 @@ async function endSession(tenantId, lessonId, user) {
   const zoomMeetingId = lesson.liveClass?.zoomMeetingId;
   if (lesson.liveClass?.platform === 'zoom' && zoomMeetingId && !lesson.liveClass?.recordingUrl) {
     setImmediate(() => {
-      const { zoomRecordingQueue } = require('../../jobs/queue');
+      const scheduledTaskRepo = require('../../database/repositories/scheduledTask.repository');
       const THIRTY_MIN = 30 * 60 * 1000;
-      zoomRecordingQueue().add(
-        { type: 'zoom-recording-fetch', tenantId: tenantId.toString(), lessonId: lessonId.toString(), meetingId: zoomMeetingId },
-        { delay: THIRTY_MIN, attempts: 5, backoff: { type: 'fixed', delay: 15 * 60 * 1000 }, jobId: `zoom-rec-${lessonId}`, removeOnComplete: true }
-      ).catch(() => {});
+      scheduledTaskRepo.schedule({
+        type:   'zoom-recording-fetch',
+        jobKey: `zoom-rec-${lessonId}`,
+        payload: { tenantId: tenantId.toString(), lessonId: lessonId.toString(), meetingId: zoomMeetingId },
+        runAt: new Date(Date.now() + THIRTY_MIN),
+        maxAttempts: 5,
+        backoffMs:   15 * 60 * 1000,
+      }).catch(() => {});
     });
   }
 

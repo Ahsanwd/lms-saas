@@ -1,11 +1,8 @@
-const { assignmentDueQueue } = require('./queue');
 const logger = require('../utils/logger');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-assignmentDueQueue().process(async (job) => {
-  if (job.data.type !== 'daily-cron') return;
-
+async function runAssignmentDueCron() {
   const Assignment    = require('../database/models/Assignment.model');
   const Submission     = require('../database/models/Submission.model');
   const enrollmentRepo = require('../database/repositories/enrollment.repository');
@@ -63,4 +60,6 @@ assignmentDueQueue().process(async (job) => {
   }
 
   logger.info(`[assignment-due] Cron finished — ${totalNotified} reminder(s) sent`);
-});
+}
+
+module.exports = { runAssignmentDueCron };

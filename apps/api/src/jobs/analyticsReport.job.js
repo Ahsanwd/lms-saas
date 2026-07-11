@@ -1,5 +1,4 @@
 const logger                = require('../utils/logger');
-const { analyticsReportQueue } = require('./queue');
 const { queueEmail }        = require('./email.job');
 const Tenant                = require('../database/models/Tenant.model');
 const User                  = require('../database/models/User.model');
@@ -11,9 +10,7 @@ const analyticsWeeklySummaryTemplate = require('../services/email/templates/anal
 
 const APP_URL = process.env.APP_URL || 'http://localhost:3000';
 
-analyticsReportQueue().process(async (job) => {
-  if (job.data.type !== 'weekly-summary') return;
-
+async function runAnalyticsWeeklyReport() {
   const now     = new Date();
   const since   = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   const dateFilter = { $gte: since, $lte: now };
@@ -82,6 +79,6 @@ analyticsReportQueue().process(async (job) => {
   }
 
   logger.info(`[analytics.report] Weekly summary job complete`);
-});
+}
 
-module.exports = {};
+module.exports = { runAnalyticsWeeklyReport };

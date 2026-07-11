@@ -1,5 +1,4 @@
 const logger       = require('../utils/logger');
-const { tenantExpiryQueue } = require('./queue');
 const { queueEmail }        = require('./email.job');
 const Tenant       = require('../database/models/Tenant.model');
 const Subscription = require('../database/models/Subscription.model');
@@ -13,11 +12,9 @@ const { emitBillingUpdated } = require('../services/socket/io');
 const APP_URL = process.env.APP_URL || 'http://localhost:3000';
 const DAY_MS  = 24 * 60 * 60 * 1000;
 
-// ─── Processor ────────────────────────────────────────────────────────────────
+// ─── Cron entry point ───────────────────────────────────────────────────────
 
-tenantExpiryQueue().process(async (job) => {
-  if (job.data.type !== 'daily-cron') return;
-
+async function runTenantExpiryCron() {
   const startedAt = new Date();
   const log = await CronLog.create({
     jobName: 'tenant-expiry-daily',
@@ -62,7 +59,7 @@ tenantExpiryQueue().process(async (job) => {
   });
 
   logger.info(`[tenant.expiry] Cron finished — status: ${status}`, results);
-});
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -314,4 +311,4 @@ async function expirePastDueSubscriptions(now, results) {
   }
 }
 
-module.exports = {};
+module.exports = { runTenantExpiryCron };

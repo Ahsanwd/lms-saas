@@ -1,11 +1,8 @@
-const { announcementQueue } = require('./queue');
-const announcementRepo      = require('../database/repositories/announcement.repository');
-const logger                = require('../utils/logger');
+const announcementRepo = require('../database/repositories/announcement.repository');
+const logger            = require('../utils/logger');
 
-announcementQueue().process(async (job) => {
-  if (job.data.type !== 'scheduled-publish') return;
-
-  const { announcementId, tenantId, scheduledAt } = job.data;
+async function handleScheduledPublish(payload) {
+  const { announcementId, tenantId, scheduledAt } = payload;
 
   const doc = await announcementRepo.findById(tenantId, announcementId);
   if (!doc) {
@@ -20,13 +17,15 @@ announcementQueue().process(async (job) => {
     logger.info(`Scheduled publish: ${announcementId} schedule cancelled — skipping`);
     return;
   }
-  // Stale job guard: a reschedule enqueues a new job with a different scheduledAt
+  // Stale task guard: a reschedule upserts a new task with a different scheduledAt
   if (doc.scheduledPublishAt.toISOString() !== scheduledAt) {
-    logger.info(`Scheduled publish: stale job for ${announcementId} — skipping`);
+    logger.info(`Scheduled publish: stale task for ${announcementId} — skipping`);
     return;
   }
 
   const svc = require('../modules/announcement/announcement.service');
   await svc.publishAnnouncementSystem(tenantId, announcementId);
   logger.info(`Scheduled announcement ${announcementId} published successfully`);
-});
+}
+
+module.exports = { handleScheduledPublish };

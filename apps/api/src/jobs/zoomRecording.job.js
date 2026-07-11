@@ -1,13 +1,11 @@
-const { zoomRecordingQueue } = require('./queue');
 const logger = require('../utils/logger');
 
 // Zoom recordings take a few minutes to process after the meeting ends.
-// This job fires 30 minutes after session end and polls the Zoom recordings API.
+// This task fires 30 minutes after session end and polls the Zoom recordings API.
 // If the recording is ready it saves the play URL to lesson.liveClass.recordingUrl.
-zoomRecordingQueue().process(async (job) => {
-  if (job.data.type !== 'zoom-recording-fetch') return;
-
-  const { tenantId, lessonId, meetingId } = job.data;
+// If not ready yet, it throws so the dispatcher retries with backoff.
+async function handleZoomRecordingFetch(payload) {
+  const { tenantId, lessonId, meetingId } = payload;
 
   const Lesson    = require('../database/models/Lesson.model');
   const zoomSvc   = require('../modules/zoom/zoom.service');
@@ -29,4 +27,6 @@ zoomRecordingQueue().process(async (job) => {
   });
 
   logger.info(`Zoom recording saved for lesson ${lessonId}: ${recordingUrl}`);
-});
+}
+
+module.exports = { handleZoomRecordingFetch };

@@ -1,11 +1,8 @@
-const { trialExpiringQueue } = require('./queue');
 const logger = require('../utils/logger');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-trialExpiringQueue().process(async (job) => {
-  if (job.data.type !== 'daily-cron') return;
-
+async function runTrialExpiringCron() {
   const MembershipSubscription = require('../database/models/MembershipSubscription.model');
   const notifySvc = require('../modules/notification/notification.service');
 
@@ -39,4 +36,6 @@ trialExpiringQueue().process(async (job) => {
   }
 
   logger.info(`[trial-expiring] Cron finished — ${totalNotified} reminder(s) sent`);
-});
+}
+
+module.exports = { runTrialExpiringCron };

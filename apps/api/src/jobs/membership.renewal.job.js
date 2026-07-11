@@ -1,31 +1,13 @@
 const logger      = require('../utils/logger');
-const { membershipRenewalQueue } = require('./queue');
 const membershipSvc = require('../modules/membership/membership.service');
 const { queueEmail } = require('./email.job');
 
-// ─── Single processor handles all job types in this queue ────────────────────
-membershipRenewalQueue().process(async (job) => {
-  // Daily cron tick — queue up individual renewal jobs
-  if (job.data.type === 'daily-cron') {
-    await expireGracePeriodEnded();
-    await scheduleMembershipRenewals();
-    await sendExpiryReminders();
-    return;
-  }
-
-  // Individual subscription renewal
-  const { subscriptionId } = job.data;
-  if (!subscriptionId) return;
-
-  logger.info(`[membership.renewal] Processing renewal for subscription ${subscriptionId}`);
-  const result = await membershipSvc.renewSubscription(subscriptionId);
-
-  if (result.ok) {
-    logger.info(`[membership.renewal] Renewed ${subscriptionId} via ${result.mode}`);
-  } else {
-    logger.warn(`[membership.renewal] Renewal failed for ${subscriptionId}: ${result.reason}`);
-  }
-});
+// ─── Cron entry point — runs daily ────────────────────────────────────────────
+async function runMembershipRenewalCron() {
+  await expireGracePeriodEnded();
+  await processMembershipRenewals();
+  await sendExpiryReminders();
+}
 
 // ─── Expire grace-period-ended subscriptions ──────────────────────────────────
 async function expireGracePeriodEnded() {
@@ -37,21 +19,28 @@ async function expireGracePeriodEnded() {
   }
 }
 
-// ─── Scheduler — called daily, queues individual renewal jobs ─────────────────
-async function scheduleMembershipRenewals() {
+// ─── Renewals — runs daily, renews each due subscription directly ────────────
+// Previously fanned out to individual Bull jobs (3 attempts, exponential
+// backoff) so a transient failure retried within minutes. Now renews inline
+// and just logs failures — a subscription that fails today is still "due for
+// renewal" tomorrow, so the next daily run naturally retries it (same
+// approach used by dunning-retry in most SaaS billing systems).
+async function processMembershipRenewals() {
   try {
     const due = await membershipSvc.getSubscriptionsDueForRenewal();
     logger.info(`[membership.renewal] Found ${due.length} subscription(s) due for renewal`);
 
     for (const sub of due) {
-      await membershipRenewalQueue().add(
-        { subscriptionId: sub._id.toString() },
-        {
-          jobId:    `renew_${sub._id}`,  // prevent duplicate jobs
-          attempts: 3,
-          backoff:  { type: 'exponential', delay: 60_000 },
+      try {
+        const result = await membershipSvc.renewSubscription(sub._id);
+        if (result.ok) {
+          logger.info(`[membership.renewal] Renewed ${sub._id} via ${result.mode}`);
+        } else {
+          logger.warn(`[membership.renewal] Renewal failed for ${sub._id}: ${result.reason}`);
         }
-      );
+      } catch (err) {
+        logger.error(`[membership.renewal] Renewal error for ${sub._id}: ${err.message}`);
+      }
     }
   } catch (err) {
     logger.error(`[membership.renewal] Scheduler error: ${err.message}`);
@@ -86,4 +75,4 @@ async function sendExpiryReminders() {
   }
 }
 
-module.exports = { scheduleMembershipRenewals, sendExpiryReminders };
+module.exports = { runMembershipRenewalCron };

@@ -20,51 +20,15 @@ const logger = require('./utils/logger');
 const { connectDefault } = require('./database/connection');
 const swaggerUi   = require('swagger-ui-express');
 const swaggerSpec = require('./config/swagger');
-require('./jobs/email.job'); // Register email job processor
+require('./jobs/email.job'); // Register email job processor (Bull, optional — dormant when SKIP_REDIS=true)
 
-// ── Membership renewal cron — runs daily at midnight UTC ─────────────────────
-require('./jobs/membership.renewal.job');
-require('./jobs/queue').membershipRenewalQueue().add(
-  { type: 'daily-cron' },
-  { repeat: { cron: '0 0 * * *' }, jobId: 'membership-renewal-cron', removeOnComplete: true }
-).catch(() => {});
-
-// ── Announcement scheduled-publish job processor ──────────────────────────────
-require('./jobs/announcement.scheduler.job');
-
-// ── Live session pre-session reminder job processor ───────────────────────────
-require('./jobs/liveReminder.job');
-
-// ── Zoom recording auto-fetch job processor ───────────────────────────────────
-require('./jobs/zoomRecording.job');
-
-// ── Tenant trial & subscription expiry cron — runs daily at 00:05 UTC ────────
-require('./jobs/tenantExpiry.job');
-require('./jobs/queue').tenantExpiryQueue().add(
-  { type: 'daily-cron' },
-  { repeat: { cron: '5 0 * * *' }, jobId: 'tenant-expiry-cron', removeOnComplete: true }
-).catch(() => {});
-
-// ── Weekly analytics report — runs every Monday at 08:00 UTC ─────────────────
-require('./jobs/analyticsReport.job');
-require('./jobs/queue').analyticsReportQueue().add(
-  { type: 'weekly-summary' },
-  { repeat: { cron: '0 8 * * 1' }, jobId: 'analytics-weekly-report', removeOnComplete: true }
-).catch(() => {});
-
-// ── Assignment due-date reminders — runs daily at 09:00 UTC ──────────────────
-require('./jobs/assignmentDue.job');
-require('./jobs/queue').assignmentDueQueue().add(
-  { type: 'daily-cron' },
-  { repeat: { cron: '0 9 * * *' }, jobId: 'assignment-due-cron', removeOnComplete: true }
-).catch(() => {});
-
-// ── Membership trial-expiring reminders — runs daily at 09:10 UTC ────────────
-require('./jobs/trialExpiring.job');
-require('./jobs/queue').trialExpiringQueue().add(
-  { type: 'daily-cron' },
-  { repeat: { cron: '10 9 * * *' }, jobId: 'trial-expiring-cron', removeOnComplete: true }
-).catch(() => {});
+// ── Background jobs — plain node-cron + MongoDB, no Redis/Bull ───────────────
+// Group A: fixed daily/weekly cron jobs (membership renewal, tenant expiry,
+// weekly analytics report, assignment-due reminders, trial-expiring reminders)
+require('./jobs/scheduler');
+// Group B: one-off delayed tasks (scheduled announcement publish, live-class
+// reminders, zoom-recording fetch), polled from MongoDB every minute
+require('./jobs/taskDispatcher');
 
 const app    = express();
 // Trust Render's proxy so express-rate-limit reads the correct client IP

@@ -30,17 +30,10 @@ function getQueue(name) {
   return queues.get(name);
 }
 
-const emailQueue              = () => getQueue('email');
-const membershipRenewalQueue  = () => getQueue('membership-renewal');
-const tenantExpiryQueue       = () => getQueue('tenant-expiry');
-const announcementQueue       = () => getQueue('announcement-scheduler');
-const liveReminderQueue       = () => getQueue('live-reminder');
-const zoomRecordingQueue      = () => getQueue('zoom-recording');
-const analyticsReportQueue    = () => getQueue('analytics-report');
-const assignmentDueQueue      = () => getQueue('assignment-due');
-const trialExpiringQueue      = () => getQueue('trial-expiring');
+// Only email still uses Bull — everything else moved to node-cron +
+// MongoDB (see jobs/scheduler.js and jobs/taskDispatcher.js) since those
+// queues polled Redis continuously even when idle, which is what actually
+// burned through the Upstash free-tier request quota, not real job volume.
+const emailQueue = () => getQueue('email');
 
-module.exports = {
-  emailQueue, membershipRenewalQueue, tenantExpiryQueue, announcementQueue, liveReminderQueue,
-  zoomRecordingQueue, analyticsReportQueue, assignmentDueQueue, trialExpiringQueue,
-};
+module.exports = { emailQueue };

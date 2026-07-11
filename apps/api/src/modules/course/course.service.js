@@ -423,13 +423,16 @@ async function updateLesson(tenantId, courseId, sectionId, lessonId, data, user)
   // Schedule 1-hour pre-session reminder when a live lesson's scheduledAt is set in the future
   if (lesson.type === 'live' && newScheduledAt && newScheduledAt.getTime() > Date.now() + 3600_000) {
     setImmediate(() => {
-      const { liveReminderQueue } = require('../../jobs/queue');
+      const scheduledTaskRepo = require('../../database/repositories/scheduledTask.repository');
       const reminderFireAt = newScheduledAt.getTime() - 3600_000; // 1 hour before
-      const delay = reminderFireAt - Date.now();
-      liveReminderQueue().add(
-        { type: 'live-reminder', tenantId: tenantId.toString(), lessonId: lessonId.toString(), scheduledAt: newScheduledAt.toISOString() },
-        { delay, attempts: 2, jobId: `live-reminder-${lessonId}`, removeOnComplete: true }
-      ).catch(() => {});
+      scheduledTaskRepo.schedule({
+        type:   'live-reminder',
+        jobKey: `live-reminder-${lessonId}`,
+        payload: { tenantId: tenantId.toString(), lessonId: lessonId.toString(), scheduledAt: newScheduledAt.toISOString() },
+        runAt: new Date(reminderFireAt),
+        maxAttempts: 2,
+        backoffMs:   0,
+      }).catch(() => {});
     });
   }
 

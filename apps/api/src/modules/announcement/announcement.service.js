@@ -38,19 +38,22 @@ async function _triggerPublishNotifications(tenantId, existing) {
   } catch { /* non-critical */ }
 }
 
-// ─── Shared: enqueue a delayed publish Bull job ───────────────────────────────
+// ─── Shared: schedule a delayed publish task ──────────────────────────────────
 async function _enqueueScheduledPublish(announcementId, tenantId, publishAt) {
-  const { announcementQueue } = require('../../jobs/queue');
-  const delay = Math.max(publishAt.getTime() - Date.now(), 1000);
-  await announcementQueue().add(
-    {
-      type:           'scheduled-publish',
+  const scheduledTaskRepo = require('../../database/repositories/scheduledTask.repository');
+  const runAt = new Date(Math.max(publishAt.getTime(), Date.now() + 1000));
+  await scheduledTaskRepo.schedule({
+    type:   'scheduled-publish',
+    jobKey: `announcement-publish-${announcementId}`,
+    payload: {
       announcementId: announcementId.toString(),
       tenantId:       tenantId.toString(),
       scheduledAt:    publishAt.toISOString(),
     },
-    { delay, attempts: 3, backoff: { type: 'fixed', delay: 5000 } }
-  );
+    runAt,
+    maxAttempts: 3,
+    backoffMs:   5000,
+  });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
