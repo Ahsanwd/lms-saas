@@ -40,6 +40,15 @@ async function createLsCheckout(req, res, next) {
   } catch (err) { next(err); }
 }
 
+async function createLsTopupCheckout(req, res, next) {
+  try {
+    const { topupType } = req.body;
+    if (!['storage_500', 'viewer_5000'].includes(topupType)) return R.error(res, 'Invalid top-up type', 400);
+    const result = await billingService.createLsTopupCheckout(req.tenant.tenantId, topupType);
+    R.success(res, result);
+  } catch (err) { next(err); }
+}
+
 async function validateCoupon(req, res, next) {
   try {
     const { code, planId } = req.body;
@@ -117,5 +126,5 @@ module.exports = {
   validateCoupon, upgradePlan, reactivatePlan, confirmSubscriptionPayment,
   createPortalSession, downloadInvoice,
   getBillingInfo, listPaymentMethods, deletePaymentMethod,
-  createLsCheckout,
+  createLsCheckout, createLsTopupCheckout,
 };

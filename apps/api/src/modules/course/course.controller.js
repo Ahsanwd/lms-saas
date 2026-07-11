@@ -492,6 +492,9 @@ async function cfStreamUploadUrl(req, res, next) {
     if (!cf.accountId || !cf.apiToken)
       return R.error(res, 'Cloudflare Stream is not configured on this platform', 400);
 
+    const limitGuardSvc = require('../../services/limitGuard/limitGuard.service');
+    await limitGuardSvc.assertStreamStorageLimit(req.tenant.tenantId, req.tenant.plan, 0);
+
     const cfSvc = require('../../services/cloudflareStream/cloudflareStream.service');
     const { uploadUrl, videoUid } = await cfSvc.createDirectUpload(cf.accountId, cf.apiToken, {
       meta: { lessonId },
@@ -514,6 +517,8 @@ async function cfStreamConfirm(req, res, next) {
 
 async function cfStreamStatus(req, res, next) {
   try {
+    const { tenantId } = req.tenant;
+    const { id: courseId, lessonId } = req.params;
     const { videoUid } = req.query;
     if (!videoUid) return R.error(res, 'videoUid required', 400);
 
@@ -523,6 +528,17 @@ async function cfStreamStatus(req, res, next) {
 
     const cfSvc = require('../../services/cloudflareStream/cloudflareStream.service');
     const status = await cfSvc.getVideoStatus(cf.accountId, cf.apiToken, videoUid);
+
+    // First time this video reports ready+duration: persist duration and meter
+    // it against the tenant's Cloudflare Stream storage-minute quota. Guarded by
+    // lesson.video.durationSeconds === 0 inside the service call, so repeated
+    // polls (the frontend polls this until readyToStream) stay idempotent.
+    if (status.readyToStream && status.duration > 0) {
+      await courseService.syncCfStreamDuration(
+        tenantId, courseId, lessonId, req.tenant.plan, status.duration, req.user
+      );
+    }
+
     R.success(res, status);
   } catch (err) { next(err); }
 }
@@ -551,6 +567,9 @@ async function cfStreamToken(req, res, next) {
     const cf = config.cloudflareStream;
     if (!cf.signingKeyId || !cf.signingKeyPem)
       return R.error(res, 'Cloudflare Stream signing key not configured', 400);
+
+    const limitGuardSvc = require('../../services/limitGuard/limitGuard.service');
+    await limitGuardSvc.assertStreamViewerAvailable(tenantId, req.tenant.plan);
 
     const cfSvc = require('../../services/cloudflareStream/cloudflareStream.service');
     const token = cfSvc.generateSignedToken(lesson.video.url, cf.signingKeyId, cf.signingKeyPem);

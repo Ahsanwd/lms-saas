@@ -19,5 +19,6 @@ router.post('/portal-session',                      requirePermission('billing:r
 router.get('/payment-methods',                      requirePermission('billing:read'), ctrl.listPaymentMethods);
 router.delete('/payment-methods/:pmId',             requirePermission('billing:read'), ctrl.deletePaymentMethod);
 router.post('/ls/checkout',                         requirePermission('billing:read'), ctrl.createLsCheckout);
+router.post('/ls/checkout-topup',                   requirePermission('billing:read'), ctrl.createLsTopupCheckout);
 
 module.exports = router;

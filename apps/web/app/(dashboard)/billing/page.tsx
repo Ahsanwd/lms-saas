@@ -1109,6 +1109,103 @@ function SavedPaymentMethodsCard() {
   );
 }
 
+// ── Cloudflare Stream Usage ───────────────────────────────────────────────────
+
+interface CfStreamStatus {
+  connected: boolean;
+  planAllows: boolean;
+  storage: { used: number; limit: number; topup: number };
+  viewer:  { used: number; limit: number; topup: number };
+}
+
+function streamPct(used: number, cap: number): number {
+  if (cap <= 0) return 0;
+  return Math.min(100, Math.round((used / cap) * 100));
+}
+
+function streamBarColor(p: number): string {
+  if (p >= 100) return 'bg-red-500';
+  if (p >= 80) return 'bg-yellow-400';
+  return 'bg-orange-500';
+}
+
+function StreamUsageBar({ label, used, cap, unit }: { label: string; used: number; cap: number; unit: string }) {
+  const p = streamPct(used, cap);
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between text-sm">
+        <span className="font-medium text-gray-700">{label}</span>
+        <span className={cn('text-xs font-medium', p >= 100 ? 'text-red-600' : p >= 80 ? 'text-yellow-600' : 'text-gray-500')}>
+          {used.toFixed(1)} / {cap} {unit}
+        </span>
+      </div>
+      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+        <div className={cn('h-full rounded-full transition-all duration-300', streamBarColor(p))} style={{ width: `${p}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function StreamUsageCard() {
+  const [buying, setBuying] = useState<'storage_500' | 'viewer_5000' | null>(null);
+  const [error, setError] = useState('');
+
+  const { data } = useQuery<CfStreamStatus>({
+    queryKey: ['cf-stream-status'],
+    queryFn: () => api.get('/tenant/cloudflare-stream/status').then(r => r.data.data),
+    staleTime: 60_000,
+  });
+
+  async function buyTopup(topupType: 'storage_500' | 'viewer_5000') {
+    setError('');
+    setBuying(topupType);
+    try {
+      const { data } = await api.post('/billing/ls/checkout-topup', { topupType });
+      window.location.href = data.data.checkoutUrl;
+    } catch (e: unknown) {
+      setError((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Could not open checkout');
+      setBuying(null);
+    }
+  }
+
+  if (!data?.connected) return null; // platform hasn't configured Cloudflare Stream yet
+
+  if (!data.planAllows) {
+    return (
+      <div className="bg-white rounded-xl border border-gray-200 p-5 flex items-center justify-between gap-4">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900">🔒 Cloudflare Stream video</h3>
+          <p className="text-xs text-gray-500 mt-0.5">Available on Basic &amp; Pro — adaptive HLS streaming, no file size limit.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-5">
+      <h3 className="text-sm font-semibold text-gray-900">Cloudflare Stream Video Usage</h3>
+
+      <div className="space-y-4">
+        <StreamUsageBar label="Storage" used={data.storage.used} cap={data.storage.limit + data.storage.topup} unit="min" />
+        <StreamUsageBar label="Viewer minutes (this cycle)" used={data.viewer.used} cap={data.viewer.limit + data.viewer.topup} unit="min" />
+      </div>
+
+      {error && <p className="text-xs text-red-600">{error}</p>}
+
+      <div className="flex flex-wrap gap-2 pt-1">
+        <Button onClick={() => buyTopup('storage_500')} loading={buying === 'storage_500'}
+          className="text-xs px-3 py-1.5 bg-white border border-gray-200 text-gray-700 hover:border-orange-300 hover:text-orange-700">
+          +500 storage-min — $7
+        </Button>
+        <Button onClick={() => buyTopup('viewer_5000')} loading={buying === 'viewer_5000'}
+          className="text-xs px-3 py-1.5 bg-white border border-gray-200 text-gray-700 hover:border-orange-300 hover:text-orange-700">
+          +5,000 viewer-min — $12
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function BillingPage() {
@@ -1126,6 +1223,7 @@ export default function BillingPage() {
       window.history.replaceState({}, '', '/billing');
       qcPage.invalidateQueries({ queryKey: ['billing', 'subscription'] });
       qcPage.invalidateQueries({ queryKey: ['billing', 'invoices'] });
+      qcPage.invalidateQueries({ queryKey: ['cf-stream-status'] });
     }
   }, [qcPage]);
 
@@ -1233,6 +1331,12 @@ export default function BillingPage() {
           />
         </section>
       )}
+
+      {/* Cloudflare Stream video usage + top-ups */}
+      <section>
+        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Video Streaming</h2>
+        <StreamUsageCard />
+      </section>
 
       {/* Saved payment methods */}
       <section>

@@ -6,6 +6,7 @@ const { runTenantExpiryCron }      = require('./tenantExpiry.job');
 const { runAnalyticsWeeklyReport } = require('./analyticsReport.job');
 const { runAssignmentDueCron }     = require('./assignmentDue.job');
 const { runTrialExpiringCron }     = require('./trialExpiring.job');
+const { runCfStreamUsageCron }     = require('./cfStreamUsage.job');
 
 // Plain in-process cron scheduling — no Redis/Bull. These are all
 // fixed-schedule daily/weekly jobs with no delay or cross-restart
@@ -23,3 +24,4 @@ register('tenant-expiry-cron',      '5 0 * * *',  runTenantExpiryCron);
 register('analytics-weekly-report', '0 8 * * 1',  runAnalyticsWeeklyReport);
 register('assignment-due-cron',     '0 9 * * *',  runAssignmentDueCron);
 register('trial-expiring-cron',     '10 9 * * *', runTrialExpiringCron);
+register('cf-stream-usage-cron',    '0 */6 * * *', runCfStreamUsageCron);

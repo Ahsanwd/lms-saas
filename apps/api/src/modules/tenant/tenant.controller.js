@@ -164,13 +164,20 @@ async function disconnectPaymentGateway(req, res, next) {
 }
 
 // ── Cloudflare Stream — shared platform-level account (config.cloudflareStream) ─
-// Tenants no longer bring their own keys; this just reports whether the
-// platform admin has Cloudflare Stream configured via env vars.
+// Tenants no longer bring their own keys; this reports whether the platform admin
+// has Cloudflare Stream configured via env vars, AND whether this tenant's plan
+// allows it + their current usage/quota (so the frontend can render a locked
+// upsell, a normal uploader, or an over-quota state without a second round-trip).
 async function getCfStreamStatus(req, res, next) {
   try {
     const config = require('../../config');
     const cf = config.cloudflareStream;
-    R.success(res, { connected: !!(cf.accountId && cf.apiToken) });
+    const configured = !!(cf.accountId && cf.apiToken);
+
+    const limitGuardSvc = require('../../services/limitGuard/limitGuard.service');
+    const usage = await limitGuardSvc.getStreamUsageSummary(req.tenant.tenantId, req.tenant.plan);
+
+    R.success(res, { connected: configured, ...usage });
   } catch (err) { next(err); }
 }
 

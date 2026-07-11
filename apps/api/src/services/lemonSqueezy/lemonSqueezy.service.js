@@ -27,8 +27,11 @@ async function lsRequest(method, path, body) {
   return json;
 }
 
-// Create a hosted checkout URL for the given variant
-async function createCheckout({ variantId, tenantId, email, name, billingCycle, successUrl, cancelUrl }) {
+// Create a hosted checkout URL for the given variant. `extraCustom` merges extra
+// keys into checkout_data.custom (echoed back on the webhook's meta.custom_data) —
+// used by one-time top-up purchases to carry a `purchase_type`/`topup_type` marker
+// alongside the usual tenant_id, without a subscription's billingCycle.
+async function createCheckout({ variantId, tenantId, email, name, billingCycle, successUrl, cancelUrl, extraCustom }) {
   const storeId = process.env.LEMONSQUEEZY_STORE_ID;
   if (!storeId) throw new AppError('LEMONSQUEEZY_STORE_ID not set', 500);
 
@@ -49,7 +52,8 @@ async function createCheckout({ variantId, tenantId, email, name, billingCycle, 
           name,
           custom: {
             tenant_id: tenantId.toString(),
-            billing_cycle: billingCycle,
+            ...(billingCycle ? { billing_cycle: billingCycle } : {}),
+            ...(extraCustom || {}),
           },
         },
         product_options: {

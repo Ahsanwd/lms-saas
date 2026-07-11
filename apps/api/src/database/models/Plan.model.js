@@ -15,6 +15,8 @@ const planSchema = new mongoose.Schema(
       courses: { type: Number, default: -1 },
       storageGB: { type: Number, default: 5 },
       maxSessions: { type: Number, default: 2 },
+      streamStorageMinutes: { type: Number, default: 0 }, // 0 = Cloudflare Stream locked (Free)
+      streamViewerMinutes:  { type: Number, default: 0 }, // per billing month
     },
     features: [{ type: String }],
     isActive: { type: Boolean, default: true },

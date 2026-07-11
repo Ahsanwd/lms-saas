@@ -177,6 +177,16 @@ const tenantSchema = new mongoose.Schema(
     contactEmail: { type: String, required: true, lowercase: true },
     storageUsedBytes: { type: Number, default: 0 },
 
+    // Cloudflare Stream plan-quota metering (shared platform-level account, config.cloudflareStream)
+    cloudflareStreamUsage: {
+      storageMinutesUsed:  { type: Number, default: 0 },   // current total library duration
+      storageTopupMinutes: { type: Number, default: 0 },   // purchased, permanent cap raise
+      viewerMinutesUsed:   { type: Number, default: 0 },   // this billing month
+      viewerTopupMinutes:  { type: Number, default: 0 },   // purchased, expires at monthly reset
+      viewerCycleResetAt:  { type: Date, default: null },
+      lastAnalyticsSyncAt: { type: Date, default: null },
+    },
+
     // Idempotency: tracks last date each warning level was sent (keys: '7d', '3d', '1d')
     warnings: { type: Map, of: Date, default: () => new Map() },
   },

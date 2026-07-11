@@ -369,10 +369,53 @@ async function createLsCheckout(tenantId, { planSlug, billingCycle }) {
   return { checkoutUrl };
 }
 
+// One-time Cloudflare Stream top-up purchase (storage-minutes or viewer-minutes),
+// via the platform's Lemon Squeezy account — the first non-subscription LS
+// purchase in this codebase. topupType: 'storage_500' | 'viewer_5000'.
+const TOPUP_VARIANT_ENV = {
+  storage_500: 'LS_VARIANT_TOPUP_STORAGE_500',
+  viewer_5000: 'LS_VARIANT_TOPUP_VIEWER_5000',
+};
+
+async function createLsTopupCheckout(tenantId, topupType) {
+  const envKey = TOPUP_VARIANT_ENV[topupType];
+  if (!envKey) throw new AppError('Unknown top-up type', 400);
+
+  const variantId = process.env[envKey];
+  if (!variantId) throw new AppError(`Lemon Squeezy variant not configured (${envKey})`, 500);
+
+  const limitGuardSvc = require('../../services/limitGuard/limitGuard.service');
+  const tenant = await tenantRepo.findById(tenantId);
+  if (!tenant) throw new AppError('Tenant not found', 404);
+
+  const usage = await limitGuardSvc.getStreamUsageSummary(tenantId, tenant.plan);
+  if (!usage.planAllows) {
+    throw new AppError('Cloudflare Stream is not available on your current plan. Upgrade to Basic or Pro first.', 403);
+  }
+
+  const { createCheckout } = require('../../services/lemonSqueezy/lemonSqueezy.service');
+  const rootDomain = process.env.ROOT_DOMAIN || 'coursel.space';
+  const tenantUrl  = tenant.subdomain
+    ? `https://${tenant.subdomain}.${rootDomain}`
+    : (process.env.APP_URL || 'http://localhost:3000');
+
+  const checkoutUrl = await createCheckout({
+    variantId,
+    tenantId,
+    email: tenant.contactEmail,
+    name:  tenant.name,
+    successUrl: `${tenantUrl}/billing?ls_success=1`,
+    cancelUrl:  `${tenantUrl}/billing`,
+    extraCustom: { purchase_type: 'topup', topup_type: topupType },
+  });
+
+  return { checkoutUrl };
+}
+
 module.exports = {
   getMySubscription, getMyInvoices, getInvoice, getAvailablePlans,
   validateCoupon, upgradePlan, reactivatePlan, confirmSubscriptionPayment,
   createPortalSession, downloadInvoice,
   listPaymentMethods, deletePaymentMethod,
-  getBillingInfo, createLsCheckout,
+  getBillingInfo, createLsCheckout, createLsTopupCheckout,
 };

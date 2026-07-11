@@ -58,6 +58,40 @@ function cfDelete(accountId, apiToken, path) {
   });
 }
 
+// GraphQL Analytics API lives at a top-level path, not under /accounts/{id} like
+// the REST endpoints above, so it needs its own low-level request helper.
+function cfGraphQL(apiToken, query, variables) {
+  return new Promise((resolve, reject) => {
+    const bodyStr = JSON.stringify({ query, variables });
+    const options = {
+      hostname: 'api.cloudflare.com',
+      path: '/client/v4/graphql',
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiToken}`,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(bodyStr),
+      },
+    };
+    const req = https.request(options, res => {
+      let data = '';
+      res.on('data', chunk => { data += chunk; });
+      res.on('end', () => {
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.errors?.length) { reject(new Error(parsed.errors[0].message)); return; }
+          resolve(parsed.data);
+        } catch {
+          reject(new Error('Invalid JSON from Cloudflare GraphQL API'));
+        }
+      });
+    });
+    req.on('error', reject);
+    req.write(bodyStr);
+    req.end();
+  });
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 // Verify credentials work
@@ -106,4 +140,35 @@ function generateSignedToken(videoUid, signingKeyId, signingKeyPem) {
   );
 }
 
-module.exports = { testConnection, createDirectUpload, getVideoStatus, deleteVideo, generateSignedToken };
+// Sum minutes-viewed (delivery) across a tenant's video UIDs since `sinceDate`,
+// via CF's GraphQL Analytics API (only populated when CF's own iframe/Stream
+// Player is used for playback — true here, see learn/page.tsx CfStreamPlayer).
+// NOTE: the `uid_in` array filter is best-effort against CF's public docs
+// (only single-`uid` examples are published) — same "unverified until tested
+// against a real account" caveat this codebase already carries for Safepay.
+async function getViewerMinutesSince(accountId, apiToken, videoUids, sinceDate) {
+  if (!videoUids?.length) return 0;
+  const query = `
+    query($accountTag: String!, $uids: [String!], $since: Date!) {
+      viewer {
+        accounts(filter: { accountTag: $accountTag }) {
+          videoPlaybackEventsAdaptiveGroups(
+            filter: { date_geq: $since, uid_in: $uids }
+            limit: 1000
+          ) {
+            sum { timeViewedMinutes }
+          }
+        }
+      }
+    }
+  `;
+  const since = sinceDate.toISOString().slice(0, 10); // Date scalar = YYYY-MM-DD
+  const data = await cfGraphQL(apiToken, query, { accountTag: accountId, uids: videoUids, since });
+  const groups = data?.viewer?.accounts?.[0]?.videoPlaybackEventsAdaptiveGroups ?? [];
+  return groups.reduce((sum, g) => sum + (g.sum?.timeViewedMinutes || 0), 0);
+}
+
+module.exports = {
+  testConnection, createDirectUpload, getVideoStatus, deleteVideo, generateSignedToken,
+  getViewerMinutesSince,
+};

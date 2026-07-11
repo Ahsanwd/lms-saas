@@ -23,6 +23,25 @@ function canEditCourse(course, user) {
     course.instructorId?.toString() === user.sub;
 }
 
+// Removes a Cloudflare Stream video (fire-and-forget) when a lesson's video is
+// replaced or the lesson is deleted, and releases its storage-minutes back to the
+// tenant's quota. Mirrors the R2 deleteFile()/decrementStorageUsed() cleanup pattern
+// used for other providers, since deleteFile()/getFileSizeBytes() silently no-op for
+// a Cloudflare videoUid (it isn't a real file path).
+function cleanupCloudflareVideo(tenantId, video) {
+  if (!video?.url) return;
+  const config = require('../../config');
+  const cf = config.cloudflareStream;
+  if (cf.accountId && cf.apiToken) {
+    const cfSvc = require('../../services/cloudflareStream/cloudflareStream.service');
+    cfSvc.deleteVideo(cf.accountId, cf.apiToken, video.url).catch(() => {});
+  }
+  if (video.durationSeconds > 0) {
+    const lgSvc = require('../../services/limitGuard/limitGuard.service');
+    lgSvc.decrementStreamStorageUsed(tenantId, video.durationSeconds / 60).catch(() => {});
+  }
+}
+
 async function recalcCourseCounters(tenantId, courseId) {
   const lessons = await lessonRepo.findByCourse(tenantId, courseId);
   const published = lessons.filter(l => l.isPublished && !l.deletedAt);
@@ -447,12 +466,16 @@ async function uploadLessonVideo(tenantId, courseId, lessonId, file, user) {
   const lesson = await lessonRepo.findById(tenantId, lessonId);
   if (!lesson) throw new AppError('Lesson not found', 404);
   if (lesson.video?.url) {
-    const oldSize = getFileSizeBytes(lesson.video.url);
-    deleteFile(lesson.video.url);
-    if (oldSize > 0) setImmediate(() => {
-      const lgSvc = require('../../services/limitGuard/limitGuard.service');
-      lgSvc.decrementStorageUsed(tenantId, oldSize).catch(() => {});
-    });
+    if (lesson.video.provider === 'cloudflare') {
+      cleanupCloudflareVideo(tenantId, lesson.video);
+    } else {
+      const oldSize = getFileSizeBytes(lesson.video.url);
+      deleteFile(lesson.video.url);
+      if (oldSize > 0) setImmediate(() => {
+        const lgSvc = require('../../services/limitGuard/limitGuard.service');
+        lgSvc.decrementStorageUsed(tenantId, oldSize).catch(() => {});
+      });
+    }
   }
 
   const { USE_S3 } = require('../../services/storage/storage.service');
@@ -479,6 +502,50 @@ async function confirmCfStreamVideo(tenantId, courseId, lessonId, videoUid, user
     'video.provider': 'cloudflare',
     updatedBy: user.sub,
   });
+  await recalcCourseCounters(tenantId, courseId);
+  return updated;
+}
+
+// Called from the status-poll endpoint once Cloudflare reports the video ready with
+// a known duration. Idempotent (no-ops once video.durationSeconds is already set) so
+// repeated polls from the frontend are safe. Meters the duration against the
+// tenant's Cloudflare Stream storage-minute quota; if the tenant is over quota at
+// this point (e.g. two uploads raced past the pre-upload check), the orphaned
+// Cloudflare video is deleted and the lesson's video field is cleared.
+async function syncCfStreamDuration(tenantId, courseId, lessonId, planId, durationSeconds, user) {
+  const course = await courseRepo.findById(tenantId, courseId);
+  if (!course) throw new AppError('Course not found', 404);
+  if (!canEditCourse(course, user)) throw new AppError('Forbidden', 403);
+
+  const lesson = await lessonRepo.findById(tenantId, lessonId);
+  if (!lesson) throw new AppError('Lesson not found', 404);
+  if (lesson.video?.provider !== 'cloudflare' || !lesson.video.url) return lesson;
+  if (lesson.video.durationSeconds > 0) return lesson; // already synced
+
+  const minutes = durationSeconds / 60;
+  const limitGuardSvc = require('../../services/limitGuard/limitGuard.service');
+
+  try {
+    await limitGuardSvc.assertStreamStorageLimit(tenantId, planId, minutes);
+  } catch (err) {
+    const config = require('../../config');
+    const cf = config.cloudflareStream;
+    if (cf.accountId && cf.apiToken) {
+      const cfSvc = require('../../services/cloudflareStream/cloudflareStream.service');
+      cfSvc.deleteVideo(cf.accountId, cf.apiToken, lesson.video.url).catch(() => {});
+    }
+    await lessonRepo.updateById(tenantId, lessonId, {
+      'video.url': null, 'video.provider': 'local', updatedBy: user.sub,
+    });
+    throw err;
+  }
+
+  const updated = await lessonRepo.updateById(tenantId, lessonId, {
+    'video.durationSeconds': durationSeconds,
+    durationSeconds,
+    updatedBy: user.sub,
+  });
+  await limitGuardSvc.incrementStreamStorageUsed(tenantId, minutes);
   await recalcCourseCounters(tenantId, courseId);
   return updated;
 }
@@ -639,8 +706,12 @@ async function deleteLesson(tenantId, courseId, sectionId, lessonId, user) {
   // Reclaim all storage used by this lesson's media files
   let reclaimBytes = 0;
   if (lesson.video?.url) {
-    reclaimBytes += getFileSizeBytes(lesson.video.url);
-    deleteFile(lesson.video.url);
+    if (lesson.video.provider === 'cloudflare') {
+      cleanupCloudflareVideo(tenantId, lesson.video);
+    } else {
+      reclaimBytes += getFileSizeBytes(lesson.video.url);
+      deleteFile(lesson.video.url);
+    }
   }
   if (lesson.audio?.url) {
     reclaimBytes += getFileSizeBytes(lesson.audio.url);
@@ -1387,6 +1458,7 @@ module.exports = {
   getLessonQuiz, createLessonQuiz, detachLessonQuiz,
   presignVideoUpload,
   confirmCfStreamVideo,
+  syncCfStreamDuration,
   confirmBunnyVideo,
   importScorm,
   enroll, dropEnrollment, listEnrolledStudents, getMyEnrollments, getMyCertificates,

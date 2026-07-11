@@ -150,6 +150,65 @@ async function handlePaymentFailed(data) {
   logger.warn(`LS: payment failed — lsId ${lsSubId}`);
 }
 
+// Resolve a Cloudflare Stream top-up from an LS variant ID
+function getTopupFromVariant(variantId) {
+  const vid = String(variantId);
+  const map = {
+    [process.env.LS_VARIANT_TOPUP_STORAGE_500]: { type: 'storage', field: 'cloudflareStreamUsage.storageTopupMinutes', minutes: 500 },
+    [process.env.LS_VARIANT_TOPUP_VIEWER_5000]: { type: 'viewer',  field: 'cloudflareStreamUsage.viewerTopupMinutes',  minutes: 5000 },
+  };
+  return map[vid] || null;
+}
+
+// order_created is LS's one-time-purchase event (distinct from subscription_*),
+// only handled here for Cloudflare Stream top-ups — the first non-subscription LS
+// purchase in this codebase.
+async function handleOrderCreated(data, meta) {
+  if (meta?.custom_data?.purchase_type !== 'topup') return; // not a top-up order
+
+  const tenantId  = meta?.custom_data?.tenant_id;
+  const attrs     = data.attributes;
+  const variantId = attrs.first_order_item?.variant_id || attrs.variant_id;
+  const topup     = getTopupFromVariant(variantId);
+
+  if (!tenantId) return logger.warn('LS webhook: order_created (topup) missing tenant_id');
+  if (!topup)    return logger.warn(`LS webhook: unknown topup variant ${variantId}`);
+
+  // Credit the purchased minutes first — this is the actual product the tenant
+  // paid for; the invoice record below is bookkeeping and must not block it.
+  const Tenant = require('../../database/models/Tenant.model');
+  await Tenant.updateOne({ _id: tenantId }, { $inc: { [topup.field]: topup.minutes } });
+  logger.info(`LS: topup credited — tenant ${tenantId}, +${topup.minutes} ${topup.type} minutes`);
+
+  try {
+    const sub   = await subscriptionRepo.findByTenant(tenantId);
+    const total = (attrs.total || 0) / 100; // LS stores in cents
+    const now   = new Date();
+
+    await invoiceRepo.create({
+      tenantId,
+      subscriptionId:    sub?._id || null,
+      planId:            sub?.planId?._id || sub?.planId,
+      invoiceNumber:     await generateInvoiceNumber(),
+      periodStart:       now,
+      periodEnd:         now,
+      dueDate:           now,
+      subtotal:          total,
+      discountAmount:    0,
+      total,
+      currency:          (attrs.currency || 'usd').toLowerCase(),
+      status:            'paid',
+      paidAt:            now,
+      billingCycle:      'manual',
+      description:       `Cloudflare Stream top-up — +${topup.minutes} ${topup.type} minutes`,
+      provider:          'lemonsqueezy',
+      providerInvoiceId: String(data.id),
+    });
+  } catch (err) {
+    logger.error(`LS: topup invoice record failed for tenant ${tenantId}: ${err.message}`);
+  }
+}
+
 async function handleWebhook(req, res) {
   try {
     verifyWebhookSignature(req.body, req.headers['x-signature']);
@@ -176,6 +235,7 @@ async function handleWebhook(req, res) {
       case 'subscription_expired':         await handleSubscriptionExpired(data);       break;
       case 'subscription_payment_success': await handlePaymentSuccess(data, meta);      break;
       case 'subscription_payment_failed':  await handlePaymentFailed(data);             break;
+      case 'order_created':                await handleOrderCreated(data, meta);       break;
       default: logger.info(`LS webhook: unhandled event ${eventName}`);
     }
     res.json({ received: true });

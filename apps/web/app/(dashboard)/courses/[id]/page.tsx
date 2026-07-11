@@ -456,13 +456,21 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isEdit = !!lesson;
 
-  const { data: cfStreamSettings } = useQuery<{ connected: boolean }>({
+  const { data: cfStreamSettings } = useQuery<{
+    connected: boolean;
+    planAllows: boolean;
+    storage: { used: number; limit: number; topup: number };
+    viewer: { used: number; limit: number; topup: number };
+  }>({
     queryKey: ['cf-stream-status'],
     queryFn: () => api.get('/tenant/cloudflare-stream/status').then(r => r.data.data),
     staleTime: 5 * 60_000,
     enabled: type === 'video',
   });
   const cfEnabled = cfStreamSettings?.connected ?? false;
+  const cfPlanAllows = cfStreamSettings?.planAllows ?? false;
+  const cfStorageOverQuota = !!cfStreamSettings && cfPlanAllows &&
+    cfStreamSettings.storage.used >= (cfStreamSettings.storage.limit + cfStreamSettings.storage.topup);
 
   const { data: zoomStatus } = useQuery<{ connected: boolean; email?: string }>({
     queryKey: ['zoom-status'],
@@ -942,7 +950,7 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
                       { s: 'upload'    as VideoSource, label: '⬆ Upload File' },
                       { s: 'youtube'   as VideoSource, label: 'YouTube'       },
                       { s: 'vimeo'     as VideoSource, label: 'Vimeo'         },
-                      ...(cfEnabled ? [{ s: 'cloudflare' as VideoSource, label: '☁ Cloudflare Stream' }] : []),
+                      ...(cfEnabled ? [{ s: 'cloudflare' as VideoSource, label: cfPlanAllows ? '☁ Cloudflare Stream' : '☁ Cloudflare Stream 🔒' }] : []),
                     ]).map(({ s, label }) => (
                       <button key={s} type="button" onClick={() => setVideoSource(s)}
                         className={cn('px-4 py-1.5 rounded-full text-xs font-semibold border transition-all',
@@ -1013,13 +1021,35 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
                 )}
 
                 {/* Cloudflare Stream upload zone */}
-                {videoSource === 'cloudflare' && (
-                  <CfStreamUploader
-                    courseId={courseId}
-                    lessonId={lesson?._id ?? ''}
-                    existingUid={lesson?.video?.provider === 'cloudflare' ? lesson.video.url ?? null : null}
-                    onConfirmed={(uid) => { setVideoUrl(uid); }}
-                  />
+                {videoSource === 'cloudflare' && !cfPlanAllows && (
+                  <div className="rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 p-6 text-center space-y-2">
+                    <div className="w-12 h-12 mx-auto rounded-2xl bg-gray-100 flex items-center justify-center text-xl">🔒</div>
+                    <p className="text-sm font-semibold text-gray-700">Cloudflare Stream is a Basic &amp; Pro feature</p>
+                    <p className="text-xs text-gray-500">Upgrade your plan to unlock adaptive HLS streaming with no file size limit.</p>
+                    <a href="/billing" className="inline-block text-xs font-semibold text-primary-600 hover:text-primary-700 underline">Upgrade plan →</a>
+                  </div>
+                )}
+                {videoSource === 'cloudflare' && cfPlanAllows && cfStorageOverQuota && (
+                  <div className="rounded-2xl border-2 border-dashed border-amber-200 bg-amber-50 p-6 text-center space-y-2">
+                    <p className="text-sm font-semibold text-amber-800">Storage quota reached</p>
+                    <p className="text-xs text-amber-700">
+                      {cfStreamSettings!.storage.used.toFixed(1)} / {cfStreamSettings!.storage.limit + cfStreamSettings!.storage.topup} minutes used this cycle
+                    </p>
+                    <a href="/billing" className="inline-block text-xs font-semibold text-amber-700 hover:text-amber-900 underline">Buy a top-up →</a>
+                  </div>
+                )}
+                {videoSource === 'cloudflare' && cfPlanAllows && !cfStorageOverQuota && (
+                  <div className="space-y-1.5">
+                    <CfStreamUploader
+                      courseId={courseId}
+                      lessonId={lesson?._id ?? ''}
+                      existingUid={lesson?.video?.provider === 'cloudflare' ? lesson.video.url ?? null : null}
+                      onConfirmed={(uid) => { setVideoUrl(uid); }}
+                    />
+                    <p className="text-[11px] text-gray-400 text-right px-1">
+                      {cfStreamSettings!.storage.used.toFixed(1)} / {cfStreamSettings!.storage.limit + cfStreamSettings!.storage.topup} storage-min used this cycle
+                    </p>
+                  </div>
                 )}
 
                 {/* URL input (YouTube / Vimeo) */}
