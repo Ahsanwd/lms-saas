@@ -2406,7 +2406,7 @@ function CurriculumTab({ courseId }: { courseId: string }) {
 
 // ─── Overview Tab ─────────────────────────────────────────────────────────────
 
-function OverviewTab({ courseId, course }: { courseId: string; course: Course }) {
+function OverviewTab({ courseId, course, onFirstSave }: { courseId: string; course: Course; onFirstSave?: () => void }) {
   const qc = useQueryClient();
   const thumbnailRef = useRef<HTMLInputElement>(null);
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
@@ -2503,6 +2503,7 @@ function OverviewTab({ courseId, course }: { courseId: string; course: Course })
       qc.invalidateQueries({ queryKey: ['course', courseId] });
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
+      onFirstSave?.();
     },
     onError: (err: AxiosError<{ message: string }>) =>
       setSaveError(err.response?.data?.message ?? 'Failed to save'),
@@ -3848,10 +3849,12 @@ function InstructorView() {
   const searchParams = useSearchParams();
   const courseId = params.id as string;
   const qc = useQueryClient();
-  const [tab, setTab] = useState<ActiveTab>(
-    searchParams.get('tab') === 'curriculum' ? 'curriculum' : 'overview'
-  );
+  const [tab, setTab] = useState<ActiveTab>('overview');
   const [actionError, setActionError] = useState('');
+  // Freshly created course (?new=1) — after the very first Overview save,
+  // jump to Curriculum so the instructor knows what to do next. Doesn't
+  // affect normal edits to an already-set-up course.
+  const isNewCourse = searchParams.get('new') === '1';
 
   const { data: course, isLoading } = useQuery({
     queryKey: ['course', courseId],
@@ -3984,7 +3987,16 @@ function InstructorView() {
         </nav>
       </div>
 
-      {tab === 'overview'   && <OverviewTab courseId={courseId} course={course} />}
+      {tab === 'overview'   && (
+        <OverviewTab
+          courseId={courseId}
+          course={course}
+          onFirstSave={isNewCourse ? () => {
+            setTab('curriculum');
+            router.replace(`/courses/${courseId}`);
+          } : undefined}
+        />
+      )}
       {tab === 'curriculum' && <CurriculumTab courseId={courseId} />}
       {tab === 'students'   && <StudentsTab courseId={courseId} enrollmentCount={course.enrollmentCount} />}
       {tab === 'cohorts'    && <CohortsTab courseId={courseId} />}

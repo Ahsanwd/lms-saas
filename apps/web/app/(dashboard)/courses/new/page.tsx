@@ -153,7 +153,7 @@ export default function NewCoursePage() {
   const createMutation = useMutation({
     mutationFn: (data: FormData) => api.post('/courses', { ...data, tags }),
     onSuccess: (res) => {
-      router.push(`/courses/${res.data.data.course._id}?tab=curriculum`);
+      router.push(`/courses/${res.data.data.course._id}?new=1`);
     },
     onError: (err: AxiosError<{ message: string }>) => {
       setError(err.response?.data?.message ?? 'Failed to create course');
