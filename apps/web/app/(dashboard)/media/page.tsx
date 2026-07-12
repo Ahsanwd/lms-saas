@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { Button, Badge, Spinner, Alert } from '@/components/ui';
@@ -93,8 +93,16 @@ const FILTER_TABS: { key: CategoryFilter; label: string }[] = [
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
+function categoryForFile(file: File): 'thumbnail' | 'video' | 'audio' | 'attachment' {
+  if (file.type.startsWith('image/')) return 'thumbnail';
+  if (file.type.startsWith('video/')) return 'video';
+  if (file.type.startsWith('audio/')) return 'audio';
+  return 'attachment';
+}
+
 export default function MediaLibraryPage() {
   const qc = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [category, setCategory] = useState<CategoryFilter>('all');
   const [search, setSearch]     = useState('');
   const [page, setPage]         = useState(1);
@@ -121,6 +129,30 @@ export default function MediaLibraryPage() {
     },
   });
 
+  const uploadMutation = useMutation({
+    mutationFn: (file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      return api.post(`/media/upload?category=${categoryForFile(file)}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['media'] });
+      toast.success('File uploaded');
+    },
+    onError: (err: AxiosError<{ message: string }>) => {
+      setActionError(err.response?.data?.message ?? 'Upload failed');
+      setTimeout(() => setActionError(''), 3000);
+    },
+  });
+
+  function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) uploadMutation.mutate(file);
+    e.target.value = '';
+  }
+
   function handleDelete(item: MediaItem) {
     const ok = window.confirm(
       `Delete "${item.filename || 'this file'}"? If it's still used in a course, lesson, or elsewhere, that reference will break (broken link). This cannot be undone.`
@@ -139,11 +171,25 @@ export default function MediaLibraryPage() {
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-xl font-semibold text-gray-900">Media Library</h1>
-        <p className="text-sm text-gray-500 mt-0.5">
-          Every image, video, and document uploaded across your organization — search, copy a URL, or free up storage.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-semibold text-gray-900">Media Library</h1>
+          <p className="text-sm text-gray-500 mt-0.5">
+            Every image, video, and document uploaded across your organization — search, copy a URL, or free up storage.
+          </p>
+        </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="hidden"
+          onChange={handleFileSelected}
+        />
+        <Button onClick={() => fileInputRef.current?.click()} loading={uploadMutation.isPending}>
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          Upload
+        </Button>
       </div>
 
       {actionError && <Alert variant="error">{actionError}</Alert>}

@@ -15,4 +15,11 @@ async function deleteMedia(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { listMedia, deleteMedia };
+async function uploadMedia(req, res, next) {
+  try {
+    if (!req.trackedMedia) return R.error(res, 'Upload failed', 400);
+    R.success(res, { media: req.trackedMedia }, 'File uploaded');
+  } catch (err) { next(err); }
+}
+
+module.exports = { listMedia, deleteMedia, uploadMedia };

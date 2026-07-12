@@ -5,12 +5,16 @@ const logger = require('../utils/logger');
 // guardStorageLimit()/trackUpload() where those already exist). Catalogs the
 // uploaded file into the Media collection so it shows up in the tenant's Media
 // Library (browse/search/copy-URL/delete), regardless of which upload flow
-// created it. `resolveContext(req)` returns { contextType, contextId } — purely
-// informational (not a live reference count).
+// created it. `category` is either a literal string or a `(req) => string`
+// resolver (used where the category is only known at request time, e.g. the
+// standalone library-upload endpoint). `resolveContext(req)` returns
+// { contextType, contextId } — purely informational (not a live reference count).
 function trackMediaAsset(category, resolveContext) {
   return async (req, res, next) => {
     if (!req.file) return next();
     try {
+      const resolvedCategory = typeof category === 'function' ? category(req) : category;
+
       const { USE_S3, getPublicUrl } = require('../services/storage/storage.service');
       const provider = USE_S3 ? 's3' : 'local';
 
@@ -28,13 +32,13 @@ function trackMediaAsset(category, resolveContext) {
       const url = getPublicUrl(req.file.path);
       const { contextType, contextId } = resolveContext ? (resolveContext(req) || {}) : {};
 
-      await Media.create({
+      req.trackedMedia = await Media.create({
         tenantId:    req.tenant?.tenantId,
         url,
         key:         req.file.key || null,
         filename:    req.file.originalname || req.file.filename || null,
         mimeType:    req.file.mimetype || null,
-        category,
+        category:    resolvedCategory,
         sizeBytes:   req.file.size || 0,
         width,
         height,
@@ -45,7 +49,7 @@ function trackMediaAsset(category, resolveContext) {
       });
     } catch (err) {
       // Cataloging failure must never block the actual upload flow.
-      logger.error(`[mediaTracking] failed to record ${category} upload: ${err.message}`);
+      logger.error(`[mediaTracking] failed to record upload: ${err.message}`);
     }
     next();
   };
