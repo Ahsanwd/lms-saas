@@ -273,7 +273,11 @@ async function getSections(tenantId, courseId, user) {
     sectionObj.lessons = allLessons
       .filter(l => {
         if (l.sectionId.toString() !== section._id.toString()) return false;
-        return isEditor || isCoursePublished || l.isPublished;
+        // Lesson-level publish state is always respected, independent of the
+        // course's own status — otherwise a draft lesson added to an already-
+        // published course would show to students immediately regardless of
+        // its own toggle.
+        return isEditor || l.isPublished;
       })
       .map(l => {
         const lessonObj = l.toObject ? l.toObject() : { ...l };

@@ -39,8 +39,9 @@ async function getFileToken(req, res, next) {
     const lesson = await Lesson.findOne({ _id: lessonId, tenantId, deletedAt: null }).lean();
     if (!lesson?.file) throw new AppError('Lesson or file not found', 404);
 
-    // Students must have an active enrollment in the course
-    if (role === 'student') {
+    // Students must have an active enrollment in the course, unless this
+    // lesson is marked Free Preview
+    if (role === 'student' && !lesson.isPreview) {
       const enrolled = await Enrollment.findOne({
         tenantId, courseId: lesson.courseId, userId, status: 'active',
       }).lean();

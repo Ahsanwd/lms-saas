@@ -555,8 +555,8 @@ async function cfStreamToken(req, res, next) {
     if (!lesson?.video?.url) return R.error(res, 'Lesson or video not found', 404);
     if (lesson.video.provider !== 'cloudflare') return R.error(res, 'Not a Cloudflare Stream video', 400);
 
-    // Students must be enrolled
-    if (req.user.role === 'student') {
+    // Students must be enrolled, unless this lesson is marked Free Preview
+    if (req.user.role === 'student' && !lesson.isPreview) {
       const enrolled = await Enrollment.findOne({
         tenantId, courseId: lesson.courseId, userId: req.user.sub, status: 'active',
       }).lean();
@@ -594,8 +594,8 @@ async function audioToken(req, res, next) {
       return R.success(res, { signedUrl: lesson.audio.url, signed: false });
     }
 
-    // Students must be enrolled
-    if (req.user.role === 'student') {
+    // Students must be enrolled, unless this lesson is marked Free Preview
+    if (req.user.role === 'student' && !lesson.isPreview) {
       const enrolled = await Enrollment.findOne({
         tenantId, courseId, userId: req.user.sub, status: 'active',
       }).lean();
