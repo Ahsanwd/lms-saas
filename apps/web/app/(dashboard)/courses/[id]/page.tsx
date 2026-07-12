@@ -3845,9 +3845,12 @@ type ActiveTab = 'overview' | 'curriculum' | 'students' | 'cohorts' | 'requests'
 function InstructorView() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const courseId = params.id as string;
   const qc = useQueryClient();
-  const [tab, setTab] = useState<ActiveTab>('overview');
+  const [tab, setTab] = useState<ActiveTab>(
+    searchParams.get('tab') === 'curriculum' ? 'curriculum' : 'overview'
+  );
   const [actionError, setActionError] = useState('');
 
   const { data: course, isLoading } = useQuery({
