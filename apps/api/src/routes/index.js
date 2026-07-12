@@ -63,5 +63,6 @@ router.use('/analytics',              require('../modules/analytics/analytics.ro
 router.use('/search',                 require('../modules/search/search.routes'));
 router.use('/bookmarks',              require('../modules/bookmark/bookmark.routes'));
 router.use('/cohorts',                require('../modules/cohort/cohort.top.routes'));
+router.use('/media',                  require('../modules/media/media.routes'));
 
 module.exports = router;

@@ -3,6 +3,7 @@ const ctrl = require('./tenant.controller');
 const { authenticate } = require('../../middlewares/auth.middleware');
 const { requireRole, requirePermission } = require('../../middlewares/permission.middleware');
 const { upload } = require('../../services/storage/storage.service');
+const { trackMediaAsset } = require('../../middlewares/mediaTracking.middleware');
 
 // Public — no auth needed (login/register/storefront pages fetch this for branding)
 router.get('/branding', ctrl.getPublicBranding);
@@ -16,9 +17,13 @@ router.get('/plan', requirePermission('settings:read'), ctrl.getPlanInfo);
 router.get('/storage', requirePermission('settings:read'), ctrl.getStorageUsage)
 router.get('/usage',   requirePermission('settings:read'), ctrl.getUsageSummary)
 
-router.post('/logo',    requirePermission('settings:manage'), upload('thumbnail').single('logo'),    ctrl.uploadLogo);
+router.post('/logo',    requirePermission('settings:manage'), upload('thumbnail').single('logo'),
+  trackMediaAsset('thumbnail', req => ({ contextType: 'tenant-logo', contextId: req.tenant.tenantId })),
+  ctrl.uploadLogo);
 router.delete('/logo', requirePermission('settings:manage'), ctrl.removeLogo);
-router.post('/favicon',    requirePermission('settings:manage'), upload('thumbnail').single('favicon'), ctrl.uploadFavicon);
+router.post('/favicon',    requirePermission('settings:manage'), upload('thumbnail').single('favicon'),
+  trackMediaAsset('thumbnail', req => ({ contextType: 'tenant-favicon', contextId: req.tenant.tenantId })),
+  ctrl.uploadFavicon);
 router.delete('/favicon',  requirePermission('settings:manage'), ctrl.removeFavicon);
 
 // Feature flags (tenant_admin only)

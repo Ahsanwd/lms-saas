@@ -17,6 +17,7 @@ const PERMISSIONS = {
     'analytics:read', 'analytics:manage',
     'settings:read', 'settings:manage',
     'session:read', 'session:manage',
+    'media:read', 'media:delete', 'media:manage',
   ],
 
   instructor: [
@@ -29,6 +30,7 @@ const PERMISSIONS = {
     'announcement:create', 'announcement:read', 'announcement:update', 'announcement:delete',
     'analytics:read',
     'user:read',
+    'media:read',
   ],
 
   student: [

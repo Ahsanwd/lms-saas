@@ -4,6 +4,7 @@ const { authenticate } = require('../../middlewares/auth.middleware');
 const { requirePermission } = require('../../middlewares/permission.middleware');
 const { upload } = require('../../services/storage/storage.service');
 const { guardCourseLimit, guardStorageLimit, trackUpload } = require('../../middlewares/limitGuard.middleware');
+const { trackMediaAsset } = require('../../middlewares/mediaTracking.middleware');
 
 /**
  * @swagger
@@ -246,6 +247,7 @@ router.post('/:id/thumbnail',
   guardStorageLimit(),
   upload('thumbnail').single('thumbnail'),
   trackUpload(),
+  trackMediaAsset('thumbnail', req => ({ contextType: 'course-thumbnail', contextId: req.params.id })),
   ctrl.uploadThumbnail
 );
 
@@ -254,6 +256,7 @@ router.post('/:id/content-images',
   guardStorageLimit(),
   upload('content-image').single('image'),
   trackUpload(),
+  trackMediaAsset('content-image', req => ({ contextType: 'course-content-image', contextId: req.params.id })),
   ctrl.uploadContentImage
 );
 router.patch('/:id/publish',    requirePermission('course:manage'), ctrl.publishCourse);
@@ -288,6 +291,7 @@ router.post('/:id/lessons/:lessonId/video',
   guardStorageLimit(),
   upload('video').single('video'),
   trackUpload(),
+  trackMediaAsset('video', req => ({ contextType: 'lesson-video', contextId: req.params.lessonId })),
   ctrl.uploadVideo
 );
 router.post('/:id/lessons/:lessonId/audio',
@@ -295,6 +299,7 @@ router.post('/:id/lessons/:lessonId/audio',
   guardStorageLimit(),
   upload('audio').single('audio'),
   trackUpload(),
+  trackMediaAsset('audio', req => ({ contextType: 'lesson-audio', contextId: req.params.lessonId })),
   ctrl.uploadAudio
 );
 router.get('/:id/lessons/:lessonId/audio-token', requirePermission('course:read'), ctrl.audioToken);
@@ -303,6 +308,7 @@ router.post('/:id/lessons/:lessonId/file',
   guardStorageLimit(),
   upload('attachment').single('file'),
   trackUpload(),
+  trackMediaAsset('attachment', req => ({ contextType: 'lesson-file', contextId: req.params.lessonId })),
   ctrl.uploadFile
 );
 router.post('/:id/lessons/:lessonId/attachments',
@@ -310,6 +316,7 @@ router.post('/:id/lessons/:lessonId/attachments',
   guardStorageLimit(),
   upload('attachment').single('file'),
   trackUpload(),
+  trackMediaAsset('attachment', req => ({ contextType: 'lesson-attachment', contextId: req.params.lessonId })),
   ctrl.addAttachment
 );
 router.delete('/:id/lessons/:lessonId/attachments/:attachmentId',

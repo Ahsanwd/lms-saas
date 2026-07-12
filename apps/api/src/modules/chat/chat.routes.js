@@ -2,6 +2,7 @@ const router    = require('express').Router();
 const rateLimit = require('express-rate-limit');
 const { authenticate } = require('../../middlewares/auth.middleware');
 const { upload } = require('../../services/storage/storage.service');
+const { trackMediaAsset } = require('../../middlewares/mediaTracking.middleware');
 const ctrl = require('./chat.controller');
 
 router.use(authenticate);
@@ -29,7 +30,9 @@ router.delete('/:id',       ctrl.deleteConversation);
 // Messages within a conversation
 router.get('/:id/messages',              ctrl.getMessages);
 router.get('/:id/messages/search',       ctrl.searchMessages);
-router.post('/:id/messages',             messageLimiter, uploadChatFile, ctrl.sendMessage);
+router.post('/:id/messages',             messageLimiter, uploadChatFile,
+  trackMediaAsset('chat', req => ({ contextType: 'chat-message', contextId: req.params.id })),
+  ctrl.sendMessage);
 router.patch('/:id/messages/:msgId',     ctrl.editMessage);
 router.delete('/:id/messages/:msgId',    ctrl.deleteMessage);
 

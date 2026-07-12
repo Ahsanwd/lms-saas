@@ -107,6 +107,15 @@ async function uploadAvatar(tenantId, userId, fileBuffer) {
   if (user.avatar) removeAvatarFile(user.avatar);
 
   const updated = await userRepo.updateById(userId, { avatar: avatarUrl });
+
+  const Media = require('../../database/models/Media.model');
+  const stat  = fs.statSync(filePath);
+  Media.create({
+    tenantId: tenantId, url: avatarUrl, filename: fileName, mimeType: 'image/jpeg',
+    category: 'thumbnail', sizeBytes: stat.size, width: 256, height: 256,
+    provider: 'local', contextType: 'user-avatar', contextId: userId, createdBy: userId,
+  }).catch(() => {});
+
   return { avatar: avatarUrl, user: updated };
 }
 

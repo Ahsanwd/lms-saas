@@ -3,10 +3,12 @@ const ctrl = require('./assignment.controller');
 const { authenticate } = require('../../middlewares/auth.middleware');
 const { requirePermission } = require('../../middlewares/permission.middleware');
 const { upload } = require('../../services/storage/storage.service');
+const { trackMediaAsset } = require('../../middlewares/mediaTracking.middleware');
 
 router.use(authenticate);
 
 const uploadAttachment = upload('attachment').single('attachment');
+const trackAssignmentTemplate = trackMediaAsset('attachment', req => ({ contextType: 'assignment-template', contextId: req.params.id || null }));
 
 // ── Static routes BEFORE /:id ─────────────────────────────────────────────────
 // Bulk submission status for current student across multiple assignments
@@ -14,9 +16,9 @@ router.get('/my-submissions', requirePermission('assignment:read'), ctrl.getMySu
 
 // ── Assignments ───────────────────────────────────────────────────────────────
 router.get('/',     requirePermission('assignment:read'),   ctrl.listAssignments);
-router.post('/',    requirePermission('assignment:create'), uploadAttachment, ctrl.createAssignment);
+router.post('/',    requirePermission('assignment:create'), uploadAttachment, trackAssignmentTemplate, ctrl.createAssignment);
 router.get('/:id',  requirePermission('assignment:read'),   ctrl.getAssignment);
-router.patch('/:id',requirePermission('assignment:update'), uploadAttachment, ctrl.updateAssignment);
+router.patch('/:id',requirePermission('assignment:update'), uploadAttachment, trackAssignmentTemplate, ctrl.updateAssignment);
 router.delete('/:id',requirePermission('assignment:delete'),ctrl.deleteAssignment);
 
 router.patch('/:id/publish', requirePermission('assignment:manage'), ctrl.publishAssignment);
@@ -25,7 +27,9 @@ router.patch('/:id/archive', requirePermission('assignment:manage'), ctrl.archiv
 // ── Submissions ───────────────────────────────────────────────────────────────
 router.get('/:id/submissions',     requirePermission('assignment:manage'), ctrl.listSubmissions);
 router.get('/:id/not-submitted',   requirePermission('assignment:manage'), ctrl.getNotSubmitted);
-router.post('/:id/submit',         requirePermission('assignment:read'),   upload('attachment').single('file'), ctrl.submitAssignment);
+router.post('/:id/submit',         requirePermission('assignment:read'),   upload('attachment').single('file'),
+  trackMediaAsset('attachment', req => ({ contextType: 'assignment-submission', contextId: req.params.id })),
+  ctrl.submitAssignment);
 router.get('/:id/my-submission',   requirePermission('assignment:read'),   ctrl.getMySubmission);
 router.patch('/:id/submissions/:submissionId/grade', requirePermission('assignment:manage'), ctrl.gradeSubmission);
 router.post('/:id/submissions/:submissionId/comments', requirePermission('assignment:read'), ctrl.addComment);

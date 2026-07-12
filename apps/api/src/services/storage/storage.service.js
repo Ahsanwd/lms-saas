@@ -101,8 +101,17 @@ class R2StorageEngine {
 
     file.stream.on('data', chunk => chunks.push(chunk));
     file.stream.on('error', err => cb(err));
-    file.stream.on('end', () => {
+    file.stream.on('end', async () => {
       const buffer = Buffer.concat(chunks);
+      let dimensions = null;
+      if (file.mimetype?.startsWith('image/')) {
+        try {
+          const sharp = require('sharp');
+          const meta = await sharp(buffer).metadata();
+          dimensions = { width: meta.width ?? null, height: meta.height ?? null };
+        } catch { /* non-image or unreadable — dimensions stay null */ }
+      }
+
       getS3Client()
         .send(new PutObjectCommand({
           Bucket:        config.storage.s3.bucket,
@@ -116,6 +125,8 @@ class R2StorageEngine {
           path:     r2PublicUrl(key),
           size:     buffer.length,
           filename: path.basename(key),
+          width:    dimensions?.width  ?? null,
+          height:   dimensions?.height ?? null,
         }))
         .catch(err => {
           console.error('[R2] upload failed:', err.Code || err.name, err.message);

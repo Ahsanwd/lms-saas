@@ -547,6 +547,14 @@ async function syncCfStreamDuration(tenantId, courseId, lessonId, planId, durati
   });
   await limitGuardSvc.incrementStreamStorageUsed(tenantId, minutes);
   await recalcCourseCounters(tenantId, courseId);
+
+  const Media = require('../../database/models/Media.model');
+  Media.create({
+    tenantId, url: lesson.video.url, key: lesson.video.url, filename: null, mimeType: 'video/mp4',
+    category: 'cloudflare-stream', sizeBytes: 0, durationSeconds, provider: 'cloudflare',
+    contextType: 'lesson-video', contextId: lessonId, createdBy: user.sub,
+  }).catch(() => {});
+
   return updated;
 }
 
