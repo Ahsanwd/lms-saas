@@ -237,6 +237,52 @@ async function inviteUser(tenantId, { email, role, name, expiresInHours }, actin
   return { message: `Invitation sent to ${email}`, inviteUrl };
 }
 
+// ─── Direct Create (admin sets the password, account is active immediately) ──
+async function createUser(tenantId, { firstName, lastName, email, password, role }) {
+  const normalizedEmail = email.trim().toLowerCase();
+
+  const [existing, tenant] = await Promise.all([
+    userRepo.findByEmail(tenantId, normalizedEmail),
+    tenantRepo.findById(tenantId),
+  ]);
+
+  if (existing) throw new AppError('A user with this email already exists', 409);
+
+  await limitGuardSvc.assertUserLimit(tenantId, tenant.plan, role);
+
+  const user = await userRepo.create({
+    tenantId,
+    firstName: firstName.trim(),
+    lastName:  lastName.trim(),
+    email:     normalizedEmail,
+    passwordHash: password,
+    role,
+    status: 'active',
+  });
+
+  const ROOT_DOMAIN  = process.env.ROOT_DOMAIN || 'coursel.space';
+  const tenantOrigin = `https://${tenant.subdomain}.${ROOT_DOMAIN}`;
+  const accountCreatedTemplate = require('../../services/email/templates/accountCreated');
+  const template = accountCreatedTemplate({
+    firstName: user.firstName,
+    tenantName: tenant.name,
+    branding: {
+      logoUrl:      tenant.settings?.logo         || null,
+      primaryColor: tenant.settings?.primaryColor || null,
+    },
+    role,
+    email: normalizedEmail,
+    password,
+    loginUrl: `${tenantOrigin}/login`,
+  });
+  await queueEmail({ to: normalizedEmail, ...template }).catch(() => {});
+
+  return {
+    _id: user._id, firstName: user.firstName, lastName: user.lastName,
+    email: user.email, role: user.role, status: user.status,
+  };
+}
+
 // ─── Accept Invite ────────────────────────────────────────────────────────────
 async function acceptInvite(tenantId, { token, firstName, lastName, password }) {
   const invite = await inviteRepo.findByRawToken(token);
@@ -445,7 +491,7 @@ module.exports = {
   uploadAvatar, deleteAvatar,
   changePassword,
   updateRole, suspendUser, unsuspendUser, deleteUser,
-  inviteUser, acceptInvite,
+  inviteUser, acceptInvite, createUser,
   getUserSessions, revokeUserSession,
   previewBulkImport, bulkImportUsers, exportUsers,
 };

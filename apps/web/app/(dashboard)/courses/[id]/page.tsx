@@ -2915,6 +2915,11 @@ function OverviewTab({ courseId, course, onFirstSave }: { courseId: string; cour
 
 // ─── Students Tab ─────────────────────────────────────────────────────────────
 
+function generateStudentPassword(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%';
+  return Array.from({ length: 12 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+}
+
 function StudentsTab({ courseId, enrollmentCount }: { courseId: string; enrollmentCount: number }) {
   const qc = useQueryClient();
   const [showEnrollModal, setShowEnrollModal] = useState(false);
@@ -2926,6 +2931,12 @@ function StudentsTab({ courseId, enrollmentCount }: { courseId: string; enrollme
   const [extendDays, setExtendDays]           = useState('30');
   const [csvResult, setCsvResult]             = useState<{ enrolled: string[]; skipped: string[]; notFound: string[] } | null>(null);
   const [showCsvModal, setShowCsvModal]       = useState(false);
+  // Shown when the looked-up email has no matching user yet — lets the admin
+  // create the student account inline, then immediately enroll them.
+  const [noUserFound, setNoUserFound]         = useState(false);
+  const [newFirstName, setNewFirstName]       = useState('');
+  const [newLastName, setNewLastName]         = useState('');
+  const [newCreds, setNewCreds]               = useState<{ email: string; password: string } | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['course-students', courseId],
@@ -2944,12 +2955,18 @@ function StudentsTab({ courseId, enrollmentCount }: { courseId: string; enrollme
     },
   });
 
-  // Lookup user by email before enrolling
+  // Lookup user by email before enrolling — scoped to students, since
+  // enrolling an instructor/admin as a "student" is not a real use case.
   const lookupMutation = useMutation({
-    mutationFn: (email: string) => api.get(`/users?search=${encodeURIComponent(email)}&limit=1`),
+    mutationFn: (email: string) => api.get(`/users?search=${encodeURIComponent(email)}&role=student&limit=1`),
     onSuccess: (res) => {
       const users = res.data.data.users ?? [];
-      if (users.length === 0) { setEnrollMsg('No user found with that email'); return; }
+      if (users.length === 0) {
+        setNoUserFound(true);
+        setEnrollMsg('');
+        return;
+      }
+      setNoUserFound(false);
       setEnrollUserId(users[0]._id);
       setEnrollMsg(`Found: ${users[0].firstName} ${users[0].lastName}`);
     },
@@ -2960,10 +2977,31 @@ function StudentsTab({ courseId, enrollmentCount }: { courseId: string; enrollme
     mutationFn: (userId: string) => api.post(`/courses/${courseId}/students`, { userId }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['course-students', courseId] });
-      setShowEnrollModal(false);
-      setEnrollEmail(''); setEnrollUserId(''); setEnrollMsg('');
+      if (!newCreds) {
+        // Normal enroll-existing-student flow — close the modal.
+        setShowEnrollModal(false);
+        setEnrollEmail(''); setEnrollUserId(''); setEnrollMsg(''); setNoUserFound(false);
+      }
+      // When newCreds is set, the create-then-enroll flow keeps the modal
+      // open so the admin can copy the new student's password.
     },
     onError: (err: AxiosError<{ message: string }>) => setEnrollMsg(err.response?.data?.message ?? 'Enrollment failed'),
+  });
+
+  // Student doesn't exist yet — create the account, then enroll it right away.
+  const createAndEnrollMutation = useMutation({
+    mutationFn: async () => {
+      const password = generateStudentPassword();
+      const { data } = await api.post('/users', {
+        firstName: newFirstName, lastName: newLastName, email: enrollEmail, password, role: 'student',
+      });
+      return { user: data.data.user, password };
+    },
+    onSuccess: ({ user, password }) => {
+      setNewCreds({ email: user.email, password });
+      enrollMutation.mutate(user._id);
+    },
+    onError: (err: AxiosError<{ message: string }>) => setEnrollMsg(err.response?.data?.message ?? 'Could not create student'),
   });
 
   const unenrollMutation = useMutation({
@@ -3063,40 +3101,93 @@ function StudentsTab({ courseId, enrollmentCount }: { courseId: string; enrollme
       {showEnrollModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
-            <h2 className="text-lg font-semibold text-gray-900">Enroll a Student</h2>
-            <p className="text-sm text-gray-500">Enter the student's email address to look them up, then confirm enrollment.</p>
-            <div className="flex gap-2">
-              <input
-                type="email"
-                value={enrollEmail}
-                onChange={(e) => { setEnrollEmail(e.target.value); setEnrollUserId(''); setEnrollMsg(''); }}
-                placeholder="student@example.com"
-                className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
-              />
-              <Button
-                size="sm" variant="outline"
-                loading={lookupMutation.isPending}
-                disabled={!enrollEmail.trim()}
-                onClick={() => lookupMutation.mutate(enrollEmail.trim())}
-              >
-                Look up
-              </Button>
-            </div>
-            {enrollMsg && (
-              <p className={`text-sm ${enrollUserId ? 'text-green-700' : 'text-red-600'}`}>{enrollMsg}</p>
+            {newCreds ? (
+              <>
+                <h2 className="text-lg font-semibold text-gray-900">Student Created &amp; Enrolled</h2>
+                <p className="text-sm text-gray-500">We've emailed these details to {newCreds.email} — you can also share them directly.</p>
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-1.5">
+                  <p className="text-xs text-gray-500">Email</p>
+                  <p className="text-sm font-mono text-gray-800 break-all">{newCreds.email}</p>
+                  <p className="text-xs text-gray-500 pt-1.5">Password</p>
+                  <p className="text-sm font-mono text-gray-800 break-all">{newCreds.password}</p>
+                </div>
+                <div className="flex justify-end">
+                  <Button onClick={() => {
+                    setShowEnrollModal(false);
+                    setEnrollEmail(''); setEnrollUserId(''); setEnrollMsg('');
+                    setNoUserFound(false); setNewFirstName(''); setNewLastName(''); setNewCreds(null);
+                  }}>Done</Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h2 className="text-lg font-semibold text-gray-900">Enroll a Student</h2>
+                <p className="text-sm text-gray-500">Enter the student's email address to look them up, then confirm enrollment.</p>
+                <div className="flex gap-2">
+                  <input
+                    type="email"
+                    value={enrollEmail}
+                    onChange={(e) => { setEnrollEmail(e.target.value); setEnrollUserId(''); setEnrollMsg(''); setNoUserFound(false); }}
+                    placeholder="student@example.com"
+                    className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+                  />
+                  <Button
+                    size="sm" variant="outline"
+                    loading={lookupMutation.isPending}
+                    disabled={!enrollEmail.trim()}
+                    onClick={() => lookupMutation.mutate(enrollEmail.trim())}
+                  >
+                    Look up
+                  </Button>
+                </div>
+                {enrollMsg && (
+                  <p className={`text-sm ${enrollUserId ? 'text-green-700' : 'text-red-600'}`}>{enrollMsg}</p>
+                )}
+
+                {noUserFound && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-3">
+                    <p className="text-sm text-amber-800">No student found with that email — create the account and enroll them in one step.</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="text" placeholder="First name" value={newFirstName}
+                        onChange={(e) => setNewFirstName(e.target.value)}
+                        className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+                      />
+                      <input
+                        type="text" placeholder="Last name" value={newLastName}
+                        onChange={(e) => setNewLastName(e.target.value)}
+                        className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+                      />
+                    </div>
+                    <Button
+                      size="sm" className="w-full"
+                      loading={createAndEnrollMutation.isPending || enrollMutation.isPending}
+                      disabled={!newFirstName.trim() || !newLastName.trim()}
+                      onClick={() => createAndEnrollMutation.mutate()}
+                    >
+                      Create Student &amp; Enroll
+                    </Button>
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-3 pt-1">
+                  <Button variant="outline" onClick={() => {
+                    setShowEnrollModal(false);
+                    setEnrollEmail(''); setEnrollUserId(''); setEnrollMsg('');
+                    setNoUserFound(false); setNewFirstName(''); setNewLastName('');
+                  }}>
+                    Cancel
+                  </Button>
+                  <Button
+                    loading={enrollMutation.isPending}
+                    disabled={!enrollUserId}
+                    onClick={() => enrollMutation.mutate(enrollUserId)}
+                  >
+                    Enroll
+                  </Button>
+                </div>
+              </>
             )}
-            <div className="flex justify-end gap-3 pt-1">
-              <Button variant="outline" onClick={() => { setShowEnrollModal(false); setEnrollEmail(''); setEnrollUserId(''); setEnrollMsg(''); }}>
-                Cancel
-              </Button>
-              <Button
-                loading={enrollMutation.isPending}
-                disabled={!enrollUserId}
-                onClick={() => enrollMutation.mutate(enrollUserId)}
-              >
-                Enroll
-              </Button>
-            </div>
           </div>
         </div>
       )}

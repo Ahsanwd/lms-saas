@@ -21,6 +21,9 @@ router.delete('/me/avatar', ctrl.deleteAvatar);
 // ── Invite ────────────────────────────────────────────────────────────────────
 router.post('/invite', requirePermission('user:manage'), guardUserLimit(), ctrl.invite);
 
+// ── Direct Create (admin sets password, account active immediately) ──────────
+router.post('/', requirePermission('user:manage'), guardUserLimit(), ctrl.createUser);
+
 // ── Bulk Import / Export ───────────────────────────────────────────────────────
 router.post('/bulk-import/preview', requirePermission('user:manage'), ctrl.csvUpload.single('file'), ctrl.previewImport);
 router.post('/bulk-import', requirePermission('user:manage'), ctrl.csvUpload.single('file'), ctrl.bulkImport);

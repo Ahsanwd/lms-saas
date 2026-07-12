@@ -7,6 +7,7 @@ const {
   validateUpdateRole,
   validateAcceptInvite,
 } = require('../../validators/user.validator');
+const { validateRegister } = require('../../validators/auth.validator');
 const R = require('../../utils/response');
 
 const csvUpload = multer({
@@ -117,6 +118,19 @@ async function invite(req, res, next) {
   } catch (err) { next(err); }
 }
 
+// ─── Direct Create (admin sets the password, account is active immediately) ──
+async function createUser(req, res, next) {
+  try {
+    const { firstName, lastName, email, password, role } = req.body;
+    validateUpdateRole({ role });
+    validateRegister({ firstName, lastName, email, password }, req.tenant.settings?.passwordPolicy);
+    const user = await userService.createUser(
+      req.tenant.tenantId, { firstName, lastName, email, password, role }
+    );
+    R.created(res, { user }, 'User created');
+  } catch (err) { next(err); }
+}
+
 async function previewImport(req, res, next) {
   try {
     if (!req.file) return R.error(res, 'CSV file is required', 400);
@@ -210,7 +224,7 @@ module.exports = {
   list, getById,
   updateMe, changePassword, mySessions, revokeMySession,
   avatarUpload, uploadAvatar, deleteAvatar,
-  invite, acceptInvite,
+  invite, acceptInvite, createUser,
   updateRole, suspend, unsuspend, deleteUser,
   getUserSessions, revokeUserSession,
   csvUpload, bulkImport, previewImport, exportCsv,

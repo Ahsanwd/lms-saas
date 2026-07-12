@@ -653,6 +653,131 @@ function InviteModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+// ── Add User Modal (direct create — no invite email) ──────────────────────────
+function generatePassword(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%';
+  return Array.from({ length: 12 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+}
+
+function AddUserModal({ onClose }: { onClose: () => void }) {
+  const qc = useQueryClient();
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName]   = useState('');
+  const [email, setEmail]         = useState('');
+  const [role, setRole]           = useState<Role>('student');
+  const [password, setPassword]   = useState(generatePassword());
+  const [error, setError]         = useState('');
+  const [created, setCreated]     = useState(false);
+
+  const mutation = useMutation({
+    mutationFn: () => api.post('/users', { firstName, lastName, email, password, role }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['users'] });
+      setCreated(true);
+    },
+    onError: (err: AxiosError<{ message: string }>) => {
+      setError(err.response?.data?.message ?? 'Failed to create user');
+    },
+  });
+
+  if (created) {
+    return (
+      <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+              <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">User Created</h2>
+              <p className="text-sm text-gray-500">We've emailed these details to {email} — you can also share them directly.</p>
+            </div>
+          </div>
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4 space-y-1.5">
+            <p className="text-xs text-gray-500">Email</p>
+            <p className="text-sm font-mono text-gray-800 break-all">{email}</p>
+            <p className="text-xs text-gray-500 pt-1.5">Password</p>
+            <p className="text-sm font-mono text-gray-800 break-all">{password}</p>
+          </div>
+          <div className="flex justify-end">
+            <Button onClick={onClose}>Done</Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-1">Add User</h2>
+        <p className="text-sm text-gray-500 mb-4">Creates the account immediately — no invite email needed.</p>
+        {error && <Alert variant="error" className="mb-3">{error}</Alert>}
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+              <input
+                autoFocus type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+              <input
+                type="text" value={lastName} onChange={(e) => setLastName(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <input
+              type="email" placeholder="user@example.com" value={email} onChange={(e) => setEmail(e.target.value)}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+            <select
+              value={role} onChange={(e) => setRole(e.target.value as Role)}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+            >
+              {ROLE_OPTIONS.map((r) => (
+                <option key={r.value} value={r.value}>{r.label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+            <div className="flex gap-2">
+              <input
+                type="text" value={password} onChange={(e) => setPassword(e.target.value)}
+                className="flex-1 px-3 py-2 text-sm font-mono border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+              <Button type="button" variant="outline" size="sm" onClick={() => setPassword(generatePassword())}>
+                Generate
+              </Button>
+            </div>
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 mt-6">
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button
+            loading={mutation.isPending}
+            disabled={!firstName.trim() || !lastName.trim() || !email.trim() || password.length < 8}
+            onClick={() => mutation.mutate()}
+          >
+            Create User
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Role Change Modal ─────────────────────────────────────────────────────────
 function RoleModal({ user, onClose }: { user: TenantUser; onClose: () => void }) {
   const qc = useQueryClient();
@@ -698,6 +823,7 @@ export default function UsersPage() {
   const [roleFilter, setRoleFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [addUserOpen, setAddUserOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [roleModal, setRoleModal] = useState<TenantUser | null>(null);
   const [actionError, setActionError] = useState('');
@@ -813,6 +939,14 @@ export default function UsersPage() {
             </svg>
             Import CSV
           </button>
+
+          {/* Add User (direct create) */}
+          <Button variant="outline" onClick={() => setAddUserOpen(true)}>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Add User
+          </Button>
 
           {/* Invite */}
           <Button onClick={() => setInviteOpen(true)}>
@@ -960,6 +1094,7 @@ export default function UsersPage() {
       )}
 
       {inviteOpen  && <InviteModal onClose={() => setInviteOpen(false)} />}
+      {addUserOpen && <AddUserModal onClose={() => setAddUserOpen(false)} />}
       {importOpen  && <ImportModal onClose={() => setImportOpen(false)} />}
       {roleModal   && <RoleModal user={roleModal} onClose={() => setRoleModal(null)} />}
     </div>
