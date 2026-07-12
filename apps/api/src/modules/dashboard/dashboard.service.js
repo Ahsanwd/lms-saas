@@ -495,22 +495,20 @@ async function getOnboardingChecklist(tenantId) {
     Course.countDocuments({ tenantId: tid, deletedAt: null }),
     User.countDocuments({ tenantId: tid, role: 'student', deletedAt: null }),
     User.countDocuments({ tenantId: tid, role: 'instructor', deletedAt: null }),
-    Tenant.findById(tenantId).select('emailSettings settings.logo settings.primaryColor').lean(),
+    Tenant.findById(tenantId).select('settings.logo settings.primaryColor').lean(),
   ]);
 
   const hasCourses     = courseCount     > 0;
   const hasStudents    = studentCount    > 0;
   const hasInstructor  = instructorCount > 0;
-  const hasSmtp        = !!(tenant?.emailSettings?.smtp?.host);
   const hasBranding    = !!(tenant?.settings?.logo || (tenant?.settings?.primaryColor && tenant?.settings?.primaryColor !== '#3B82F6'));
 
   return {
     hasBranding,
-    hasSmtp,
     hasCourses,
     hasInstructor,
     hasStudents,
-    isComplete: hasBranding && hasSmtp && hasCourses && hasInstructor && hasStudents,
+    isComplete: hasBranding && hasCourses && hasInstructor && hasStudents,
   };
 }
 

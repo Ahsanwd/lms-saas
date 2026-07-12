@@ -10,7 +10,6 @@ import { Spinner } from '@/components/ui';
 
 interface OnboardingChecklist {
   hasBranding: boolean;
-  hasSmtp: boolean;
   hasCourses: boolean;
   hasInstructor: boolean;
   hasStudents: boolean;
@@ -33,13 +32,6 @@ function OnboardingChecklistCard({ checklist }: { checklist: OnboardingChecklist
       description: 'Make your platform feel like your own with a logo and primary color.',
       action: () => router.push('/settings'),
       cta: 'Customize',
-    },
-    {
-      done: checklist.hasSmtp,
-      label: 'Configure email (SMTP)',
-      description: 'Send automated emails to students and instructors.',
-      action: () => router.push('/settings'),
-      cta: 'Set up SMTP',
     },
     {
       done: checklist.hasCourses,

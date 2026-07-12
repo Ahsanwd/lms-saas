@@ -37,7 +37,6 @@ router.delete('/domain', requirePermission('settings:manage'), ctrl.removeCustom
 // Email settings (tenant admin only)
 router.get( '/email-settings',      requireRole('tenant_admin'), ctrl.getEmailSettings);
 router.put( '/email-settings',      requireRole('tenant_admin'), ctrl.saveEmailSettings);
-router.post('/email-settings/test', requireRole('tenant_admin'), ctrl.testEmailSmtp);
 
 // Payment gateway BYOK for course purchases — Stripe or Safepay (tenant admin only)
 router.get(   '/payment-gateway',           requireRole('tenant_admin'), ctrl.getPaymentGateway);

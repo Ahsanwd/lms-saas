@@ -128,13 +128,6 @@ async function saveEmailSettings(req, res, next) {
   } catch (err) { next(err); }
 }
 
-async function testEmailSmtp(req, res, next) {
-  try {
-    const result = await tenantService.testEmailSmtp(req.tenant.tenantId, req.body);
-    R.success(res, result, result.message);
-  } catch (err) { next(err); }
-}
-
 async function getPaymentGateway(req, res, next) {
   try {
     const data = await tenantService.getPaymentGatewaySettings(req.tenant.tenantId);
@@ -284,7 +277,6 @@ module.exports = {
   updateFeatureFlags,
   getEmailSettings,
   saveEmailSettings,
-  testEmailSmtp,
   getPaymentGateway,
   savePaymentGatewayStripe,
   savePaymentGatewaySafepay,

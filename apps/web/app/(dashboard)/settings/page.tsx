@@ -963,32 +963,18 @@ function formatBytes(bytes: number) {
 // EMAIL SETTINGS SECTION (tenant admin only)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-interface EmailSmtp {
-  host: string | null; port: number; secure: boolean;
-  user: string | null; hasPassword: boolean; verified: boolean; verifiedAt: string | null;
-}
 interface EmailSettingsData {
-  fromName: string | null; fromEmail: string | null; replyTo: string | null; smtp: EmailSmtp;
+  fromName: string | null; fromEmail: string | null; replyTo: string | null;
 }
 
 function EmailSettingsSection() {
   const qc = useQueryClient();
-  const [saved,       setSaved]       = useState(false);
-  const [showSmtp,    setShowSmtp]    = useState(false);
-  const [testEmail,   setTestEmail]   = useState('');
-  const [testResult,  setTestResult]  = useState<{ ok: boolean; msg: string } | null>(null);
+  const [saved, setSaved] = useState(false);
 
   // Branding fields
   const [fromName,  setFromName]  = useState('');
   const [fromEmail, setFromEmail] = useState('');
   const [replyTo,   setReplyTo]   = useState('');
-
-  // SMTP fields
-  const [host,     setHost]     = useState('');
-  const [port,     setPort]     = useState(587);
-  const [secure,   setSecure]   = useState(false);
-  const [smtpUser, setSmtpUser] = useState('');
-  const [password, setPassword] = useState('');
 
   const { data, isLoading } = useQuery<EmailSettingsData>({
     queryKey: ['email-settings'],
@@ -1000,11 +986,6 @@ function EmailSettingsSection() {
     setFromName(data.fromName   || '');
     setFromEmail(data.fromEmail || '');
     setReplyTo(data.replyTo     || '');
-    setHost(data.smtp.host      || '');
-    setPort(data.smtp.port      || 587);
-    setSecure(data.smtp.secure  || false);
-    setSmtpUser(data.smtp.user  || '');
-    setShowSmtp(!!(data.smtp.host || data.smtp.user));
   }, [data]);
 
   const saveMutation = useMutation({
@@ -1012,31 +993,15 @@ function EmailSettingsSection() {
       fromName:  fromName  || null,
       fromEmail: fromEmail || null,
       replyTo:   replyTo   || null,
-      smtp: showSmtp
-        ? { host, port, secure, user: smtpUser, ...(password ? { password } : {}) }
-        : { host: null, user: null },
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['email-settings'] });
-      setSaved(true); setPassword('');
+      setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     },
   });
 
-  const testMutation = useMutation({
-    mutationFn: () => api.post('/tenant/email-settings/test', {
-      host, port, secure, user: smtpUser,
-      ...(password ? { password } : {}),
-      fromEmail: fromEmail || smtpUser,
-      toEmail: testEmail,
-    }),
-    onSuccess: (res) => setTestResult({ ok: true,  msg: res.data?.message ?? 'Test email sent!' }),
-    onError:   (err: any) => setTestResult({ ok: false, msg: err.response?.data?.message ?? 'Connection failed' }),
-  });
-
   if (isLoading) return null;
-
-  const smtp = data?.smtp;
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -1048,7 +1013,7 @@ function EmailSettingsSection() {
         </div>
         <div>
           <p className="text-sm font-bold text-gray-800">Email Settings</p>
-          <p className="text-xs text-gray-400">Branding + optional custom SMTP — platform SMTP used as fallback</p>
+          <p className="text-xs text-gray-400">Branding for emails sent to your students and instructors</p>
         </div>
       </div>
 
@@ -1071,111 +1036,7 @@ function EmailSettingsSection() {
               <input type="email" className={inputCls} value={replyTo} onChange={e => setReplyTo(e.target.value)} placeholder="support@yourdomain.com" />
             </div>
           </div>
-          <p className="text-xs text-gray-400 mt-2">Emails will show your brand name and address. Platform SMTP handles delivery unless custom SMTP is configured below.</p>
-        </div>
-
-        {/* ── Custom SMTP toggle ── */}
-        <div className="border-t border-gray-100 pt-5">
-          <div className="flex items-center justify-between mb-1">
-            <div>
-              <p className="text-sm font-semibold text-gray-800">Custom SMTP Server</p>
-              <p className="text-xs text-gray-400">Use your own email server instead of the platform default</p>
-            </div>
-            <Toggle checked={showSmtp} onChange={v => { setShowSmtp(v); setTestResult(null); }} />
-          </div>
-
-          {showSmtp && (
-            <div className="mt-4 space-y-4 bg-gray-50 rounded-xl border border-gray-200 p-4">
-
-              {/* Verification badge */}
-              {smtp?.verified ? (
-                <div className="flex items-center gap-2 text-xs font-semibold text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                  Verified · last tested {smtp.verifiedAt ? new Date(smtp.verifiedAt).toLocaleDateString() : ''}
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                  Not verified — fill in details and use "Test Connection" below
-                </div>
-              )}
-
-              {/* Host + Port */}
-              <div className="grid grid-cols-3 gap-3">
-                <div className="col-span-2">
-                  <label className={labelCls}>SMTP Host</label>
-                  <input type="text" className={inputCls} value={host} onChange={e => setHost(e.target.value)} placeholder="smtp.gmail.com" />
-                </div>
-                <div>
-                  <label className={labelCls}>Port</label>
-                  <input type="number" className={inputCls} value={port} onChange={e => setPort(parseInt(e.target.value) || 587)} />
-                </div>
-              </div>
-
-              {/* User + Password */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={labelCls}>Username</label>
-                  <input type="text" className={inputCls} value={smtpUser} onChange={e => setSmtpUser(e.target.value)} placeholder="you@gmail.com" />
-                </div>
-                <div>
-                  <label className={labelCls}>
-                    Password {smtp?.hasPassword && <span className="font-normal normal-case text-gray-400">(blank = keep existing)</span>}
-                  </label>
-                  <input type="password" className={inputCls} value={password} onChange={e => setPassword(e.target.value)}
-                    placeholder={smtp?.hasPassword ? '••••••••••••••••' : 'App password'} />
-                </div>
-              </div>
-
-              {/* SSL toggle */}
-              <div className="flex items-center justify-between py-1">
-                <div>
-                  <p className="text-sm font-medium text-gray-800">Use SSL / TLS</p>
-                  <p className="text-xs text-gray-400">Enable for port 465, leave off for port 587 (STARTTLS)</p>
-                </div>
-                <Toggle checked={secure} onChange={setSecure} />
-              </div>
-
-              {/* Quick-fill presets */}
-              <div>
-                <p className="text-xs text-gray-400 mb-2">Quick presets:</p>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { label: 'Gmail',     host: 'smtp.gmail.com',     port: 587, secure: false },
-                    { label: 'Outlook',   host: 'smtp.office365.com', port: 587, secure: false },
-                    { label: 'Mailgun',   host: 'smtp.mailgun.org',   port: 587, secure: false },
-                    { label: 'SendGrid',  host: 'smtp.sendgrid.net',  port: 587, secure: false },
-                  ].map(p => (
-                    <button key={p.label} type="button"
-                      onClick={() => { setHost(p.host); setPort(p.port); setSecure(p.secure); }}
-                      className="text-xs px-2.5 py-1 rounded-lg border border-gray-200 bg-white hover:border-primary-300 hover:text-primary-600 transition-colors">
-                      {p.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Test connection */}
-              <div className="border-t border-gray-200 pt-4">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Test Connection</p>
-                <div className="flex gap-2">
-                  <input type="email" className={`${inputCls} flex-1`} value={testEmail}
-                    onChange={e => setTestEmail(e.target.value)} placeholder="Send test email to…" />
-                  <Button size="sm" variant="outline"
-                    disabled={!testEmail || !host || !smtpUser || testMutation.isPending}
-                    loading={testMutation.isPending}
-                    onClick={() => { setTestResult(null); testMutation.mutate(); }}>
-                    Test
-                  </Button>
-                </div>
-                {testResult && (
-                  <p className={cn('text-xs mt-2 font-medium flex items-center gap-1.5', testResult.ok ? 'text-green-600' : 'text-red-600')}>
-                    {testResult.ok ? '✅' : '❌'} {testResult.msg}
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
+          <p className="text-xs text-gray-400 mt-2">Emails will show your brand name and address. Delivery is always handled by the platform.</p>
         </div>
 
         {/* Save row */}

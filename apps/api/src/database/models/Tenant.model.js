@@ -82,16 +82,6 @@ const tenantSchema = new mongoose.Schema(
       fromName:  { type: String, default: null },   // "Sunrise Academy"
       fromEmail: { type: String, default: null },   // no-reply@sunriseacademy.com
       replyTo:   { type: String, default: null },   // support@sunriseacademy.com
-
-      smtp: {
-        host:       { type: String, default: null },
-        port:       { type: Number, default: 587 },
-        secure:     { type: Boolean, default: false }, // true = port 465
-        user:       { type: String, default: null },
-        passEncrypted: { type: String, default: null, select: false }, // AES-256 encrypted
-        verified:   { type: Boolean, default: false },
-        verifiedAt: { type: Date,    default: null },
-      },
     },
 
     // Bring-your-own payment gateway for course purchases (tenant is paid directly, platform takes no cut)

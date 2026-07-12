@@ -2,7 +2,6 @@ const tenantRepo = require('../../database/repositories/tenant.repository');
 const planRepo   = require('../../database/repositories/plan.repository');
 const AppError   = require('../../utils/AppError');
 const { encrypt, decrypt } = require('../../utils/crypto');
-const { testSmtpConnection } = require('../../services/email/email.service');
 const { getTenantStripeClient } = require('../../services/stripe/stripe');
 const Tenant = require('../../database/models/Tenant.model');
 
@@ -118,7 +117,7 @@ async function getStorageUsage(tenantId) {
   };
 }
 
-// ─── Get Email Settings (password masked) ────────────────────────────────────
+// ─── Get Email Settings ───────────────────────────────────────────────────────
 async function getEmailSettings(tenantId) {
   const tenant = await Tenant.findById(tenantId)
     .select('emailSettings')
@@ -126,84 +125,27 @@ async function getEmailSettings(tenantId) {
   if (!tenant) throw new AppError('Tenant not found', 404);
 
   const es = tenant.emailSettings || {};
-  const smtp = es.smtp || {};
 
   return {
     fromName:  es.fromName  || null,
     fromEmail: es.fromEmail || null,
     replyTo:   es.replyTo   || null,
-    smtp: {
-      host:      smtp.host      || null,
-      port:      smtp.port      || 587,
-      secure:    smtp.secure    || false,
-      user:      smtp.user      || null,
-      hasPassword: !!smtp.passEncrypted,   // never expose raw/encrypted value
-      verified:  smtp.verified  || false,
-      verifiedAt: smtp.verifiedAt || null,
-    },
   };
 }
 
 // ─── Save Email Settings ──────────────────────────────────────────────────────
 async function saveEmailSettings(tenantId, body) {
-  const { fromName, fromEmail, replyTo, smtp } = body;
+  const { fromName, fromEmail, replyTo } = body;
 
-  const update = { 'emailSettings.fromName': fromName || null,
-                   'emailSettings.fromEmail': fromEmail || null,
-                   'emailSettings.replyTo':   replyTo   || null };
-
-  if (smtp) {
-    update['emailSettings.smtp.host']   = smtp.host   || null;
-    update['emailSettings.smtp.port']   = smtp.port   || 587;
-    update['emailSettings.smtp.secure'] = smtp.secure || false;
-    update['emailSettings.smtp.user']   = smtp.user   || null;
-
-    // Only re-encrypt password if a new one was provided (non-empty string)
-    if (smtp.password && smtp.password.trim()) {
-      update['emailSettings.smtp.passEncrypted'] = encrypt(smtp.password.trim());
-      // Changing credentials resets verified status
-      update['emailSettings.smtp.verified']   = false;
-      update['emailSettings.smtp.verifiedAt'] = null;
-    }
-
-    // If SMTP host/user was cleared, also clear verification
-    if (!smtp.host || !smtp.user) {
-      update['emailSettings.smtp.verified']      = false;
-      update['emailSettings.smtp.verifiedAt']    = null;
-      update['emailSettings.smtp.passEncrypted'] = null;
-    }
-  }
-
-  const tenant = await Tenant.findByIdAndUpdate(
-    tenantId,
-    { $set: update },
-    { new: true, select: 'emailSettings' }
-  );
-
-  return getEmailSettings(tenantId);
-}
-
-// ─── Test SMTP Connection ─────────────────────────────────────────────────────
-async function testEmailSmtp(tenantId, { host, port, secure, user, password, fromEmail, toEmail }) {
-  if (!host || !user || !password) throw new AppError('host, user and password are required', 400);
-  if (!toEmail) throw new AppError('toEmail is required to receive the test email', 400);
-
-  try {
-    await testSmtpConnection({ host, port: port || 587, secure: secure || false,
-                                user, pass: password, fromEmail, toEmail });
-  } catch (err) {
-    throw new AppError(`SMTP test failed: ${err.message}`, 422);
-  }
-
-  // Mark as verified in DB
   await Tenant.findByIdAndUpdate(tenantId, {
     $set: {
-      'emailSettings.smtp.verified':   true,
-      'emailSettings.smtp.verifiedAt': new Date(),
+      'emailSettings.fromName':  fromName  || null,
+      'emailSettings.fromEmail': fromEmail || null,
+      'emailSettings.replyTo':   replyTo   || null,
     },
   });
 
-  return { verified: true, message: `Test email sent to ${toEmail}` };
+  return getEmailSettings(tenantId);
 }
 
 // ─── Get Payment Gateway Settings (secrets masked) ────────────────────────────
@@ -389,7 +331,6 @@ module.exports = {
   getStorageUsage,
   getEmailSettings,
   saveEmailSettings,
-  testEmailSmtp,
   getPaymentGatewaySettings,
   saveStripeGateway,
   saveSafepayGateway,
