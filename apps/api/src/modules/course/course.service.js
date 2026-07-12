@@ -1408,16 +1408,6 @@ async function importScorm(tenantId, courseId, fileBuffer, user) {
   const root = manifest?.manifest;
   if (!root) throw new AppError('Invalid SCORM manifest structure', 400);
 
-  // Build resource map: identifier → launchUrl
-  const resourceMap = {};
-  const resources = root.resources?.resource;
-  if (resources) {
-    const resArr = Array.isArray(resources) ? resources : [resources];
-    for (const r of resArr) {
-      if (r.identifier) resourceMap[r.identifier] = r.href || r['adlcp:href'] || null;
-    }
-  }
-
   // Navigate organization items
   const orgs = root.organizations?.organization;
   const org  = orgs ? (Array.isArray(orgs) ? orgs[0] : orgs) : null;
@@ -1437,18 +1427,24 @@ async function importScorm(tenantId, courseId, fileBuffer, user) {
     });
     results.sectionsCreated++;
 
-    // Leaf item with no children → treat as a single lesson
+    // Leaf item with no children → treat as a single lesson.
+    // NOTE: the manifest only tells us the SCO's launch path *inside the zip*
+    // (e.g. "scormcontent/lesson1.html") — it is not a real, servable URL, and
+    // this import does not extract/upload the zip's actual content files. So
+    // `file` is intentionally left null here rather than pointing it at a
+    // broken path that would 404 when a student opens the lesson. Only the
+    // course structure (sections/lesson titles) is imported; each lesson's
+    // real content still needs to be added manually.
     const lessonsToCreate = subItems.length > 0 ? subItems : [item];
     for (let li = 0; li < lessonsToCreate.length; li++) {
-      const sco    = lessonsToCreate[li];
-      const launch = resourceMap[sco.identifierref] || null;
+      const sco = lessonsToCreate[li];
       await lessonRepo.create({
         tenantId, courseId, sectionId: section._id,
         title: String(sco.title || `Lesson ${li + 1}`),
         type:  'file',
-        order: li, isPublished: true,
-        file:  launch ? { url: launch, provider: 'external', name: String(sco.title || 'SCORM Content') } : null,
-        notes: `SCORM SCO — original identifierref: ${sco.identifierref || 'N/A'}`,
+        order: li, isPublished: false,
+        file:  null,
+        notes: `Imported from SCORM — original identifierref: ${sco.identifierref || 'N/A'}. Add this lesson's real content (video/file/text) manually.`,
         createdBy: user.sub,
       });
       results.lessonsCreated++;
@@ -1456,6 +1452,7 @@ async function importScorm(tenantId, courseId, fileBuffer, user) {
   }
 
   await recalcCourseCounters(tenantId, courseId);
+  results.note = 'Only the course structure (sections and lesson titles) was imported — SCORM content files are not yet supported. Each lesson was left unpublished; add its real content and publish it manually.';
   return results;
 }
 

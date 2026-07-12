@@ -554,11 +554,13 @@ function ManagementTable() {
       });
     },
     onSuccess: (res) => {
-      const { sectionsCreated, lessonsCreated } = res.data.data;
-      setScormSuccess(`SCORM imported: ${sectionsCreated} sections, ${lessonsCreated} lessons added`);
+      const { sectionsCreated, lessonsCreated, note } = res.data.data;
+      setScormSuccess(
+        `Structure imported: ${sectionsCreated} sections, ${lessonsCreated} lessons added (left unpublished). ${note ?? ''}`
+      );
       queryClient.invalidateQueries({ queryKey: ['courses'] });
       setScormTargetId(null);
-      setTimeout(() => setScormSuccess(''), 5000);
+      setTimeout(() => setScormSuccess(''), 12000);
     },
   });
 
@@ -581,7 +583,7 @@ function ManagementTable() {
         )}
       </div>
 
-      {scormSuccess && <Alert variant="success">{scormSuccess}</Alert>}
+      {scormSuccess && <Alert variant="warning">{scormSuccess}</Alert>}
 
       {/* Hidden SCORM file picker — triggered per-row */}
       <input
