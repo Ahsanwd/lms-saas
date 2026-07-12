@@ -317,6 +317,23 @@ const features = [
 
 const plans = [
   {
+    name: 'Free',
+    slug: 'free',
+    monthlyPrice: 0,
+    yearlyPrice: 0,
+    description: '14-day trial to explore the platform before you commit.',
+    features: [
+      'Up to 50 students',
+      '3 instructors',
+      '5 courses',
+      '2 GB storage',
+      'Basic courses',
+      'Email support',
+      '🔒 Cloudflare Stream video (Basic & Pro only)',
+    ],
+    highlighted: false,
+  },
+  {
     name: 'Basic',
     slug: 'basic',
     monthlyPrice: 29,
@@ -474,7 +491,7 @@ function PlatformLandingPage() {
             </div>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-8 max-w-3xl mx-auto">
+          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
             {plans.map((plan) => (
               <div
                 key={plan.slug}
@@ -496,12 +513,20 @@ function PlatformLandingPage() {
                   {plan.description}
                 </p>
                 <div className="mb-6">
-                  <span className={`text-4xl font-extrabold ${plan.highlighted ? 'text-white' : 'text-gray-900'}`}>
-                    ${yearly ? plan.yearlyPrice : plan.monthlyPrice}
-                  </span>
-                  <span className={`text-sm ml-1 ${plan.highlighted ? 'text-indigo-200' : 'text-gray-400'}`}>
-                    /{yearly ? 'year' : 'month'}
-                  </span>
+                  {plan.monthlyPrice === 0 ? (
+                    <span className={`text-4xl font-extrabold ${plan.highlighted ? 'text-white' : 'text-gray-900'}`}>
+                      Free
+                    </span>
+                  ) : (
+                    <>
+                      <span className={`text-4xl font-extrabold ${plan.highlighted ? 'text-white' : 'text-gray-900'}`}>
+                        ${yearly ? plan.yearlyPrice : plan.monthlyPrice}
+                      </span>
+                      <span className={`text-sm ml-1 ${plan.highlighted ? 'text-indigo-200' : 'text-gray-400'}`}>
+                        /{yearly ? 'year' : 'month'}
+                      </span>
+                    </>
+                  )}
                 </div>
                 <ul className="space-y-3 mb-8 flex-1">
                   {plan.features.map((feat) => (
@@ -524,7 +549,7 @@ function PlatformLandingPage() {
                       : 'bg-indigo-600 text-white hover:bg-indigo-700'
                   }`}
                 >
-                  Start Free Trial
+                  {plan.monthlyPrice === 0 ? 'Get Started Free' : 'Start Free Trial'}
                 </Link>
               </div>
             ))}
