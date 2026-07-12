@@ -523,9 +523,18 @@ function ManagementTable() {
     staleTime: 30000,
   });
 
+  const [deleteError, setDeleteError] = useState('');
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/courses/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['courses'] }),
+    onSuccess: () => {
+      setDeleteError('');
+      queryClient.invalidateQueries({ queryKey: ['courses'] });
+    },
+    onError: (err: AxiosError<{ message: string }>) => {
+      setDeleteError(err.response?.data?.message ?? 'Failed to delete course');
+      setTimeout(() => setDeleteError(''), 6000);
+    },
   });
 
   const publishMutation = useMutation({
@@ -584,6 +593,7 @@ function ManagementTable() {
       </div>
 
       {scormSuccess && <Alert variant="warning">{scormSuccess}</Alert>}
+      {deleteError && <Alert variant="error">{deleteError}</Alert>}
 
       {/* Hidden SCORM file picker — triggered per-row */}
       <input
