@@ -920,15 +920,24 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
                   </div>
                 )}
 
-                {/* Rich text editor — Visual/HTML toggle built in */}
-                <div className="p-4">
-                  <RichTextEditor
-                    value={content}
-                    onChange={setContent}
-                    placeholder="Start writing your lesson content…"
-                    minHeight={280}
-                  />
-                </div>
+                {textEditorMode === 'write' ? (
+                  <div className="p-4">
+                    <RichTextEditor
+                      value={content}
+                      onChange={setContent}
+                      placeholder="Start writing your lesson content…"
+                      minHeight={280}
+                    />
+                  </div>
+                ) : (
+                  <div className="p-4 bg-white overflow-y-auto" style={{ minHeight: 280 }}>
+                    {content.trim() ? (
+                      <SmartContent content={content} />
+                    ) : (
+                      <p className="text-sm text-gray-400 italic">Nothing to preview yet — switch to Write and add some content.</p>
+                    )}
+                  </div>
+                )}
 
                 {/* Footer */}
                 <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-t border-gray-100">
