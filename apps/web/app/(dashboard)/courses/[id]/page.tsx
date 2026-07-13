@@ -1195,26 +1195,11 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
 
                 {/* Security + How-to guide — changes per source */}
                 {audioSource === 'upload' && (
-                  <div className="rounded-xl bg-green-50 border border-green-200 overflow-hidden">
-                    <div className="flex items-start gap-3 px-4 py-3">
-                      <svg className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
-                      </svg>
-                      <div>
-                        <p className="text-xs font-bold text-green-800">🔒 Secure &amp; Enrollment-Gated — Recommended</p>
-                        <p className="text-xs text-green-700 mt-0.5 leading-relaxed">Audio is stored on your private server. Students get a signed link that expires in 2 hours — it cannot be shared, forwarded, or downloaded. Only enrolled students can access it.</p>
-                      </div>
-                    </div>
-                    <div className="border-t border-green-200 bg-green-100/50 px-4 py-3">
-                      <p className="text-[11px] font-bold text-green-800 uppercase tracking-wide mb-2">How to use</p>
-                      <ol className="space-y-1.5 text-xs text-green-800">
-                        <li className="flex gap-2"><span className="font-bold flex-shrink-0">1.</span><span>Record your lecture using any tool — <strong>Audacity</strong> (free), GarageBand, Zoom recording, or your phone's voice recorder.</span></li>
-                        <li className="flex gap-2"><span className="font-bold flex-shrink-0">2.</span><span>Export as <strong>MP3</strong> for the smallest file size, or <strong>WAV / M4A</strong> for higher quality.</span></li>
-                        <li className="flex gap-2"><span className="font-bold flex-shrink-0">3.</span><span>Click the upload zone below (or drag your file in). Supported: MP3, WAV, M4A, OGG, FLAC — up to 500 MB.</span></li>
-                        <li className="flex gap-2"><span className="font-bold flex-shrink-0">4.</span><span>Click <strong>Save Lesson</strong> — the file uploads automatically and is stored securely.</span></li>
-                        <li className="flex gap-2"><span className="font-bold flex-shrink-0">5.</span><span>Students will be served a private time-limited streaming link — no download button is shown.</span></li>
-                      </ol>
-                    </div>
+                  <div className="rounded-xl bg-green-50 border border-green-200 px-4 py-2.5 flex items-center gap-2">
+                    <svg className="w-4 h-4 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                    </svg>
+                    <p className="text-xs font-medium text-green-800">🔒 Secure — signed link, enrollment-gated, no download. Up to 500MB (MP3, WAV, M4A, OGG, FLAC).</p>
                   </div>
                 )}
 
