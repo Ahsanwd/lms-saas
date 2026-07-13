@@ -697,6 +697,100 @@ export function ContactFormSection({
   );
 }
 
+// ─── Course Application ────────────────────────────────────────────────────────
+// Distinct from ContactFormSection above — a visitor picks a specific course
+// they want to join. The course list comes from the courses prop already
+// threaded through PageSectionsRenderer (same one CoursesGrid uses), not from
+// section-level config.
+
+export interface CourseApplicationData {
+  heading: string;
+  subheading: string;
+}
+
+export function CourseApplicationSection({
+  data, courses, subdomain, pageId, linksDisabled,
+}: {
+  data: CourseApplicationData;
+  courses: PublicCourse[];
+  subdomain?: string;
+  pageId?: string;
+  linksDisabled?: boolean;
+}) {
+  const [form, setForm] = useState({ name: '', email: '', phone: '', gender: '', courseId: '' });
+  const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+
+  if (!data) return null;
+
+  const set = (field: keyof typeof form, value: string) => setForm((prev) => ({ ...prev, [field]: value }));
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (linksDisabled) return; // builder preview — inert
+    setStatus('submitting');
+    try {
+      const recaptchaToken = await executeRecaptcha('course_application').catch(() => '');
+      await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/course-applications/submit`,
+        { ...form, pageId, recaptchaToken },
+        { headers: { 'X-Tenant-Subdomain': subdomain || '' } }
+      );
+      setStatus('success');
+      setForm({ name: '', email: '', phone: '', gender: '', courseId: '' });
+    } catch {
+      setStatus('error');
+    }
+  }
+
+  const inputCls = 'w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400';
+
+  return (
+    <section id="course-application" className="py-14 px-6 bg-gray-50 scroll-mt-16">
+      <div className="max-w-xl mx-auto">
+        {(data.heading || data.subheading) && (
+          <div className="text-center mb-8">
+            {data.heading && <h2 className="text-2xl font-bold text-gray-900">{data.heading}</h2>}
+            {data.subheading && <p className="text-gray-500 mt-2">{data.subheading}</p>}
+          </div>
+        )}
+        {status === 'success' ? (
+          <div className="text-center py-10 bg-white rounded-2xl border border-gray-200">
+            <p className="text-lg font-semibold text-gray-900">Thanks — your application has been submitted!</p>
+            <p className="text-sm text-gray-500 mt-1">We'll be in touch once it's reviewed.</p>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4">
+            <input required value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="Your name" className={inputCls} />
+            <input required type="email" value={form.email} onChange={(e) => set('email', e.target.value)} placeholder="Your email" className={inputCls} />
+            <input value={form.phone} onChange={(e) => set('phone', e.target.value)} placeholder="Phone number" className={inputCls} />
+            <select value={form.gender} onChange={(e) => set('gender', e.target.value)} className={inputCls}>
+              <option value="">Gender (optional)</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="other">Other</option>
+            </select>
+            <select required value={form.courseId} onChange={(e) => set('courseId', e.target.value)} className={inputCls}>
+              <option value="">Select a course…</option>
+              {courses.map((c) => (
+                <option key={c._id} value={c._id}>{c.title}</option>
+              ))}
+            </select>
+            {status === 'error' && <p className="text-sm text-red-600">Something went wrong — please try again.</p>}
+            <button
+              type="submit"
+              disabled={status === 'submitting'}
+              className="w-full bg-primary-600 text-white text-sm font-semibold py-3 rounded-xl hover:bg-primary-700 transition-colors disabled:opacity-60 cursor-pointer"
+            >
+              {status === 'submitting' ? 'Submitting…' : 'Submit Application'}
+            </button>
+            {linksDisabled && <p className="text-xs text-gray-400 text-center">Preview mode — submissions are disabled here.</p>}
+          </form>
+        )}
+      </div>
+    </section>
+  );
+}
+
 // ─── Footer ───────────────────────────────────────────────────────────────────
 
 export function LandingFooter({ displayName, linksDisabled }: { displayName: string; linksDisabled?: boolean }) {
@@ -721,7 +815,7 @@ export function LandingFooter({ displayName, linksDisabled }: { displayName: str
 
 export interface PageSection {
   _id?: string; // Mongoose-assigned; absent for a section not yet saved
-  type: 'hero' | 'about' | 'coursesSection' | 'testimonials' | 'cta' | 'contact' | 'custom' | 'contactForm';
+  type: 'hero' | 'about' | 'coursesSection' | 'testimonials' | 'cta' | 'contact' | 'custom' | 'contactForm' | 'courseApplication';
   order: number;
   data: unknown;
 }
@@ -798,6 +892,8 @@ export function PageSectionsRenderer({
             return <CustomCodeSection key={i} data={section.data as CustomCodeData} />;
           case 'contactForm':
             return <ContactFormSection key={i} data={section.data as ContactFormData} subdomain={subdomain} pageId={pageId} linksDisabled={linksDisabled} />;
+          case 'courseApplication':
+            return <CourseApplicationSection key={i} data={section.data as CourseApplicationData} courses={courses} subdomain={subdomain} pageId={pageId} linksDisabled={linksDisabled} />;
           default:
             return null;
         }

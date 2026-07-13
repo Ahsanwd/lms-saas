@@ -69,6 +69,7 @@ function validateSections(sections) {
   const seenFixedTypes = new Set();
   let customCount = 0;
   let contactFormCount = 0;
+  let courseApplicationCount = 0;
 
   for (const section of sections) {
     if (FIXED_SECTION_TYPES.includes(section.type)) {
@@ -89,6 +90,10 @@ function validateSections(sections) {
       const { recipientEmail } = section.data || {};
       if (recipientEmail && (typeof recipientEmail !== 'string' || recipientEmail.length > 200 || !EMAIL_RE.test(recipientEmail)))
         throw new AppError('Invalid recipient email override', 400);
+    } else if (section.type === 'courseApplication') {
+      courseApplicationCount += 1;
+      if (courseApplicationCount > 1)
+        throw new AppError('Only one "courseApplication" section is allowed per page', 400);
     } else {
       throw new AppError(`Unknown section type "${section.type}"`, 400);
     }

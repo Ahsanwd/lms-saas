@@ -34,6 +34,11 @@ router.use('/tenant/pages', require('../modules/tenantPage/tenantPage.routes'));
 router.use('/tenant/contact-submissions', require('../modules/contactSubmission/contactSubmission.routes'));
 router.use('/tenant',  require('../modules/tenant/tenant.routes'));
 
+// Same rationale as /tenant/contact-submissions above — a public application
+// form (and the admin's ability to review it) shouldn't be blocked by a
+// lapsed plan, so this is mounted before requireActivePlan too.
+router.use('/course-applications', require('../modules/courseApplication/courseApplication.routes'));
+
 // All other operational routes require an active (non-expired) plan.
 router.use(requireActivePlan);
 

@@ -15,19 +15,20 @@ import {
   type Testimonial,
   type CustomCodeData,
   type ContactFormData,
+  type CourseApplicationData,
 } from '@/components/website/LandingPageSections';
 
 // Fixed types: 0-or-1 per page. 'custom' is the one repeatable type — any
 // number of Custom Code sections are allowed per page.
-type FixedSectionType = 'hero' | 'about' | 'coursesSection' | 'testimonials' | 'cta' | 'contact' | 'contactForm';
+type FixedSectionType = 'hero' | 'about' | 'coursesSection' | 'testimonials' | 'cta' | 'contact' | 'contactForm' | 'courseApplication';
 type SectionType = FixedSectionType | 'custom';
 type InstituteType = 'school' | 'academy' | 'college' | 'university';
 
-const SECTION_TYPE_ORDER: FixedSectionType[] = ['hero', 'about', 'coursesSection', 'testimonials', 'cta', 'contact', 'contactForm'];
+const SECTION_TYPE_ORDER: FixedSectionType[] = ['hero', 'about', 'coursesSection', 'testimonials', 'cta', 'contact', 'contactForm', 'courseApplication'];
 const SECTION_LABELS: Record<SectionType, string> = {
   hero: 'Hero', about: 'About', coursesSection: 'Courses Section',
   testimonials: 'Testimonials', cta: 'Call To Action', contact: 'Contact', custom: 'Custom Code',
-  contactForm: 'Contact Form',
+  contactForm: 'Contact Form', courseApplication: 'Course Application',
 };
 
 const DEFAULT_SECTION_DATA: Record<SectionType, unknown> = {
@@ -39,6 +40,7 @@ const DEFAULT_SECTION_DATA: Record<SectionType, unknown> = {
   contact: { email: '', phone: '', address: '' },
   custom: { html: '', css: '', js: '', heightPx: 400, isEnabled: true } as CustomCodeData,
   contactForm: { heading: 'Get in touch', subheading: '', fields: { name: true, phone: false, subject: true }, recipientEmail: null } as ContactFormData,
+  courseApplication: { heading: 'Apply Now', subheading: '' } as CourseApplicationData,
 };
 
 const INSTITUTE_LABELS: Record<InstituteType, string> = {
@@ -841,6 +843,23 @@ function PageEditorScreen({ pageId, onBack }: { pageId: string; onBack: () => vo
                           onChange={(e) => setSectionFieldAt<ContactFormData>(idx, 'recipientEmail', e.target.value || null)}
                           placeholder="Defaults to your account's contact email" />
                       </div>
+                    </>
+                    );
+                  })()}
+
+                  {section.type === 'courseApplication' && (() => {
+                    const appData = section.data as CourseApplicationData;
+                    return (
+                    <>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Heading</label>
+                        <input className={inputCls} value={appData.heading} onChange={(e) => setSectionFieldAt<CourseApplicationData>(idx, 'heading', e.target.value)} placeholder="Apply Now" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Subheading</label>
+                        <input className={inputCls} value={appData.subheading} onChange={(e) => setSectionFieldAt<CourseApplicationData>(idx, 'subheading', e.target.value)} placeholder="Optional subheading" />
+                      </div>
+                      <p className="text-xs text-gray-400">Name, Email, and Course are always shown. Phone and Gender are optional for the visitor to fill.</p>
                     </>
                     );
                   })()}

@@ -157,6 +157,11 @@ const MailIcon = () => (
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
   </svg>
 );
+const ClipboardCheckIcon = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-5 9l2 2 4-4" />
+  </svg>
+);
 const ChevronIcon = ({ open }: { open: boolean }) => (
   <svg className={cn('w-4 h-4 flex-shrink-0 text-gray-400 transition-transform duration-200', open && 'rotate-90')}
     fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -207,6 +212,7 @@ const NAV_ENTRIES: NavEntry[] = [
       { href: '/chat',          label: 'Chat',           icon: <ChatIcon />,      roles: ['tenant_admin', 'instructor', 'student'], badge: 'chat-count' },
       { href: '/announcements', label: 'Announcements',  icon: <MegaphoneIcon />, roles: ['tenant_admin', 'instructor', 'student'] },
       { href: '/contact-submissions', label: 'Contact Submissions', icon: <MailIcon />, roles: ['tenant_admin'] },
+      { href: '/course-applications', label: 'Course Applications', icon: <ClipboardCheckIcon />, roles: ['tenant_admin'] },
       { href: '/groups',        label: 'Groups',         icon: <GroupIcon />,     roles: ['tenant_admin'] },
       { href: '/cohorts',       label: 'Cohorts',        icon: <CohortIcon />,    roles: ['tenant_admin'] },
     ],
