@@ -356,6 +356,9 @@ router.post('/:id/scorm-import', requirePermission('course:update'), scormUpload
 
 // ── Cohorts ───────────────────────────────────────────────────────────────────
 router.use('/:courseId/cohorts', require('../cohort/cohort.routes'));
+// Student-facing — no requirePermission, service resolves everything from the
+// caller's own userId, same pattern as /:id/progress below.
+router.get('/:id/my-cohort', require('../cohort/cohort.controller').myCohort);
 
 // ── Waitlist ───────────────────────────────────────────────────────────────────
 router.use('/:courseId/waitlist', require('../waitlist/waitlist.routes'));

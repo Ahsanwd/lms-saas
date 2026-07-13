@@ -83,4 +83,11 @@ async function report(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { listAll, getOne, list, create, update, remove, enroll, students, graduate, graduateAll, report };
+async function myCohort(req, res, next) {
+  try {
+    const data = await svc.getMyCohort(req.tenant.tenantId, req.params.id, req.user.sub);
+    R.success(res, data);
+  } catch (err) { next(err); }
+}
+
+module.exports = { listAll, getOne, list, create, update, remove, enroll, students, graduate, graduateAll, report, myCohort };

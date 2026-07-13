@@ -112,6 +112,10 @@ const lessonSchema = new mongoose.Schema(
 
       // Zoom auto-created meeting ID (used to regenerate/delete via API)
       zoomMeetingId: { type: String, default: null },
+
+      // Restricts this session to one batch. null (default, every existing
+      // lesson) means visible to every enrolled student, same as today.
+      cohortId: { type: mongoose.Schema.Types.ObjectId, ref: 'Cohort', default: null },
     },
 
     // Attachments available for any lesson type

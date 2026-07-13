@@ -11,7 +11,9 @@ import { cn, avatarColor, getInitials } from '@/lib/utils';
 
 interface Author { _id: string; firstName: string; lastName: string; avatar?: string; }
 interface AnnouncementCourse { _id: string; title: string; }
+interface AnnouncementCohort { _id: string; name: string; }
 interface CourseOption { _id: string; title: string; }
+interface CohortOption { _id: string; name: string; }
 
 interface Announcement {
   _id: string;
@@ -19,6 +21,7 @@ interface Announcement {
   body: string;
   authorId: Author;
   courseId?: AnnouncementCourse;
+  cohortId?: AnnouncementCohort;
   isPublished: boolean;
   publishedAt?: string;
   scheduledPublishAt?: string;
@@ -156,8 +159,11 @@ function AnnouncementModal({
 
   const [title,       setTitle]       = useState(announcement?.title ?? '');
   const [body,        setBody]        = useState(announcement?.body  ?? '');
-  const [scope,       setScope]       = useState<'tenant' | 'course'>(announcement?.courseId ? 'course' : 'tenant');
+  const [scope,       setScope]       = useState<'tenant' | 'course' | 'cohort'>(
+    announcement?.cohortId ? 'cohort' : announcement?.courseId ? 'course' : 'tenant'
+  );
   const [courseId,    setCourseId]    = useState(announcement?.courseId?._id ?? '');
+  const [cohortId,    setCohortId]    = useState(announcement?.cohortId?._id ?? '');
   const [useSchedule, setUseSchedule] = useState(!!announcement?.scheduledPublishAt);
   const [scheduledAt, setScheduledAt] = useState(() => {
     if (!announcement?.scheduledPublishAt) return '';
@@ -174,12 +180,22 @@ function AnnouncementModal({
   });
   const courses = coursesRaw ?? [];
 
+  const { data: cohortsRaw } = useQuery({
+    queryKey: ['cohorts-for-announcement', courseId],
+    queryFn: () =>
+      api.get(`/courses/${courseId}/cohorts`)
+        .then(r => r.data?.data?.cohorts as CohortOption[]),
+    enabled: scope === 'cohort' && !!courseId,
+  });
+  const cohorts = cohortsRaw ?? [];
+
   const mutation = useMutation({
     mutationFn: () => {
       const payload: Record<string, unknown> = {
         title,
         body,
-        courseId: scope === 'course' ? courseId || null : null,
+        courseId: scope !== 'tenant' ? courseId || null : null,
+        cohortId: scope === 'cohort' ? cohortId || null : null,
       };
 
       if (useSchedule && scheduledAt) {
@@ -199,7 +215,8 @@ function AnnouncementModal({
   const minDatetime = new Date(Date.now() + 5 * 60 * 1000).toISOString().slice(0, 16);
   const saveLabel   = useSchedule && scheduledAt ? 'Save & Schedule' : 'Save';
   const canSave     = title.trim() && body.trim()
-    && (scope !== 'course' || !!courseId)
+    && (scope === 'tenant' || !!courseId)
+    && (scope !== 'cohort' || !!cohortId)
     && (!useSchedule || !!scheduledAt);
 
   return (
@@ -226,30 +243,42 @@ function AnnouncementModal({
           <div>
             <p className="text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Audience</p>
             <div className="flex gap-2">
-              {(['tenant', 'course'] as const).map((s) => (
+              {(['tenant', 'course', 'cohort'] as const).map((s) => (
                 <button
                   key={s}
                   type="button"
-                  onClick={() => setScope(s)}
+                  onClick={() => { setScope(s); if (s !== 'cohort') setCohortId(''); }}
                   className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
                     scope === s
                       ? 'bg-primary-50 border-primary-400 text-primary-700'
                       : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                   }`}
                 >
-                  {s === 'tenant' ? 'Tenant-wide' : 'Specific Course'}
+                  {s === 'tenant' ? 'Tenant-wide' : s === 'course' ? 'Specific Course' : 'Specific Batch'}
                 </button>
               ))}
             </div>
-            {scope === 'course' && (
+            {(scope === 'course' || scope === 'cohort') && (
               <select
                 value={courseId}
-                onChange={(e) => setCourseId(e.target.value)}
+                onChange={(e) => { setCourseId(e.target.value); setCohortId(''); }}
                 className="mt-2 w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               >
                 <option value="">Select a course…</option>
                 {courses.map((c) => (
                   <option key={c._id} value={c._id}>{c.title}</option>
+                ))}
+              </select>
+            )}
+            {scope === 'cohort' && courseId && (
+              <select
+                value={cohortId}
+                onChange={(e) => setCohortId(e.target.value)}
+                className="mt-2 w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              >
+                <option value="">Select a batch…</option>
+                {cohorts.map((c) => (
+                  <option key={c._id} value={c._id}>{c.name}</option>
                 ))}
               </select>
             )}
@@ -361,8 +390,13 @@ function DetailModal({ announcement, onClose }: { announcement: Announcement; on
           </div>
           <div className="flex-1 min-w-0">
             {announcement.courseId && (
-              <span className="inline-flex items-center px-2.5 py-0.5 mb-1.5 bg-primary-50 text-primary-700 rounded-full text-xs font-medium">
+              <span className="inline-flex items-center px-2.5 py-0.5 mb-1.5 mr-1.5 bg-primary-50 text-primary-700 rounded-full text-xs font-medium">
                 {announcement.courseId.title}
+              </span>
+            )}
+            {announcement.cohortId && (
+              <span className="inline-flex items-center px-2.5 py-0.5 mb-1.5 bg-violet-50 text-violet-700 rounded-full text-xs font-medium">
+                {announcement.cohortId.name}
               </span>
             )}
             <h2 className="text-lg font-bold text-gray-900 leading-snug">{announcement.title}</h2>
@@ -447,6 +481,11 @@ function AnnouncementCard({
               {announcement.courseId && (
                 <span className="inline-flex items-center px-2.5 py-0.5 bg-primary-50 text-primary-700 rounded-full text-xs font-medium">
                   {announcement.courseId.title}
+                </span>
+              )}
+              {announcement.cohortId && (
+                <span className="inline-flex items-center px-2.5 py-0.5 bg-violet-50 text-violet-700 rounded-full text-xs font-medium">
+                  {announcement.cohortId.name}
                 </span>
               )}
             </div>

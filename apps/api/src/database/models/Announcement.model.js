@@ -9,6 +9,10 @@ const announcementSchema = new mongoose.Schema(
     body:        { type: String, required: true },
     authorId:    { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     courseId:    { type: mongoose.Schema.Types.ObjectId, ref: 'Course', default: null },
+    // Narrows an already course-scoped announcement to just one batch. A
+    // cohort always belongs to exactly one course, so this is only ever set
+    // alongside a matching courseId (enforced in announcement.service.js).
+    cohortId:    { type: mongoose.Schema.Types.ObjectId, ref: 'Cohort', default: null },
     isPublished:        { type: Boolean, default: false },
     publishedAt:        { type: Date, default: null },
     scheduledPublishAt: { type: Date, default: null },

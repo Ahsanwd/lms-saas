@@ -6,6 +6,8 @@ const categoryRepo = require('../../database/repositories/category.repository');
 const enrollmentRepo = require('../../database/repositories/enrollment.repository');
 const progressRepo = require('../../database/repositories/progress.repository');
 const userRepo = require('../../database/repositories/user.repository');
+const cohortMemberRepo = require('../../database/repositories/cohortMember.repository');
+const Cohort = require('../../database/models/Cohort.model');
 const { getPublicUrl, deleteFile, getFileSizeBytes } = require('../../services/storage/storage.service');
 const AppError = require('../../utils/AppError');
 const logger   = require('../../utils/logger');
@@ -263,9 +265,11 @@ async function getSections(tenantId, courseId, user) {
 
   // For drip content: find student's enrollment date if applicable
   let enrolledAt = null;
+  let myCohortIds = null;
   if (!isEditor && user.role === 'student') {
     const enrollment = await enrollmentRepo.findByUserAndCourse(tenantId, user.sub, courseId);
     enrolledAt = enrollment?.enrolledAt ?? null;
+    myCohortIds = new Set(await cohortMemberRepo.findUserCohortIds(tenantId, user.sub, courseId));
   }
 
   return visibleSections.map(section => {
@@ -277,7 +281,13 @@ async function getSections(tenantId, courseId, user) {
         // course's own status — otherwise a draft lesson added to an already-
         // published course would show to students immediately regardless of
         // its own toggle.
-        return isEditor || l.isPublished;
+        if (!isEditor && !l.isPublished) return false;
+        // A live-class lesson restricted to one batch is invisible to every
+        // other student, same enforcement point as isPublished above.
+        if (!isEditor && l.type === 'live' && l.liveClass?.cohortId) {
+          return myCohortIds.has(l.liveClass.cohortId.toString());
+        }
+        return true;
       })
       .map(l => {
         const lessonObj = l.toObject ? l.toObject() : { ...l };
@@ -368,6 +378,11 @@ async function createLesson(tenantId, courseId, sectionId, data, user) {
   const section = await sectionRepo.findById(tenantId, sectionId);
   if (!section || section.courseId.toString() !== courseId) throw new AppError('Section not found', 404);
 
+  if (data.liveClass?.cohortId) {
+    const cohort = await Cohort.findOne({ _id: data.liveClass.cohortId, tenantId, courseId });
+    if (!cohort) throw new AppError('Cohort not found for this course', 400);
+  }
+
   const existing = await lessonRepo.findBySection(tenantId, courseId, sectionId);
   const order = existing.length;
 
@@ -411,9 +426,14 @@ async function updateLesson(tenantId, courseId, sectionId, lessonId, data, user)
   }
   let newScheduledAt = null;
   if (data.liveClass !== undefined) {
+    if (data.liveClass.cohortId) {
+      const cohort = await Cohort.findOne({ _id: data.liveClass.cohortId, tenantId, courseId });
+      if (!cohort) throw new AppError('Cohort not found for this course', 400);
+    }
     for (const k of ['meetingUrl', 'platform', 'scheduledAt', 'durationMinutes', 'instructions']) {
       if (data.liveClass[k] !== undefined) update[`liveClass.${k}`] = data.liveClass[k];
     }
+    if (data.liveClass.cohortId !== undefined) update['liveClass.cohortId'] = data.liveClass.cohortId || null;
     if (data.liveClass.scheduledAt) newScheduledAt = new Date(data.liveClass.scheduledAt);
   }
   // Video source + settings update (non-upload path — URL/embed/settings changes)

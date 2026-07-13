@@ -1,8 +1,11 @@
 const announcementRepo = require('../../database/repositories/announcement.repository');
+const cohortMemberRepo = require('../../database/repositories/cohortMember.repository');
 const AppError         = require('../../utils/AppError');
 const Enrollment       = require('../../database/models/Enrollment.model');
 const User             = require('../../database/models/User.model');
 const Tenant           = require('../../database/models/Tenant.model');
+const Cohort           = require('../../database/models/Cohort.model');
+const CohortMember     = require('../../database/models/CohortMember.model');
 
 function canManage(announcement, user) {
   if (user.permissions.includes('announcement:manage')) return true;
@@ -18,9 +21,13 @@ async function _triggerPublishNotifications(tenantId, existing) {
     const tenantName = tenant?.name || 'Learning Platform';
     const courseId   = existing.courseId?._id?.toString() ?? null;
     const courseName = existing.courseId?.title ?? null;
+    const cohortId   = existing.cohortId?._id?.toString() ?? existing.cohortId?.toString() ?? null;
 
     let userIds = [];
-    if (courseId) {
+    if (cohortId) {
+      const members = await CohortMember.find({ tenantId, cohortId, status: { $ne: 'dropped' } }).distinct('userId');
+      userIds = members.map(id => id.toString());
+    } else if (courseId) {
       const enrollments = await Enrollment.find({ tenantId, courseId, status: 'active' }).distinct('userId');
       userIds = enrollments.map(id => id.toString());
     } else {
@@ -65,6 +72,14 @@ async function listAnnouncements(tenantId, user, query) {
   if (!canSeeAll) filter.isPublished = true;
   if (query.courseId) filter.courseId = query.courseId;
   const announcements = await announcementRepo.findAll(tenantId, filter);
+
+  if (!canSeeAll && announcements.some(a => a.cohortId)) {
+    const myCohortIds = new Set(await cohortMemberRepo.findUserCohortIdsAcrossTenant(tenantId, user.sub));
+    return {
+      announcements: announcements.filter(a => !a.cohortId || myCohortIds.has(a.cohortId._id.toString())),
+    };
+  }
+
   return { announcements };
 }
 
@@ -77,6 +92,13 @@ async function getAnnouncement(tenantId, id, user) {
   return { announcement };
 }
 
+async function _resolveCohortId(tenantId, courseId, cohortId) {
+  if (!cohortId) return null;
+  const cohort = await Cohort.findOne({ _id: cohortId, tenantId, courseId });
+  if (!cohort) throw new AppError('Cohort not found for this course', 400);
+  return cohortId;
+}
+
 async function createAnnouncement(tenantId, body, user) {
   const data = {
     tenantId,
@@ -84,6 +106,7 @@ async function createAnnouncement(tenantId, body, user) {
     body:     body.body.trim(),
     authorId: user.sub,
     courseId: body.courseId || null,
+    cohortId: await _resolveCohortId(tenantId, body.courseId || null, body.cohortId || null),
   };
 
   let scheduledPublishAt = null;
@@ -111,6 +134,12 @@ async function updateAnnouncement(tenantId, id, body, user) {
   if (body.title    !== undefined) update.title    = body.title.trim();
   if (body.body     !== undefined) update.body     = body.body.trim();
   if (body.courseId !== undefined) update.courseId = body.courseId || null;
+  if (body.cohortId !== undefined) {
+    const effectiveCourseId = body.courseId !== undefined
+      ? (body.courseId || null)
+      : (existing.courseId?._id ?? existing.courseId ?? null);
+    update.cohortId = await _resolveCohortId(tenantId, effectiveCourseId, body.cohortId || null);
+  }
 
   let newScheduledAt = null;
   if ('scheduledPublishAt' in body) {

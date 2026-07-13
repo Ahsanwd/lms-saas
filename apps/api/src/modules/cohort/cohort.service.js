@@ -227,6 +227,39 @@ async function graduateAll(tenantId, cohortId, actingUser) {
   return { graduated: count };
 }
 
+// ─── Student: my own batch (name/dates/own progress + batchmates roster) ──────
+// Deliberately exposes only batchmates' names/avatars, not their individual
+// progress — that level of detail stays admin-only via getCohortStudents.
+async function getMyCohort(tenantId, courseId, userId) {
+  const member = await CohortMember.findOne({ tenantId, courseId, userId, status: { $ne: 'dropped' } }).lean();
+  if (!member) return { cohort: null };
+
+  const cohort = await Cohort.findOne({ _id: member.cohortId, tenantId }).lean();
+  if (!cohort) return { cohort: null };
+
+  const [progress, members] = await Promise.all([
+    CourseProgress.findOne({ tenantId, courseId, userId }).lean(),
+    CohortMember.find({ tenantId, cohortId: cohort._id, status: { $ne: 'dropped' } })
+      .populate('userId', 'firstName lastName avatar')
+      .lean(),
+  ]);
+
+  return {
+    cohort: {
+      _id: cohort._id, name: cohort.name, description: cohort.description,
+      startDate: cohort.startDate, endDate: cohort.endDate, status: cohort.status,
+    },
+    myProgress: {
+      percentage: progress?.percentage ?? 0,
+      completedLessons: progress?.completedLessons ?? 0,
+      totalLessons: progress?.totalLessons ?? 0,
+    },
+    batchmates: members
+      .filter(m => m.userId && m.userId._id.toString() !== userId.toString())
+      .map(m => ({ firstName: m.userId.firstName, lastName: m.userId.lastName, avatar: m.userId.avatar })),
+  };
+}
+
 // ─── Cohort report ────────────────────────────────────────────────────────────
 async function getCohortReport(tenantId, cohortId) {
   const cohort = await Cohort.findOne({ _id: cohortId, tenantId })
@@ -314,6 +347,6 @@ async function getCohortReport(tenantId, cohortId) {
 module.exports = {
   listAllCohorts, getOneCohort,
   createCohort, listCohorts, updateCohort, deleteCohort,
-  bulkEnroll, getCohortStudents,
+  bulkEnroll, getCohortStudents, getMyCohort,
   graduateStudent, graduateAll, getCohortReport,
 };

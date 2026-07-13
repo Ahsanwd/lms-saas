@@ -427,6 +427,14 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
   const [liveInstructions, setLiveInstructions] = useState(lesson?.liveClass?.instructions ?? '');
   const [liveRecordingUrl, setLiveRecordingUrl] = useState((lesson?.liveClass as any)?.recordingUrl ?? '');
   const [zoomMeetingId, setZoomMeetingId] = useState<string | null>(lesson?.liveClass?.zoomMeetingId ?? null);
+  const [liveCohortId, setLiveCohortId] = useState((lesson?.liveClass as any)?.cohortId ?? '');
+
+  const { data: liveCohortsRaw } = useQuery({
+    queryKey: ['cohorts-for-live-lesson', courseId],
+    queryFn: () => api.get(`/courses/${courseId}/cohorts`).then(r => r.data?.data?.cohorts as { _id: string; name: string }[]),
+    enabled: type === 'live',
+  });
+  const liveCohorts = liveCohortsRaw ?? [];
 
   // File source
   const [fileSource, setFileSource] = useState<FileSource>(inferFileSource(lesson));
@@ -563,6 +571,7 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
         scheduledAt: liveScheduledAt || null, durationMinutes: liveDuration,
         instructions: liveInstructions || null,
         recordingUrl: liveRecordingUrl || null,
+        cohortId: liveCohortId || null,
       };
     }
     if (type === 'video') {
@@ -1550,6 +1559,19 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
                 <textarea rows={2} value={liveInstructions} onChange={(e) => setLiveInstructions(e.target.value)}
                   placeholder="e.g. Join the Zoom link 5 minutes before class starts..."
                   className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none bg-gray-50" />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1.5">
+                  Restrict to a batch <span className="font-normal text-gray-400">(optional — leave blank to show every enrolled student)</span>
+                </label>
+                <select value={liveCohortId} onChange={(e) => setLiveCohortId(e.target.value)}
+                  className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 bg-gray-50">
+                  <option value="">Everyone enrolled</option>
+                  {liveCohorts.map((c) => (
+                    <option key={c._id} value={c._id}>{c.name}</option>
+                  ))}
+                </select>
               </div>
 
               <div className="pt-1 border-t border-gray-100">

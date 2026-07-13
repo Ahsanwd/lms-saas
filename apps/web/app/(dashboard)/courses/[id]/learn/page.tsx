@@ -31,6 +31,57 @@ const LESSON_ICON: Record<string, string> = {
 };
 
 // ── Sidebar ───────────────────────────────────────────────────────────────────
+interface MyCohortBatchmate { firstName: string; lastName: string; avatar: string | null }
+interface MyCohortData {
+  cohort: { _id: string; name: string; description: string; startDate: string | null; endDate: string | null; status: string } | null;
+  myProgress?: { percentage: number; completedLessons: number; totalLessons: number };
+  batchmates?: MyCohortBatchmate[];
+}
+
+function formatCohortDate(iso: string | null) {
+  if (!iso) return null;
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+// Renders nothing when the student isn't in a batch for this course — the
+// common case for most students, same "return null when unconfigured"
+// convention used across the Website Builder sections.
+function MyCohortPanel({ courseId }: { courseId: string }) {
+  const { data } = useQuery<MyCohortData>({
+    queryKey: ['my-cohort', courseId],
+    queryFn: async () => {
+      const { data } = await api.get(`/courses/${courseId}/my-cohort`);
+      return data.data;
+    },
+  });
+
+  if (!data?.cohort) return null;
+  const { cohort, batchmates = [] } = data;
+  const dateRange = [formatCohortDate(cohort.startDate), formatCohortDate(cohort.endDate)].filter(Boolean).join(' – ');
+
+  return (
+    <div className="px-4 py-3 border-b border-gray-100 bg-violet-50/50">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-bold text-violet-700 truncate">{cohort.name}</p>
+        {dateRange && <span className="text-[10px] text-violet-500 flex-shrink-0">{dateRange}</span>}
+      </div>
+      {batchmates.length > 0 && (
+        <div className="flex items-center -space-x-1.5 mt-1.5">
+          {batchmates.slice(0, 6).map((m, i) => (
+            <div key={i} title={`${m.firstName} ${m.lastName}`}
+              className="w-5 h-5 rounded-full bg-violet-200 border border-white flex items-center justify-center text-[9px] font-semibold text-violet-700 overflow-hidden">
+              {m.avatar ? <img src={m.avatar} alt="" className="w-full h-full object-cover" /> : m.firstName[0]}
+            </div>
+          ))}
+          {batchmates.length > 6 && (
+            <span className="text-[10px] text-gray-400 pl-2">+{batchmates.length - 6} more</span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Sidebar({
   sections, activeLessonId, activeQuizId, completedIds,
   courseQuizzes, onSelect, onSelectQuiz, isOpen, onClose, courseId,
@@ -89,6 +140,7 @@ function Sidebar({
             <span className="text-[11px] font-medium text-gray-500 flex-shrink-0">{doneCount}/{totalLessons}</span>
           </div>
         </div>
+        <MyCohortPanel courseId={courseId} />
         <nav className="flex-1 overflow-y-auto">
         {sections.map((section) => (
           <div key={section._id}>
