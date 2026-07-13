@@ -981,19 +981,9 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
                   </div>
 
                   {/* Limits & format info */}
-                  <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 space-y-2">
-                    <p className="text-xs font-semibold text-blue-800 flex items-center gap-1.5">
-                      <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                      Upload limits &amp; supported formats
-                    </p>
-                    <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
-                      <span className="text-blue-600 font-medium">⬆ Upload File</span>
-                      <span className="text-blue-700">Max <strong>2 GB</strong> · MP4, WebM, MOV, OGG · Served via Cloudflare CDN</span>
-                      <span className="text-blue-600 font-medium">☁ Cloudflare Stream</span>
-                      <span className="text-blue-700">No size limit · HLS adaptive streaming · MP4, MOV, WebM, MKV, AVI</span>
-                      <span className="text-blue-600 font-medium">▶ YouTube / Vimeo</span>
-                      <span className="text-blue-700">Paste video URL — no file upload needed</span>
-                    </div>
+                  <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-2.5 flex items-center gap-2">
+                    <svg className="w-3.5 h-3.5 flex-shrink-0 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <p className="text-xs font-medium text-blue-800">Upload: max 2GB (MP4/WebM/MOV/OGG) · Cloudflare Stream: no size limit · YouTube/Vimeo: just paste the URL.</p>
                   </div>
                 </div>
 
@@ -1093,23 +1083,16 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
 
                   {/* Unlisted guidance */}
                   {videoSource === 'youtube' && (
-                    <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 flex gap-3">
-                      <span className="text-amber-500 text-base flex-shrink-0 mt-0.5">⚠️</span>
-                      <div className="text-xs text-amber-800 space-y-1">
-                        <p className="font-semibold">Set your YouTube video to Unlisted</p>
-                        <p className="text-amber-700">Go to YouTube Studio → your video → Visibility → <strong>Unlisted</strong>. This prevents the video from appearing in search or on your channel while still allowing it to be embedded here.</p>
-                        <p className="text-amber-700">Do not use <strong>Private</strong> — private videos won't play for students.</p>
-                      </div>
+                    <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-2.5 flex items-center gap-2">
+                      <span className="text-amber-500 text-base flex-shrink-0">⚠️</span>
+                      <p className="text-xs font-medium text-amber-800">Set the video to <strong>Unlisted</strong> in YouTube Studio (Visibility) — not Private, or it won't play for students.</p>
                     </div>
                   )}
 
                   {videoSource === 'vimeo' && (
-                    <div className="rounded-xl bg-blue-50 border border-blue-200 px-4 py-3 flex gap-3">
-                      <span className="text-blue-500 text-base flex-shrink-0 mt-0.5">ℹ️</span>
-                      <div className="text-xs text-blue-800 space-y-1">
-                        <p className="font-semibold">Recommended Vimeo privacy settings</p>
-                        <p className="text-blue-700">Set the video to <strong>Hide from Vimeo</strong> (unlisted). For best security, use <strong>Vimeo Pro</strong> and enable domain-level privacy to restrict playback to this site only.</p>
-                      </div>
+                    <div className="rounded-xl bg-blue-50 border border-blue-200 px-4 py-2.5 flex items-center gap-2">
+                      <span className="text-blue-500 text-base flex-shrink-0">ℹ️</span>
+                      <p className="text-xs font-medium text-blue-800">Set the video to <strong>Hide from Vimeo</strong> (unlisted) — Vimeo Pro + domain-level privacy recommended for best security.</p>
                     </div>
                   )}
 
