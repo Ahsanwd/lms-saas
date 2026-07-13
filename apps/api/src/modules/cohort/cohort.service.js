@@ -98,6 +98,7 @@ async function deleteCohort(tenantId, cohortId) {
   const cohort = await Cohort.findOne({ _id: cohortId, tenantId });
   if (!cohort) throw new AppError('Cohort not found', 404);
   await cohort.deleteOne();
+  await CohortMember.deleteMany({ tenantId, cohortId });
   return { ok: true };
 }
 
