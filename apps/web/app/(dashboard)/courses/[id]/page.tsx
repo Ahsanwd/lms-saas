@@ -1976,8 +1976,20 @@ function LessonRow({ courseId, sectionId, lesson, onEdit, onDeleted, isFirst, is
     }
   };
 
+  const ICON_STYLES: Record<string, string> = {
+    video: 'bg-blue-50 text-blue-600',
+    text: 'bg-slate-100 text-slate-500',
+    file: 'bg-orange-50 text-orange-600',
+    quiz: 'bg-emerald-50 text-emerald-600',
+    audio: 'bg-purple-50 text-purple-600',
+    live: 'bg-red-50 text-red-600',
+  };
+  const isLive = lesson.type === 'live';
+  const liveStatus = (lesson.liveClass as any)?.status;
+  const durationSeconds = lesson.video?.durationSeconds ?? lesson.audio?.durationSeconds;
+
   return (
-    <div className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 group border-b border-gray-50 last:border-0">
+    <div className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50/80 group border-b border-gray-50 last:border-0 transition-colors">
       {/* Up / Down reorder buttons */}
       <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
         <button
@@ -2002,28 +2014,40 @@ function LessonRow({ courseId, sectionId, lesson, onEdit, onDeleted, isFirst, is
         </button>
       </div>
       {/* Type icon */}
-      <div className="flex-shrink-0 w-7 h-7 rounded-md bg-gray-100 flex items-center justify-center">
+      <div className={cn('flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center', ICON_STYLES[lesson.type] ?? ICON_STYLES.text)}>
         {lesson.type === 'video' && (
-          <svg className="w-3.5 h-3.5 text-blue-500" fill="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
             <path d="M8 5v14l11-7z" />
           </svg>
         )}
         {lesson.type === 'text' && (
-          <svg className="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
               d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
         )}
         {lesson.type === 'file' && (
-          <svg className="w-3.5 h-3.5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
               d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
           </svg>
         )}
         {lesson.type === 'quiz' && (
-          <svg className="w-3.5 h-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
               d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+          </svg>
+        )}
+        {lesson.type === 'audio' && (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M9 19V6l12-2v13M9 19a3 3 0 11-6 0 3 3 0 016 0zm12-2a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        )}
+        {isLive && (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
           </svg>
         )}
       </div>
@@ -2031,32 +2055,24 @@ function LessonRow({ courseId, sectionId, lesson, onEdit, onDeleted, isFirst, is
       {/* Title + meta */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-900 truncate">{lesson.title}</span>
-          {lesson.isPreview && (
-            <span className="text-xs text-green-600 bg-green-50 px-1.5 py-0.5 rounded flex-shrink-0">
-              Preview
-            </span>
+          <span className="text-sm font-medium text-gray-900 truncate">{lesson.title}</span>
+          {lesson.isPreview && <Badge variant="success" className="flex-shrink-0">Preview</Badge>}
+          {!lesson.isPublished && <Badge variant="default" className="flex-shrink-0">Draft</Badge>}
+          {isLive && liveStatus === 'live' && (
+            <Badge variant="danger" className="flex-shrink-0 gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse" /> Live
+            </Badge>
           )}
-          {!lesson.isPublished && (
-            <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded flex-shrink-0">
-              Draft
-            </span>
-          )}
-          {lesson.type === 'live' && (lesson.liveClass as any)?.status === 'live' && (
-            <span className="text-xs text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded flex-shrink-0 font-semibold">
-              🔴 Live
-            </span>
-          )}
-          {lesson.type === 'live' && (lesson.liveClass as any)?.status === 'ended' && (
-            <span className="text-xs text-green-600 bg-green-50 border border-green-200 px-1.5 py-0.5 rounded flex-shrink-0">
-              ✓ Ended
-            </span>
-          )}
+          {isLive && liveStatus === 'ended' && <Badge variant="success" className="flex-shrink-0">✓ Ended</Badge>}
         </div>
-        {lesson.video && (
-          <span className="text-xs text-gray-400">{fmtDuration(lesson.video.durationSeconds)}</span>
-        )}
-        {uploadError && <span className="block text-xs text-red-500 mt-0.5">{uploadError}</span>}
+        <div className="flex items-center gap-1.5 mt-0.5">
+          {durationSeconds ? (
+            <span className="text-xs text-gray-400">{fmtDuration(durationSeconds)}</span>
+          ) : (
+            <span className="text-xs text-gray-300 capitalize">{lesson.type} lesson</span>
+          )}
+          {uploadError && <span className="text-xs text-red-500">· {uploadError}</span>}
+        </div>
       </div>
 
       {/* Upload buttons — always visible when no content, hover-only otherwise */}
@@ -2097,12 +2113,12 @@ function LessonRow({ courseId, sectionId, lesson, onEdit, onDeleted, isFirst, is
             </Button>
           </>
         )}
-        <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5">
+        <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 pl-1.5 ml-0.5 border-l border-gray-200">
           <Button size="sm" variant="ghost" loading={publishMutation.isPending}
             onClick={() => publishMutation.mutate()}>
             {lesson.isPublished ? 'Unpublish' : 'Publish'}
           </Button>
-          {lesson.type === 'live' && (
+          {isLive && (
             <Button size="sm" variant="ghost" onClick={() => setShowSessionModal(true)}>
               🔴 Session
             </Button>
@@ -2131,10 +2147,11 @@ function LessonRow({ courseId, sectionId, lesson, onEdit, onDeleted, isFirst, is
 interface SectionRowProps {
   courseId: string;
   section: Section;
+  index: number;
   onRefresh: () => void;
 }
 
-function SectionRow({ courseId, section, onRefresh }: SectionRowProps) {
+function SectionRow({ courseId, section, index, onRefresh }: SectionRowProps) {
   const qc = useQueryClient();
   const [expanded, setExpanded] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
@@ -2182,14 +2199,24 @@ function SectionRow({ courseId, section, onRefresh }: SectionRowProps) {
   };
 
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden">
+    <div className={cn(
+      'border rounded-xl overflow-hidden shadow-sm transition-colors',
+      expanded ? 'border-primary-200' : 'border-gray-200'
+    )}>
       {/* Header */}
       <div
-        className="flex items-center gap-3 px-4 py-3 bg-gray-50 hover:bg-gray-100 cursor-pointer"
+        className={cn(
+          'flex items-center gap-3 pl-3 pr-4 py-3 cursor-pointer border-l-4 transition-colors',
+          expanded ? 'bg-primary-50/40 border-l-primary-400 hover:bg-primary-50' : 'bg-gray-50 border-l-transparent hover:bg-gray-100'
+        )}
         onClick={() => setExpanded((v) => !v)}
       >
+        <div className="flex items-center justify-center w-6 h-6 rounded-full bg-white border border-gray-200 text-[11px] font-semibold text-gray-500 flex-shrink-0">
+          {index + 1}
+        </div>
+
         <svg
-          className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${expanded ? 'rotate-90' : ''}`}
+          className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${expanded ? 'rotate-90 text-primary-500' : ''}`}
           fill="none" stroke="currentColor" viewBox="0 0 24 24"
         >
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -2212,7 +2239,7 @@ function SectionRow({ courseId, section, onRefresh }: SectionRowProps) {
             />
           ) : (
             <span
-              className="text-sm font-medium text-gray-900 hover:text-primary-600 cursor-text"
+              className="text-sm font-semibold text-gray-900 hover:text-primary-600 cursor-text"
               onDoubleClick={(e) => { e.stopPropagation(); setEditingTitle(true); }}
               title="Double-click to rename"
             >
@@ -2221,18 +2248,14 @@ function SectionRow({ courseId, section, onRefresh }: SectionRowProps) {
           )}
         </div>
 
-        <span className="text-xs text-gray-400 flex-shrink-0">
+        <Badge variant="default" className="flex-shrink-0 font-medium">
           {lessons.length} lesson{lessons.length !== 1 ? 's' : ''}
           {section.totalDurationSeconds ? ` · ${fmtDuration(section.totalDurationSeconds)}` : ''}
-        </span>
+        </Badge>
 
-        {!section.isPublished && (
-          <span className="text-xs bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded flex-shrink-0">
-            Draft
-          </span>
-        )}
+        {!section.isPublished && <Badge variant="warning" className="flex-shrink-0">Draft</Badge>}
 
-        <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-1.5 flex-shrink-0 pl-2 ml-1 border-l border-gray-200" onClick={(e) => e.stopPropagation()}>
           <Button size="sm" variant="outline"
             className="border-primary-400 text-primary-600 hover:bg-primary-50 hover:border-primary-500 font-semibold"
             onClick={() => { setExpanded(true); setLessonModal('new'); }}>
@@ -2256,15 +2279,20 @@ function SectionRow({ courseId, section, onRefresh }: SectionRowProps) {
 
       {/* Lessons list */}
       {expanded && (
-        <div>
+        <div className="bg-white">
           {lessons.length === 0 ? (
-            <div className="px-4 py-8 text-center text-sm text-gray-400">
-              No lessons yet.{' '}
+            <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
+              <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
+                <svg className="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+              </div>
+              <p className="text-sm text-gray-400">No lessons yet</p>
               <button
-                className="text-primary-600 hover:underline"
+                className="text-sm text-primary-600 font-medium hover:underline"
                 onClick={() => setLessonModal('new')}
               >
-                Add one
+                + Add your first lesson
               </button>
             </div>
           ) : (
@@ -2350,11 +2378,12 @@ function CurriculumTab({ courseId }: { courseId: string }) {
         </Card>
       ) : (
         <>
-          {sections.map((section) => (
+          {sections.map((section, index) => (
             <SectionRow
               key={section._id}
               courseId={courseId}
               section={section}
+              index={index}
               onRefresh={() => qc.invalidateQueries({ queryKey: ['sections', courseId] })}
             />
           ))}
