@@ -358,13 +358,16 @@ type AudioSource = 'upload' | 'external' | 'soundcloud' | 'spotify' | 'embed';
 type FileSource  = 'upload' | 'external' | 'gdrive' | 'dropbox' | 'onedrive' | 'embed';
 
 // The "External URL" audio/file source needs a *direct* file link (the browser's
-// native <audio>/<a> tag can't render an HTML preview page). Google Drive and
-// Dropbox share links are the two most common things people paste here instead —
-// auto-rewrite them to their direct-download form rather than silently failing.
+// native <audio>/<a> tag can't render an HTML preview page). A Dropbox share
+// link is the most common thing people paste here instead of a direct link —
+// auto-rewrite it rather than silently failing. Google Drive links are NOT
+// handled here on purpose: Drive's file-serving domain always sends
+// `Cross-Origin-Resource-Policy: same-site`, which makes every browser refuse
+// to play a Drive file inside a page on a different site (coursel.space) no
+// matter what URL format is used — Google's own restriction, not fixable
+// client-side. See the "External" audio/file source help text.
 function normalizeDirectMediaUrl(url: string): string {
   const trimmed = url.trim();
-  const driveMatch = trimmed.match(/drive\.google\.com\/file\/d\/([^/]+)/);
-  if (driveMatch) return `https://drive.google.com/uc?export=download&id=${driveMatch[1]}`;
   if (trimmed.includes('dropbox.com')) {
     if (/[?&]dl=0\b/.test(trimmed)) return trimmed.replace(/dl=0/, 'dl=1');
     if (!/[?&]dl=/.test(trimmed)) return trimmed + (trimmed.includes('?') ? '&dl=1' : '?dl=1');
@@ -1217,15 +1220,15 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
                     <div className="border-t border-amber-200 bg-amber-100/50 px-4 py-3">
                       <p className="text-[11px] font-bold text-amber-800 uppercase tracking-wide mb-2">How to use</p>
                       <ol className="space-y-1.5 text-xs text-amber-900">
-                        <li className="flex gap-2"><span className="font-bold flex-shrink-0">1.</span><span>Host your audio file on any public server or CDN — your own hosting, AWS S3, Cloudflare R2, Google Drive, or Dropbox.</span></li>
+                        <li className="flex gap-2"><span className="font-bold flex-shrink-0">1.</span><span>Host your audio file on any public server or CDN — your own hosting, AWS S3, Cloudflare R2, or Dropbox.</span></li>
                         <li className="flex gap-2"><span className="font-bold flex-shrink-0">2.</span><span>Get a <strong>direct file link</strong> that ends with the audio extension (e.g. <code className="bg-amber-200 px-1 rounded">https://mysite.com/lecture.mp3</code>) — not a webpage link.</span></li>
                         <li className="flex gap-2"><span className="font-bold flex-shrink-0">3.</span><span>Test the URL in a new browser tab — if it plays or downloads directly, it will work here.</span></li>
                         <li className="flex gap-2"><span className="font-bold flex-shrink-0">4.</span><span>Paste the URL in the field below and save.</span></li>
                       </ol>
                       <div className="mt-2.5 space-y-1 text-xs text-amber-800">
                         <p className="font-semibold">Platform tips:</p>
-                        <p>• <strong>Google Drive:</strong> Share → "Anyone with link" — paste the normal share link as-is, it's converted to a direct link automatically on save.</p>
                         <p>• <strong>Dropbox:</strong> Paste the normal share link as-is — <code className="bg-amber-200 px-1 rounded">?dl=0</code> is switched to <code className="bg-amber-200 px-1 rounded">?dl=1</code> automatically on save.</p>
+                        <p>• <strong>Google Drive is not supported here</strong> — Google blocks other sites from embedding Drive files (a restriction on their end, not fixable from this app), so it will never actually play. Use Dropbox or <strong>Upload</strong> instead.</p>
                       </div>
                     </div>
                   </div>
