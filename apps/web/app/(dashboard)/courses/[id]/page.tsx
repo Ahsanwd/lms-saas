@@ -53,7 +53,7 @@ function CfStreamUploader({ courseId, lessonId, existingUid, onConfirmed }: CfSt
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
 
   async function handleUpload(selectedFile: File) {
-    if (!lessonId) { setErrorMsg('Save the lesson first before uploading to Cloudflare Stream'); return; }
+    if (!lessonId) { setStatus('error'); setErrorMsg('Save the lesson first before uploading to Cloudflare Stream'); return; }
     setFile(selectedFile);
     setUploading(true);
     setStatus('uploading');
