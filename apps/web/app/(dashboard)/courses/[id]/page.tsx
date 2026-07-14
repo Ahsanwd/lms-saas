@@ -437,7 +437,6 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
 
   // Live class
   const [liveUrl, setLiveUrl] = useState(lesson?.liveClass?.meetingUrl ?? '');
-  const [livePlatform, setLivePlatform] = useState<'zoom' | 'meet' | 'teams' | 'youtube_live' | 'custom'>(lesson?.liveClass?.platform ?? 'zoom');
   const [liveScheduledAt, setLiveScheduledAt] = useState(
     lesson?.liveClass?.scheduledAt ? new Date(lesson.liveClass.scheduledAt).toISOString().slice(0, 16) : ''
   );
@@ -498,10 +497,10 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
   const cfStorageOverQuota = !!cfStreamSettings && cfPlanAllows &&
     cfStreamSettings.storage.used >= (cfStreamSettings.storage.limit + cfStreamSettings.storage.topup);
 
-  const { data: zoomStatus } = useQuery<{ connected: boolean; email?: string }>({
-    queryKey: ['zoom-status'],
-    queryFn: () => api.get('/zoom/status').then(r => r.data.data),
-    enabled: type === 'live' && livePlatform === 'zoom',
+  const { data: zoomStatus } = useQuery<{ connected: boolean; email?: string; source?: 'instructor' | 'tenant' }>({
+    queryKey: ['zoom-status', courseId],
+    queryFn: () => api.get(`/zoom/status?courseId=${courseId}`).then(r => r.data.data),
+    enabled: type === 'live',
     staleTime: 60_000,
   });
 
@@ -585,7 +584,7 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
     };
     if (type === 'live') {
       payload.liveClass = {
-        meetingUrl: liveUrl || null, platform: livePlatform,
+        meetingUrl: liveUrl || null, platform: 'zoom',
         scheduledAt: liveScheduledAt || null, durationMinutes: liveDuration,
         instructions: liveInstructions || null,
         recordingUrl: liveRecordingUrl || null,
@@ -1435,110 +1434,74 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
               </div>
             )}
 
-            {/* ── Live class fields ── */}
+            {/* ── Live class fields (Zoom only — fully automated) ── */}
             {type === 'live' && (
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Platform</label>
-                  <select value={livePlatform} onChange={(e) => setLivePlatform(e.target.value as typeof livePlatform)}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white">
-                    <option value="zoom">Zoom</option>
-                    <option value="meet">Google Meet</option>
-                    <option value="teams">MS Teams</option>
-                    <option value="youtube_live">YouTube Live</option>
-                    <option value="custom">Other</option>
-                  </select>
-                </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 mb-1.5">Duration (minutes)</label>
                   <input type="number" min={15} max={480} value={liveDuration}
                     onChange={(e) => setLiveDuration(Number(e.target.value))}
                     className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 bg-gray-50" />
                 </div>
-              </div>
-
-              {/* ── Google Meet helper ── */}
-              {livePlatform === 'meet' && (
-                <div className="rounded-xl border border-green-200 bg-green-50/50 p-3 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <svg className="w-4 h-4 flex-shrink-0 text-green-600" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M17.507 14.307l-.009.075c-.007.04-.015.082-.024.126l-.004.018a4.493 4.493 0 01-4.398 3.524H6.5C4.015 18.05 2 16.035 2 13.55v-3.1C2 7.965 4.015 5.95 6.5 5.95h6.572a4.49 4.49 0 014.389 3.494l.005.02c.01.044.018.087.025.13l.01.073L22 12l-4.493 2.307z"/>
-                    </svg>
-                    <p className="text-xs font-semibold text-green-800">Google Meet</p>
-                  </div>
-                  <p className="text-xs text-green-700 leading-relaxed">
-                    Create a new Google Meet session, then paste the link below.
-                  </p>
-                  <a
-                    href="https://meet.google.com/new"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-2 w-full py-2 text-sm font-semibold text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
-                    </svg>
-                    Open Google Meet to create a link
-                  </a>
-                </div>
-              )}
 
               {/* ── Zoom auto-create ── */}
-              {livePlatform === 'zoom' && (
-                <div className={cn('rounded-xl border p-3 space-y-2',
-                  zoomMeetingId ? 'border-green-200 bg-green-50/60' : 'border-blue-100 bg-blue-50/50')}>
-                  {!isEdit ? (
-                    <p className="text-xs text-blue-600">Save this lesson first, then open Edit to auto-generate a Zoom meeting link.</p>
-                  ) : !zoomStatus ? (
-                    <div className="flex items-center gap-2 text-xs text-gray-400">
-                      <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+              <div className={cn('rounded-xl border p-3 space-y-2',
+                zoomMeetingId ? 'border-green-200 bg-green-50/60' : 'border-blue-100 bg-blue-50/50')}>
+                {!isEdit ? (
+                  <p className="text-xs text-blue-600">Save this lesson first, then open Edit to auto-generate a Zoom meeting link.</p>
+                ) : !zoomStatus ? (
+                  <div className="flex items-center gap-2 text-xs text-gray-400">
+                    <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                    </svg>
+                    Checking Zoom…
+                  </div>
+                ) : !zoomStatus.connected ? (
+                  <div className="flex items-center gap-2 text-xs text-amber-700">
+                    <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                    </svg>
+                    <span>No Zoom account connected.{' '}
+                      <a href="/settings" className="underline font-medium hover:text-amber-900">Connect in Settings → Zoom</a>
+                    </span>
+                  </div>
+                ) : zoomMeetingId ? (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-xs text-green-700 font-medium">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/>
                       </svg>
-                      Checking Zoom…
+                      Zoom meeting created
                     </div>
-                  ) : !zoomStatus.connected ? (
-                    <div className="flex items-center gap-2 text-xs text-amber-700">
-                      <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-                      </svg>
-                      <span>No Zoom account connected.{' '}
-                        <a href="/settings" className="underline font-medium hover:text-amber-900">Connect in Settings → Zoom</a>
-                      </span>
-                    </div>
-                  ) : zoomMeetingId ? (
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-xs text-green-700 font-medium">
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/>
-                        </svg>
-                        Zoom meeting created
-                      </div>
-                      <button type="button"
-                        onClick={() => createZoomMeetingMutation.mutate()}
-                        disabled={createZoomMeetingMutation.isPending}
-                        className="text-xs text-blue-600 hover:text-blue-800 font-medium disabled:opacity-50">
-                        {createZoomMeetingMutation.isPending ? 'Regenerating…' : 'Regenerate'}
-                      </button>
-                    </div>
-                  ) : (
+                    <button type="button"
+                      onClick={() => createZoomMeetingMutation.mutate()}
+                      disabled={createZoomMeetingMutation.isPending}
+                      className="text-xs text-blue-600 hover:text-blue-800 font-medium disabled:opacity-50">
+                      {createZoomMeetingMutation.isPending ? 'Regenerating…' : 'Regenerate'}
+                    </button>
+                  </div>
+                ) : (
+                  <>
                     <button type="button"
                       onClick={() => createZoomMeetingMutation.mutate()}
                       disabled={createZoomMeetingMutation.isPending}
                       className="w-full py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-60">
                       {createZoomMeetingMutation.isPending ? 'Creating Meeting…' : 'Create Zoom Meeting'}
                     </button>
-                  )}
-                </div>
-              )}
+                    <p className="text-xs text-blue-600">
+                      Will use: {zoomStatus.source === 'instructor' ? 'your Zoom account' : "the organisation's Zoom account"}
+                    </p>
+                  </>
+                )}
+              </div>
 
               <div>
                 <label className="block text-xs font-semibold text-gray-500 mb-1.5">Meeting URL</label>
                 <div className="relative">
-                  <input type="url" value={liveUrl} onChange={(e) => setLiveUrl(e.target.value)}
-                    placeholder="https://zoom.us/j/... or meet.google.com/..."
-                    className="w-full pl-4 pr-10 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 bg-gray-50" />
+                  <input type="url" value={liveUrl} readOnly
+                    placeholder="Generated automatically once you create the Zoom meeting above"
+                    className="w-full pl-4 pr-10 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-100 text-gray-500 cursor-not-allowed" />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.069A1 1 0 0121 8.845v6.31a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
                   </span>
@@ -1575,7 +1538,7 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
                 <label className="block text-xs font-semibold text-gray-500 mb-1.5">
                   Recording URL <span className="font-normal text-gray-400">(add after session ends)</span>
                 </label>
-                {livePlatform === 'zoom' && zoomMeetingId && (
+                {zoomMeetingId && (
                   <div className="flex items-center gap-1.5 text-xs text-blue-600 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 mb-2">
                     <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>

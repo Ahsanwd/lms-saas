@@ -16,7 +16,7 @@ async function handleZoomRecordingFetch(payload) {
   // Already has a recording URL — skip
   if (doc.liveClass?.recordingUrl) return;
 
-  const recordingUrl = await zoomSvc.fetchRecordingUrl(tenantId, meetingId);
+  const recordingUrl = await zoomSvc.fetchRecordingUrl(tenantId, meetingId, doc.liveClass?.zoomHostUserId);
   if (!recordingUrl) {
     // Recording not ready yet — throw to trigger retry
     throw new Error(`Recording not available yet for meeting ${meetingId}`);

@@ -4,6 +4,7 @@ const jwt     = require('jsonwebtoken');
 const ZoomCredential = require('../../database/models/ZoomCredential.model');
 const { encrypt, decrypt } = require('../../utils/crypto');
 const AppError = require('../../utils/AppError');
+const logger = require('../../utils/logger');
 
 const ZOOM_AUTH_URL = 'https://zoom.us/oauth/authorize';
 const ZOOM_API_BASE = 'https://api.zoom.us/v2';
@@ -93,14 +94,16 @@ function getStateSecret() {
 
 // ── Public API ─────────────────────────────────────────────────────────────────
 
-// Returns the Zoom OAuth authorization URL. State JWT encodes tenantId + adminUserId.
-function getAuthUrl(tenantId, adminUserId) {
+// Returns the Zoom OAuth authorization URL. State JWT encodes tenantId + the
+// connecting user's id — role is deliberately NOT trusted from this state and
+// is re-derived fresh from the authenticated session at exchange time.
+function getAuthUrl(tenantId, requestingUserId) {
   const { ZOOM_CLIENT_ID, ZOOM_REDIRECT_URI } = process.env;
   if (!ZOOM_CLIENT_ID || !ZOOM_REDIRECT_URI)
     throw new AppError('Zoom OAuth is not configured on this server', 503);
 
   const state = jwt.sign(
-    { tenantId: tenantId.toString(), adminUserId: adminUserId.toString() },
+    { tenantId: tenantId.toString(), requestingUserId: requestingUserId.toString() },
     getStateSecret(),
     { expiresIn: '10m' }
   );
@@ -115,8 +118,12 @@ function getAuthUrl(tenantId, adminUserId) {
   return `${ZOOM_AUTH_URL}?${params.toString()}`;
 }
 
-// Exchanges the authorization code for tokens and saves one credential per tenant.
-async function exchangeToken(code, stateToken, requestingUserId) {
+// Exchanges the authorization code for tokens and saves a credential scoped
+// to the connecting user: instructors get their own personal doc
+// (userId: their id), tenant_admin/super_admin get the tenant-wide fallback
+// doc (userId: null). `requestingUser` is the live req.user, not the state —
+// role/tenant are always re-checked fresh, never trusted from the OAuth state.
+async function exchangeToken(code, stateToken, requestingUser) {
   let decoded;
   try {
     decoded = jwt.verify(stateToken, getStateSecret());
@@ -124,9 +131,12 @@ async function exchangeToken(code, stateToken, requestingUserId) {
     throw new AppError('Invalid or expired Zoom state — please try connecting again', 400);
   }
 
-  const { tenantId, adminUserId } = decoded;
+  const { tenantId, requestingUserId } = decoded;
 
-  if (adminUserId !== requestingUserId.toString()) {
+  if (requestingUserId !== requestingUser.sub) {
+    throw new AppError('State mismatch', 403);
+  }
+  if (tenantId !== requestingUser.tenantId?.toString()) {
     throw new AppError('State mismatch', 403);
   }
 
@@ -143,11 +153,14 @@ async function exchangeToken(code, stateToken, requestingUserId) {
   const { access_token, refresh_token, expires_in } = tokenData;
   const userInfo = await zoomApiRequest('GET', '/users/me', { token: access_token });
 
+  const targetUserId = requestingUser.role === 'instructor' ? requestingUser.sub : null;
+
   await ZoomCredential.findOneAndUpdate(
-    { tenantId },
+    { tenantId, userId: targetUserId },
     {
       tenantId,
-      connectedBy: requestingUserId,
+      userId: targetUserId,
+      connectedBy: requestingUser.sub,
       accessToken:  encrypt(access_token),
       refreshToken: encrypt(refresh_token),
       expiresAt:    new Date(Date.now() + expires_in * 1000),
@@ -160,11 +173,25 @@ async function exchangeToken(code, stateToken, requestingUserId) {
   return { email: userInfo.email };
 }
 
-// Returns a valid access token for the tenant, refreshing if needed.
-async function getValidToken(tenantId) {
-  const cred = await ZoomCredential.findOne({ tenantId });
-  if (!cred) throw new AppError('No Zoom account connected for this organisation. Ask your admin to connect one in Settings.', 400, 'ZOOM_NOT_CONNECTED');
+// Resolves which credential doc should be used for a given course: the
+// instructor's own account if they've connected one, else the tenant's
+// shared fallback. Returns { doc: null, source: null } if neither exists.
+async function resolveCredentialDoc(tenantId, instructorId) {
+  if (instructorId) {
+    const own = await ZoomCredential.findOne({ tenantId, userId: instructorId });
+    if (own) return { doc: own, source: 'instructor' };
+  }
+  const fallback = await ZoomCredential.findOne({ tenantId, userId: null });
+  if (fallback) return { doc: fallback, source: 'tenant' };
+  return { doc: null, source: null };
+}
 
+// Returns a valid access token for an already-fetched credential doc,
+// refreshing it (and persisting the refresh) if it's within 5 minutes of
+// expiry. On refresh failure the doc is deleted and ZOOM_REAUTH is thrown —
+// logged loudly when it's the tenant-wide fallback, since that now silently
+// affects every instructor without their own account, not just one admin.
+async function getValidTokenForDoc(cred) {
   if (Date.now() < cred.expiresAt.getTime() - 300_000) {
     return decrypt(cred.accessToken);
   }
@@ -175,8 +202,11 @@ async function getValidToken(tenantId) {
   );
 
   if (!tokenData.access_token) {
-    await ZoomCredential.deleteOne({ tenantId });
-    throw new AppError('Zoom session expired. Admin must reconnect in Settings → Zoom.', 401, 'ZOOM_REAUTH');
+    if (cred.userId === null) {
+      logger.warn(`Zoom fallback (tenant-wide) credential failed to refresh and was deleted — tenant ${cred.tenantId}. Every instructor without their own Zoom account will now fail to create meetings until an admin reconnects.`);
+    }
+    await ZoomCredential.deleteOne({ _id: cred._id });
+    throw new AppError('Zoom session expired. Please reconnect in Settings → Zoom.', 401, 'ZOOM_REAUTH');
   }
 
   cred.accessToken  = encrypt(tokenData.access_token);
@@ -187,18 +217,31 @@ async function getValidToken(tenantId) {
   return tokenData.access_token;
 }
 
-async function getStatus(tenantId) {
-  const cred = await ZoomCredential.findOne({ tenantId }).lean();
+// { instructorId } → resolved "would this lesson's meeting-creation work"
+// status (lesson editor). Otherwise { userId } → the requesting user's own
+// scope status (Settings page: instructor's personal doc, or the tenant
+// default for an admin).
+async function getStatus(tenantId, { userId, instructorId } = {}) {
+  if (instructorId !== undefined) {
+    const { doc, source } = await resolveCredentialDoc(tenantId, instructorId);
+    if (!doc) return { connected: false };
+    return { connected: true, source, email: doc.zoomEmail };
+  }
+  const cred = await ZoomCredential.findOne({ tenantId, userId: userId ?? null }).lean();
   if (!cred) return { connected: false };
   return { connected: true, email: cred.zoomEmail, zoomUserId: cred.zoomUserId };
 }
 
-async function disconnect(tenantId) {
-  await ZoomCredential.deleteOne({ tenantId });
+async function disconnect(tenantId, userId = null) {
+  await ZoomCredential.deleteOne({ tenantId, userId });
 }
 
-async function createMeeting(tenantId, { topic, startTime, durationMinutes }) {
-  const token = await getValidToken(tenantId);
+async function createMeeting({ tenantId, instructorId, topic, startTime, durationMinutes }) {
+  const { doc } = await resolveCredentialDoc(tenantId, instructorId);
+  if (!doc) {
+    throw new AppError('Neither the instructor nor the organisation has a Zoom account connected. Connect one in Settings → Zoom.', 400, 'ZOOM_NOT_CONNECTED');
+  }
+  const token = await getValidTokenForDoc(doc);
 
   const startIso = startTime
     ? new Date(startTime).toISOString()
@@ -226,14 +269,20 @@ async function createMeeting(tenantId, { topic, startTime, durationMinutes }) {
     joinUrl:   meeting.join_url,
     startUrl:  meeting.start_url,
     password:  meeting.password || null,
+    hostUserId: doc.userId,
   };
 }
 
 // Fetches the cloud recording download URL for a completed Zoom meeting.
-// Returns the first mp4 play_url, or null if no recording is available yet.
-async function fetchRecordingUrl(tenantId, meetingId) {
+// `hostUserId` is the literal credential that created this specific meeting
+// (from lesson.liveClass.zoomHostUserId) — never re-resolved via fallback,
+// since a recording only exists under the account that actually hosted it.
+// Returns the first mp4 play_url, or null if no recording / no credential.
+async function fetchRecordingUrl(tenantId, meetingId, hostUserId = null) {
   try {
-    const token = await getValidToken(tenantId);
+    const cred = await ZoomCredential.findOne({ tenantId, userId: hostUserId });
+    if (!cred) return null;
+    const token = await getValidTokenForDoc(cred);
     const data = await zoomApiRequest('GET', `/meetings/${meetingId}/recordings`, { token });
     const files = data?.recording_files ?? [];
     const mp4 = files.find(f => f.file_type === 'MP4' && f.status === 'completed');
@@ -245,9 +294,11 @@ async function fetchRecordingUrl(tenantId, meetingId) {
   }
 }
 
-async function deleteMeeting(tenantId, meetingId) {
+async function deleteMeeting(tenantId, meetingId, hostUserId = null) {
   try {
-    const token = await getValidToken(tenantId);
+    const cred = await ZoomCredential.findOne({ tenantId, userId: hostUserId });
+    if (!cred) return;
+    const token = await getValidTokenForDoc(cred);
     await zoomApiRequest('DELETE', `/meetings/${meetingId}`, { token });
   } catch (e) {
     if (e.statusCode !== 404 && !e.message?.includes('3001')) throw e;
@@ -257,6 +308,7 @@ async function deleteMeeting(tenantId, meetingId) {
 module.exports = {
   getAuthUrl,
   exchangeToken,
+  resolveCredentialDoc,
   getStatus,
   disconnect,
   createMeeting,

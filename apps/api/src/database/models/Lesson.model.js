@@ -112,6 +112,11 @@ const lessonSchema = new mongoose.Schema(
 
       // Zoom auto-created meeting ID (used to regenerate/delete via API)
       zoomMeetingId: { type: String, default: null },
+      // Which ZoomCredential actually hosted this meeting (null = tenant's
+      // shared account, a User id = that instructor's own account) — recorded
+      // at creation time so recording-fetch/delete/regenerate always target
+      // the real host, never re-resolve via fallback logic after the fact.
+      zoomHostUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
 
       // Restricts this session to one batch. null (default, every existing
       // lesson) means visible to every enrolled student, same as today.
