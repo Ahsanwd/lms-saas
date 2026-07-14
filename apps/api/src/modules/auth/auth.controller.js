@@ -3,6 +3,28 @@ const tenantRepo = require('../../database/repositories/tenant.repository');
 const { validateRegister, validateLogin, validateResetPassword } = require('../../validators/auth.validator');
 const R = require('../../utils/response');
 
+// The frontend's silent-refresh call (api.ts) POSTs to /auth/refresh with an
+// empty body and relies entirely on this httpOnly cookie — it never has the
+// raw refresh token in JS. Scoped to /api/auth so it isn't sent on every
+// unrelated request. 30d covers the longest-lived refresh token issued
+// (remember-me); a real token past its own JWT expiry still fails server-side
+// regardless of how long the cookie itself sticks around.
+const REFRESH_COOKIE_OPTS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'lax',
+  path: '/api/auth',
+  maxAge: 30 * 24 * 60 * 60 * 1000,
+};
+
+function setRefreshCookie(res, refreshToken) {
+  if (refreshToken) res.cookie('refreshToken', refreshToken, REFRESH_COOKIE_OPTS);
+}
+
+function clearRefreshCookie(res) {
+  res.clearCookie('refreshToken', { path: REFRESH_COOKIE_OPTS.path });
+}
+
 async function registerTenant(req, res, next) {
   try {
     const { firstName, lastName, email, password, tenantName, subdomain, recaptchaToken } = req.body;
@@ -12,6 +34,7 @@ async function registerTenant(req, res, next) {
     const result = await authService.registerTenant({
       firstName, lastName, email, password, tenantName, subdomain, recaptchaToken, req,
     });
+    setRefreshCookie(res, result.refreshToken);
     R.created(res, result, 'Account created successfully');
   } catch (err) { next(err); }
 }
@@ -31,6 +54,7 @@ async function register(req, res, next) {
       settings: req.tenant.settings,
       req,
     });
+    setRefreshCookie(res, result.refreshToken);
     R.created(res, result, result.message);
   } catch (err) { next(err); }
 }
@@ -46,6 +70,7 @@ async function login(req, res, next) {
       tenantId: req.tenant?.tenantId ?? null,
       req,
     });
+    setRefreshCookie(res, result.refreshToken);
     R.success(res, result, result.requiresTwoFactor ? '2FA required' : 'Login successful');
   } catch (err) { next(err); }
 }
@@ -112,6 +137,7 @@ async function refresh(req, res, next) {
     if (!refreshToken) return R.unauthorized(res, 'Refresh token required');
 
     const result = await authService.refreshTokens({ refreshToken, req });
+    setRefreshCookie(res, result.refreshToken);
     R.success(res, result, 'Token refreshed');
   } catch (err) { next(err); }
 }
@@ -123,6 +149,7 @@ async function logout(req, res, next) {
       tenantId:  req.user.tenantId,
       userId:    req.user.sub,
     });
+    clearRefreshCookie(res);
     R.success(res, {}, 'Logged out successfully');
   } catch (err) { next(err); }
 }
@@ -130,6 +157,7 @@ async function logout(req, res, next) {
 async function logoutAll(req, res, next) {
   try {
     await authService.logoutAll({ tenantId: req.user.tenantId, userId: req.user.sub });
+    clearRefreshCookie(res);
     R.success(res, {}, 'All sessions revoked');
   } catch (err) { next(err); }
 }
@@ -196,6 +224,7 @@ async function googleCallback(req, res, next) {
       tenantName:    tenant.name,
       req,
     });
+    setRefreshCookie(res, result.refreshToken);
     R.success(res, result, 'Login successful');
   } catch (err) { next(err); }
 }
@@ -247,6 +276,7 @@ async function verify2FA(req, res, next) {
     if (!tempToken || !code) return R.error(res, 'tempToken and code are required', 400);
 
     const result = await authService.verify2FA({ tempToken, code, req });
+    setRefreshCookie(res, result.refreshToken);
     R.success(res, result, 'Login successful');
   } catch (err) { next(err); }
 }
