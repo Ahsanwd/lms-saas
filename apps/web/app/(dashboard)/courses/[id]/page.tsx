@@ -970,7 +970,7 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
                       { s: 'vimeo'     as VideoSource, label: 'Vimeo'         },
                       ...(cfEnabled ? [{ s: 'cloudflare' as VideoSource, label: cfPlanAllows ? '☁ Cloudflare Stream' : '☁ Cloudflare Stream 🔒' }] : []),
                     ]).map(({ s, label }) => (
-                      <button key={s} type="button" onClick={() => setVideoSource(s)}
+                      <button key={s} type="button" onClick={() => { setVideoSource(s); setSelectedFile(null); }}
                         className={cn('px-4 py-1.5 rounded-full text-xs font-semibold border transition-all',
                           videoSource === s
                             ? 'bg-primary-600 text-white border-primary-600 shadow-sm'
