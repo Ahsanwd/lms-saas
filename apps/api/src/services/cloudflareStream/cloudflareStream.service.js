@@ -2,6 +2,7 @@
 
 const https = require('https');
 const jwt   = require('jsonwebtoken');
+const AppError = require('../../utils/AppError');
 
 // ── Low-level CF API helper (JSON endpoints) ──────────────────────────────────
 function cfRequest(method, accountId, apiToken, path, body = null) {
@@ -26,16 +27,16 @@ function cfRequest(method, accountId, apiToken, path, body = null) {
         try {
           const parsed = JSON.parse(data);
           if (parsed.success === false) {
-            reject(new Error(parsed.errors?.[0]?.message || 'Cloudflare API error'));
+            reject(new AppError(`Cloudflare Stream error: ${parsed.errors?.[0]?.message || 'unknown error'}`, 502));
           } else {
             resolve(parsed.result !== undefined ? parsed.result : parsed);
           }
         } catch {
-          reject(new Error('Invalid JSON from Cloudflare API'));
+          reject(new AppError(`Cloudflare Stream returned an unexpected response (HTTP ${res.statusCode})`, 502));
         }
       });
     });
-    req.on('error', reject);
+    req.on('error', (err) => reject(new AppError(`Could not reach Cloudflare Stream: ${err.message}`, 502)));
     if (bodyStr) req.write(bodyStr);
     req.end();
   });
