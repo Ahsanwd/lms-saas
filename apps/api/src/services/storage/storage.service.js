@@ -96,21 +96,33 @@ class R2StorageEngine {
     const tenantId = req.user?.tenantId || 'shared';
     const key      = `${this.category}s/${tenantId}/${uuidv4()}${ext}`;
 
+    // Images are always small (capped at 10MB, see PER_TYPE_MAX_SIZE) and we
+    // need the full buffer anyway to read width/height via sharp() — buffer
+    // + single PutObject stays simplest and safest for this case.
+    if (file.mimetype?.startsWith('image/')) {
+      this._handleImageFile(file, key, cb);
+      return;
+    }
+    // Video/audio/attachments can be hundreds of MB to 2GB — buffering the
+    // whole file in memory risked OOM-crashing the server (confirmed: a
+    // 250MB video upload failed this way). True multipart streaming keeps
+    // only one ~10MB part in memory at a time regardless of total file size.
+    this._handleLargeFile(file, key, cb);
+  }
+
+  async _handleImageFile(file, key, cb) {
     const { PutObjectCommand } = require('@aws-sdk/client-s3');
     const chunks = [];
-
     file.stream.on('data', chunk => chunks.push(chunk));
     file.stream.on('error', err => cb(err));
     file.stream.on('end', async () => {
       const buffer = Buffer.concat(chunks);
       let dimensions = null;
-      if (file.mimetype?.startsWith('image/')) {
-        try {
-          const sharp = require('sharp');
-          const meta = await sharp(buffer).metadata();
-          dimensions = { width: meta.width ?? null, height: meta.height ?? null };
-        } catch { /* non-image or unreadable — dimensions stay null */ }
-      }
+      try {
+        const sharp = require('sharp');
+        const meta = await sharp(buffer).metadata();
+        dimensions = { width: meta.width ?? null, height: meta.height ?? null };
+      } catch { /* unreadable — dimensions stay null */ }
 
       getS3Client()
         .send(new PutObjectCommand({
@@ -133,6 +145,68 @@ class R2StorageEngine {
           cb(err);
         });
     });
+  }
+
+  async _handleLargeFile(file, key, cb) {
+    const {
+      CreateMultipartUploadCommand, UploadPartCommand,
+      CompleteMultipartUploadCommand, AbortMultipartUploadCommand,
+    } = require('@aws-sdk/client-s3');
+    const PART_SIZE = 10 * 1024 * 1024; // 10MB — S3/R2 minimum per part except the last
+    const client = getS3Client();
+    const bucket = config.storage.s3.bucket;
+
+    let uploadId;
+    try {
+      const created = await client.send(new CreateMultipartUploadCommand({
+        Bucket: bucket, Key: key, ContentType: file.mimetype,
+      }));
+      uploadId = created.UploadId;
+
+      const parts = [];
+      let partNumber = 1;
+      let pending = Buffer.alloc(0);
+      let totalSize = 0;
+
+      for await (const chunk of file.stream) {
+        pending = Buffer.concat([pending, chunk]);
+        totalSize += chunk.length;
+        while (pending.length >= PART_SIZE) {
+          const partBody = pending.subarray(0, PART_SIZE);
+          pending = pending.subarray(PART_SIZE);
+          const result = await client.send(new UploadPartCommand({
+            Bucket: bucket, Key: key, UploadId: uploadId, PartNumber: partNumber, Body: partBody,
+          }));
+          parts.push({ ETag: result.ETag, PartNumber: partNumber });
+          partNumber++;
+        }
+      }
+      // Final (possibly under 10MB) part — always send one, even for a file
+      // smaller than PART_SIZE, since multipart upload requires >= 1 part.
+      if (pending.length > 0 || parts.length === 0) {
+        const result = await client.send(new UploadPartCommand({
+          Bucket: bucket, Key: key, UploadId: uploadId, PartNumber: partNumber, Body: pending,
+        }));
+        parts.push({ ETag: result.ETag, PartNumber: partNumber });
+      }
+
+      await client.send(new CompleteMultipartUploadCommand({
+        Bucket: bucket, Key: key, UploadId: uploadId, MultipartUpload: { Parts: parts },
+      }));
+
+      cb(null, {
+        key, path: r2PublicUrl(key), size: totalSize,
+        filename: path.basename(key), width: null, height: null,
+      });
+    } catch (err) {
+      console.error('[R2] multipart upload failed:', err.Code || err.name, err.message);
+      if (uploadId) {
+        try {
+          await client.send(new AbortMultipartUploadCommand({ Bucket: bucket, Key: key, UploadId: uploadId }));
+        } catch { /* best-effort cleanup */ }
+      }
+      cb(err);
+    }
   }
 
   _removeFile(req, file, cb) {
