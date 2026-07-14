@@ -1178,9 +1178,18 @@ function AudioPlayer({ lesson, courseId }: { lesson: Lesson; courseId: string })
 
   // ── Spotify ──
   if (au.provider === 'spotify' && au.url) {
-    const spotifyId = au.url.match(/(?:track|episode|show)\/([A-Za-z0-9]+)/)?.[1] ?? '';
-    const isEpisode = au.url.includes('/episode/');
-    const embedType = isEpisode ? 'episode' : 'track';
+    // A link copied via "Share > Copy Song Link" from inside an album view looks like
+    // .../album/{albumId}?highlight=spotify:track:{trackId} — prefer the highlighted
+    // track (what the user actually meant to share) over embedding the whole album.
+    const highlightMatch = au.url.match(/highlight=spotify(?::|%3A)(track|episode)(?::|%3A)([A-Za-z0-9]+)/);
+    const pathMatch = au.url.match(/(track|episode|show|album|playlist)\/([A-Za-z0-9]+)/);
+    const embedType = highlightMatch?.[1] ?? pathMatch?.[1] ?? 'track';
+    const spotifyId = highlightMatch?.[2] ?? pathMatch?.[2] ?? '';
+    // Spotify's recommended embed heights differ by content type — a fixed
+    // 152px (right for a single track) clips an album/playlist's tracklist.
+    const embedHeight = embedType === 'album' || embedType === 'playlist' ? 352
+      : embedType === 'episode' || embedType === 'show' ? 232
+      : 152;
     return (
       <div className="rounded-2xl overflow-hidden border border-green-100 shadow-sm">
         <Header color="green" />
@@ -1189,7 +1198,7 @@ function AudioPlayer({ lesson, courseId }: { lesson: Lesson; courseId: string })
             <iframe
               src={`https://open.spotify.com/embed/${embedType}/${spotifyId}?utm_source=generator&theme=0`}
               width="100%"
-              height="152"
+              height={embedHeight}
               frameBorder="0"
               allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
               loading="lazy"

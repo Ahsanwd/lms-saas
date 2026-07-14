@@ -357,6 +357,21 @@ type VideoSource = 'youtube' | 'vimeo' | 'cloudflare' | 'upload' | 'bunny' | 'ex
 type AudioSource = 'upload' | 'external' | 'soundcloud' | 'spotify' | 'embed';
 type FileSource  = 'upload' | 'external' | 'gdrive' | 'dropbox' | 'onedrive' | 'embed';
 
+// The "External URL" audio/file source needs a *direct* file link (the browser's
+// native <audio>/<a> tag can't render an HTML preview page). Google Drive and
+// Dropbox share links are the two most common things people paste here instead —
+// auto-rewrite them to their direct-download form rather than silently failing.
+function normalizeDirectMediaUrl(url: string): string {
+  const trimmed = url.trim();
+  const driveMatch = trimmed.match(/drive\.google\.com\/file\/d\/([^/]+)/);
+  if (driveMatch) return `https://drive.google.com/uc?export=download&id=${driveMatch[1]}`;
+  if (trimmed.includes('dropbox.com')) {
+    if (/[?&]dl=0\b/.test(trimmed)) return trimmed.replace(/dl=0/, 'dl=1');
+    if (!/[?&]dl=/.test(trimmed)) return trimmed + (trimmed.includes('?') ? '&dl=1' : '?dl=1');
+  }
+  return trimmed;
+}
+
 function inferVideoSource(lesson: LessonModalProps['lesson']): VideoSource {
   if (!lesson?.video) return 'upload';
   const p = lesson.video.provider;
@@ -593,7 +608,9 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
       };
       payload.audio = {
         provider: audioProviderMap[audioSource],
-        url: audioSource !== 'upload' && audioSource !== 'embed' ? (audioUrl || null) : undefined,
+        url: audioSource !== 'upload' && audioSource !== 'embed'
+          ? (audioUrl ? (audioSource === 'external' ? normalizeDirectMediaUrl(audioUrl) : audioUrl) : null)
+          : undefined,
         embedCode: audioSource === 'embed' ? (audioEmbedCode || null) : undefined,
         durationSeconds: audioDuration ? Number(audioDuration) : undefined,
       };
@@ -1207,8 +1224,8 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
                       </ol>
                       <div className="mt-2.5 space-y-1 text-xs text-amber-800">
                         <p className="font-semibold">Platform tips:</p>
-                        <p>• <strong>Google Drive:</strong> Share → "Anyone with link" → change <code className="bg-amber-200 px-1 rounded">open?id=</code> to <code className="bg-amber-200 px-1 rounded">uc?export=download&id=</code></p>
-                        <p>• <strong>Dropbox:</strong> Change <code className="bg-amber-200 px-1 rounded">?dl=0</code> to <code className="bg-amber-200 px-1 rounded">?dl=1</code> at the end of the link</p>
+                        <p>• <strong>Google Drive:</strong> Share → "Anyone with link" — paste the normal share link as-is, it's converted to a direct link automatically on save.</p>
+                        <p>• <strong>Dropbox:</strong> Paste the normal share link as-is — <code className="bg-amber-200 px-1 rounded">?dl=0</code> is switched to <code className="bg-amber-200 px-1 rounded">?dl=1</code> automatically on save.</p>
                       </div>
                     </div>
                   </div>
