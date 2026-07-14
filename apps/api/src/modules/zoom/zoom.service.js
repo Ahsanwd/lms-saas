@@ -6,7 +6,11 @@ const { encrypt, decrypt } = require('../../utils/crypto');
 const AppError = require('../../utils/AppError');
 const logger = require('../../utils/logger');
 
-const ZOOM_AUTH_URL = 'https://zoom.us/oauth/authorize';
+// Zoom's newer General Apps (created via Platform Studio) require the
+// marketplace v2 authorize endpoint, not the legacy zoom.us/oauth/authorize
+// — confirmed by comparing against Zoom's own "Generate Authorization URL"
+// output under Local Test, which used this exact host+path and worked.
+const ZOOM_AUTH_URL = 'https://marketplace.zoom.us/v2/authorize';
 const ZOOM_API_BASE = 'https://api.zoom.us/v2';
 
 // ── Low-level HTTPS helpers ────────────────────────────────────────────────────
