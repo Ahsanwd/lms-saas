@@ -35,11 +35,15 @@ function LoginPage() {
     const onSubdomain = host !== rootDomain && host !== `www.${rootDomain}` && host.endsWith(`.${rootDomain}`);
     if (onSubdomain) setIsSubdomainHost(true);
 
-    // Pre-fill tenant from URL param always, but from cookie only when already
-    // on a subdomain — avoids the cookie poisoning the super-admin login on coursel.space
+    // Pre-fill tenant from URL param, then the hostname itself (authoritative
+    // when actually on a subdomain — a fresh browser with no cookie yet must
+    // still resolve the tenant), then finally the cookie as a last resort.
+    // Avoids reading the cookie on the root domain, which would poison the
+    // super-admin login on coursel.space.
     const tenantParam = searchParams.get('tenant');
+    const hostSubdomain = onSubdomain ? host.replace(`.${rootDomain}`, '') : '';
     const tenantCookie = onSubdomain ? (Cookies.get('lms_tenant') ?? '') : '';
-    const tenant = tenantParam || tenantCookie;
+    const tenant = tenantParam || hostSubdomain || tenantCookie;
     if (tenant) setSubdomainVal(tenant);
 
     if (searchParams.get('registered') === '1') {
