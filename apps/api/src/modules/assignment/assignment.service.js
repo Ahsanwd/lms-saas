@@ -9,6 +9,19 @@ const assignmentGradedTpl  = require('../../services/email/templates/assignmentG
 const assignmentSubmittedTpl = require('../../services/email/templates/assignmentSubmitted');
 const config   = require('../../config');
 const AppError = require('../../utils/AppError');
+const { deleteFile, getFileSizeBytes } = require('../../services/storage/storage.service');
+
+// Best-effort storage reclaim, mirrors the pattern used throughout
+// course.service.js — never let a cleanup failure break the actual mutation.
+function reclaimFile(tenantId, oldUrl) {
+  if (!oldUrl) return;
+  const size = getFileSizeBytes(oldUrl);
+  deleteFile(oldUrl);
+  if (size > 0) setImmediate(() => {
+    const lgSvc = require('../../services/limitGuard/limitGuard.service');
+    lgSvc.decrementStorageUsed(tenantId, size).catch(() => {});
+  });
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -124,6 +137,10 @@ async function updateAssignment(tenantId, id, data, user) {
     if (data[field] !== undefined) update[field] = data[field];
   }
 
+  if (data.attachmentUrl !== undefined && assignment.attachmentUrl && assignment.attachmentUrl !== data.attachmentUrl) {
+    reclaimFile(tenantId, assignment.attachmentUrl);
+  }
+
   if (Array.isArray(data.allowedFileTypes)) {
     update.allowedFileTypes = data.allowedFileTypes
       .map(t => t.toLowerCase().replace(/^\./, '').trim()).filter(Boolean);
@@ -182,6 +199,7 @@ async function deleteAssignment(tenantId, id, user) {
   if (!assignment) throw new AppError('Assignment not found', 404);
   if (!canManageAssignment(assignment, user)) throw new AppError('Forbidden', 403);
 
+  reclaimFile(tenantId, assignment.attachmentUrl);
   return assignmentRepo.softDelete(tenantId, id, user.sub);
 }
 
@@ -250,6 +268,10 @@ async function submitAssignment(tenantId, assignmentId, data, user, file) {
         `You have used all ${assignment.maxSubmissions} allowed submission${assignment.maxSubmissions > 1 ? 's' : ''}`,
         400
       );
+  }
+
+  if (file && existing?.fileUrl && existing.fileUrl !== file.url) {
+    reclaimFile(tenantId, existing.fileUrl);
   }
 
   const submissionData = {
@@ -322,17 +344,31 @@ async function gradeSubmission(tenantId, submissionId, data, user) {
   let rubricScores = null;
 
   if (Array.isArray(data.rubricScores) && data.rubricScores.length > 0) {
-    // Rubric grading path
+    // Rubric grading path — validate against the assignment's own saved
+    // rubric, never the maxPoints/criterion names the client sent. Without
+    // this, a tampered request could invent a fake criterion (or an
+    // inflated maxPoints for a real one) and award full marks while
+    // bypassing the actual rubric structure entirely.
+    if (!Array.isArray(assignment.rubric) || assignment.rubric.length === 0) {
+      throw new AppError('This assignment has no rubric configured', 400);
+    }
+    const rubricMaxByName = new Map(assignment.rubric.map(r => [r.criterion, r.maxPoints]));
+    if (data.rubricScores.length !== assignment.rubric.length) {
+      throw new AppError('All rubric criteria must be scored', 400);
+    }
     for (const r of data.rubricScores) {
+      const realMax = rubricMaxByName.get(r.criterion);
+      if (realMax === undefined)
+        throw new AppError(`Unknown rubric criterion "${r.criterion}"`, 400);
       if (Number(r.awardedPoints) < 0)
         throw new AppError(`awardedPoints cannot be negative for "${r.criterion}"`, 400);
-      if (Number(r.awardedPoints) > Number(r.maxPoints))
-        throw new AppError(`awardedPoints (${r.awardedPoints}) exceeds maxPoints (${r.maxPoints}) for "${r.criterion}"`, 400);
+      if (Number(r.awardedPoints) > realMax)
+        throw new AppError(`awardedPoints (${r.awardedPoints}) exceeds "${r.criterion}"'s maxPoints (${realMax})`, 400);
     }
     finalMarks = data.rubricScores.reduce((sum, r) => sum + Number(r.awardedPoints), 0);
     rubricScores = data.rubricScores.map(r => ({
       criterion:     r.criterion,
-      maxPoints:     Number(r.maxPoints),
+      maxPoints:     rubricMaxByName.get(r.criterion), // real value, never client-supplied
       awardedPoints: Number(r.awardedPoints),
     }));
   } else {
@@ -484,7 +520,15 @@ async function addComment(tenantId, assignmentId, submissionId, text, user) {
   const submission = await submissionRepo.findById(tenantId, submissionId);
   if (!submission) throw new AppError('Submission not found', 404);
 
-  const assignment = await assignmentRepo.findById(tenantId, assignmentId);
+  // The permission check below only verifies the caller manages the
+  // assignment this submission actually belongs to — never trust the URL's
+  // :assignmentId alone, or an instructor could pass a colleague's
+  // submissionId under their own assignmentId and both read and comment on
+  // a submission (marks, feedback, other comments) they don't own.
+  const submissionAssignmentId = (submission.assignmentId?._id ?? submission.assignmentId)?.toString();
+  if (submissionAssignmentId !== assignmentId) throw new AppError('Submission not found', 404);
+
+  const assignment = await assignmentRepo.findById(tenantId, submissionAssignmentId);
   if (!assignment) throw new AppError('Assignment not found', 404);
 
   // Only the submitting student or a manager (instructor/admin) may comment
