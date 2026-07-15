@@ -184,7 +184,6 @@ const NAV_ENTRIES: NavEntry[] = [
       { href: '/quizzes',             label: 'Quizzes',      icon: <QuizIcon />,          roles: ['tenant_admin', 'instructor', 'student'] },
       { href: '/certificates',        label: 'Certificates', icon: <CertBuilderIcon />,   roles: ['student'] },
       { href: '/certificate-builder', label: 'Certificates', icon: <CertBuilderIcon />,   roles: ['tenant_admin'] },
-      { href: '/bundles',             label: 'Bundles',      icon: <BundleIcon />,        roles: ['tenant_admin', 'instructor', 'student'] },
     ],
   },
 
@@ -192,6 +191,7 @@ const NAV_ENTRIES: NavEntry[] = [
   {
     key: 'monetization', label: 'Monetization', icon: <CreditCardIcon />,
     items: [
+      { href: '/bundles',          label: 'Bundles',          icon: <BundleIcon />,     roles: ['tenant_admin', 'instructor', 'student'] },
       { href: '/coupons',          label: 'Coupons',          icon: <CouponIcon />,     roles: ['tenant_admin'] },
       { href: '/membership-plans', label: 'Membership Plans', icon: <MembershipIcon />, roles: ['tenant_admin'] },
       { href: '/website-builder',  label: 'Website Builder',  icon: <WebsiteIcon />,    roles: ['tenant_admin'] },
