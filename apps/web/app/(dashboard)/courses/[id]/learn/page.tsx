@@ -921,6 +921,24 @@ function VideoPlayer({ lesson, courseId }: { lesson: Lesson; courseId: string })
   const [resumed, setResumed] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Fetch a signed R2 URL for locally-hosted video (enrollment-gated, 2h
+  // window) — the raw storage URL is never sent to students by the sections
+  // API, only through this token endpoint. refetchInterval renews it
+  // proactively (well before the 2h expiry) so long-focused viewing doesn't
+  // silently break mid-playback.
+  const isHosted = vid?.provider === 'local' || vid?.provider === 's3';
+  const { data: videoTokenData, isLoading: videoTokenLoading, isError: videoTokenError } = useQuery<{ signedUrl: string }>({
+    queryKey: ['video-token', lesson._id],
+    queryFn: async () => {
+      const { data } = await api.get(`/courses/${courseId}/lessons/${lesson._id}/video-token`);
+      return data.data;
+    },
+    enabled: !!vid && isHosted,
+    staleTime: 50 * 60 * 1000,
+    refetchInterval: 45 * 60 * 1000,
+    retry: 1,
+  });
+
   // Fetch resume position
   const { data: progressData } = useQuery<{ positionSeconds: number }>({
     queryKey: ['lesson-position', lesson._id],
@@ -964,7 +982,7 @@ function VideoPlayer({ lesson, courseId }: { lesson: Lesson; courseId: string })
 
   const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
-  if (!vid || (!vid.url && !vid.embedCode)) {
+  if (!vid || (!vid.url && !vid.embedCode && !isHosted)) {
     return (
       <div className="bg-gray-900 rounded-2xl flex flex-col items-center justify-center py-24 text-center">
         <div className="w-16 h-16 bg-gray-700 rounded-full flex items-center justify-center mb-4">
@@ -1021,13 +1039,33 @@ function VideoPlayer({ lesson, courseId }: { lesson: Lesson; courseId: string })
     );
   }
 
+  // ── Self-hosted — wait for the signed token before rendering the player ──
+  if (isHosted) {
+    if (videoTokenLoading) {
+      return (
+        <div className="bg-black rounded-2xl aspect-video flex items-center justify-center">
+          <Spinner size="sm" />
+        </div>
+      );
+    }
+    if (videoTokenError || !videoTokenData?.signedUrl) {
+      return (
+        <div className="bg-gray-900 rounded-2xl aspect-video flex items-center justify-center">
+          <p className="text-red-400 text-sm">Could not load video. Please refresh the page.</p>
+        </div>
+      );
+    }
+  }
+
   // ── Self-hosted / External URL — native HTML5 player with custom controls ──
+  const videoSrc = isHosted ? videoTokenData?.signedUrl : (vid.url ?? undefined);
   return (
     <div className="space-y-1" onClick={() => setShowSpeedMenu(false)}>
       <div className="relative rounded-2xl overflow-hidden bg-black shadow-xl group">
         <video
           ref={videoRef}
-          src={vid.url ?? undefined}
+          key={videoSrc}
+          src={videoSrc}
           className="w-full aspect-video"
           controls
           controlsList={disableDownload ? 'nodownload' : undefined}
@@ -1109,6 +1147,7 @@ function AudioPlayer({ lesson, courseId }: { lesson: Lesson; courseId: string })
     },
     enabled: !!au && isHosted,
     staleTime: 50 * 60 * 1000, // refresh well before 2h expiry
+    refetchInterval: 45 * 60 * 1000, // proactively renew during long-focused listening
     retry: 1,
   });
 
