@@ -34,6 +34,7 @@ router.patch('/:id/archive', requirePermission('quiz:manage'), ctrl.archiveQuiz)
 // ── Attempts ──────────────────────────────────────────────────────────────────
 router.post('/:id/attempt', requirePermission('quiz:read'), ctrl.startAttempt);
 router.post('/:id/attempt/submit', requirePermission('quiz:read'), ctrl.submitAttempt);
+router.patch('/:id/attempt/:attemptId/save', requirePermission('quiz:read'), ctrl.saveAttemptProgress);
 router.get('/:id/attempts/my', ctrl.myAttempts);
 router.get('/:id/attempts', requirePermission('quiz:manage'), ctrl.allAttempts);
 router.get('/:id/attempts/:attemptId', requirePermission('quiz:manage'), ctrl.getAttemptDetail);

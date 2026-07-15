@@ -11,6 +11,40 @@ function canManageQuiz(quiz, user) {
     quiz.instructorId?.toString() === user.sub;
 }
 
+// Per-type structural completeness needed for grading.engine.js to grade
+// meaningfully. Returns an error string naming the question, or null if ok.
+function validateQuestionStructure(question, index) {
+  const q = question;
+  const label = `Question ${index + 1} ("${(q.text || '').slice(0, 40)}")`;
+  switch (q.type) {
+    case 'multiple_choice':
+    case 'multiple_select':
+    case 'true_false':
+    case 'image':
+      if (!q.options?.some(o => o.isCorrect))
+        return `${label} has no correct option marked`;
+      return null;
+    case 'fill_blank':
+      if (!(q.correctAnswer || '').trim())
+        return `${label} has no correct answer set`;
+      return null;
+    case 'matching': {
+      const complete = (q.matchingPairs || []).filter(p => (p.left || '').trim() && (p.right || '').trim());
+      if (complete.length < 2)
+        return `${label} needs at least 2 complete matching pairs`;
+      return null;
+    }
+    case 'ordering':
+      if ((q.correctOrder || []).length < 2)
+        return `${label} needs at least 2 items to order`;
+      return null;
+    case 'short_answer':
+    case 'essay':
+    default:
+      return null;
+  }
+}
+
 // ─── Question Bank ────────────────────────────────────────────────────────────
 async function listQuestions(tenantId, user, query) {
   const { type, difficulty, courseId, tags, search, page, limit } = query;
@@ -61,6 +95,26 @@ async function updateQuestion(tenantId, id, data, user) {
     'timeLimitSeconds'];
   const update = { updatedBy: user.sub };
   for (const f of fields) { if (data[f] !== undefined) update[f] = data[f]; }
+
+  // Switching type leaves other types' answer-key fields stale (e.g. an
+  // old correctAnswer surviving a fill_blank -> essay switch), which can
+  // leak through getQuiz's per-type field selection later. Clear whatever
+  // the new type doesn't use, unless the caller explicitly supplied a
+  // fresh value for that field in this same request.
+  const newType = data.type !== undefined ? data.type : question.type;
+  if (data.type !== undefined) update.type = data.type;
+  const perTypeFields = {
+    options: ['multiple_choice', 'multiple_select', 'true_false', 'image'],
+    correctAnswer: ['fill_blank', 'short_answer'],
+    correctOrder: ['ordering'],
+    matchingPairs: ['matching'],
+  };
+  for (const [field, allowedTypes] of Object.entries(perTypeFields)) {
+    if (data[field] !== undefined) continue;
+    if (!allowedTypes.includes(newType)) {
+      update[field] = field === 'correctAnswer' ? null : [];
+    }
+  }
 
   return questionRepo.updateById(tenantId, id, update);
 }
@@ -235,6 +289,15 @@ async function publishQuiz(tenantId, id, user) {
   if (!quiz.randomConfig?.enabled && quiz.questions.length === 0)
     throw new AppError('Cannot publish quiz with no questions', 400);
 
+  if (!quiz.randomConfig?.enabled) {
+    for (let i = 0; i < quiz.questions.length; i++) {
+      const q = quiz.questions[i].questionId;
+      if (!q) continue;
+      const err = validateQuestionStructure(q, i);
+      if (err) throw new AppError(`Cannot publish quiz: ${err}`, 400);
+    }
+  }
+
   const updated = await quizRepo.updateById(tenantId, id, { status: 'published', publishedAt: new Date(), updatedBy: user.sub });
 
   // Notify all enrolled students
@@ -328,9 +391,31 @@ async function startAttempt(tenantId, quizId, user) {
   });
 }
 
+// Periodic autosave while taking a quiz — stores raw, ungraded answers so a
+// refresh or "Save & Exit" doesn't lose progress. Grading only ever happens
+// in submitAttempt; this never touches score/status. Answers are stored
+// as-is (no maxPoints/grading enrichment needed until real submission).
+async function saveAttemptProgress(tenantId, quizId, attemptId, answers, user) {
+  const attempt = await quizAttemptRepo.findById(tenantId, attemptId);
+  if (!attempt || attempt.quizId.toString() !== quizId) throw new AppError('Attempt not found', 404);
+  if (attempt.userId.toString() !== user.sub) throw new AppError('Forbidden', 403);
+  if (attempt.status !== 'in_progress') throw new AppError('Attempt already submitted', 400);
+
+  const rawAnswers = (answers || []).map(a => ({
+    questionId:        a.questionId,
+    questionType:      a.questionType || null,
+    selectedOptionId:  a.selectedOptionId ?? null,
+    selectedOptionIds: a.selectedOptionIds ?? [],
+    textAnswer:        a.textAnswer ?? null,
+    orderingAnswer:    a.orderingAnswer ?? [],
+  }));
+
+  return quizAttemptRepo.updateById(tenantId, attemptId, { answers: rawAnswers });
+}
+
 async function submitAttempt(tenantId, quizId, attemptId, answers, user) {
   const attempt = await quizAttemptRepo.findById(tenantId, attemptId);
-  if (!attempt) throw new AppError('Attempt not found', 404);
+  if (!attempt || attempt.quizId.toString() !== quizId) throw new AppError('Attempt not found', 404);
   if (attempt.userId.toString() !== user.sub) throw new AppError('Forbidden', 403);
   if (attempt.status !== 'in_progress') throw new AppError('Attempt already submitted', 400);
 
@@ -355,9 +440,21 @@ async function submitAttempt(tenantId, quizId, attemptId, answers, user) {
   const passed = percentage >= (quiz.settings.passingScore || 70);
   const timeSpent = Math.round((Date.now() - attempt.startedAt.getTime()) / 1000);
 
+  // The frontend timer already auto-submits at expiry — this is the
+  // server-side backstop against a tampered client submitting whenever it
+  // wants. A 90s grace period absorbs normal network/processing latency in
+  // that auto-submit round-trip without letting a deliberately-held-open
+  // attempt through.
+  if (quiz.settings.timer?.enabled) {
+    const limitSeconds = quiz.settings.timer.durationMinutes * 60;
+    if (timeSpent > limitSeconds + 90) {
+      throw new AppError('Time limit for this attempt has expired', 400, 'TIME_EXPIRED');
+    }
+  }
+
   const status = hasManual ? 'pending_manual' : 'auto_graded';
 
-  const updated = await quizAttemptRepo.updateById(attemptId, {
+  const updated = await quizAttemptRepo.updateById(tenantId, attemptId, {
     answers: gradedAnswers,
     score: totalScore,
     maxScore,
@@ -446,7 +543,7 @@ async function gradeEssayAnswers(tenantId, quizId, attemptId, grades, user) {
   const percentage = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0;
   const passed = percentage >= (quiz?.settings.passingScore || 70);
 
-  const result = await quizAttemptRepo.updateById(attemptId, {
+  const result = await quizAttemptRepo.updateById(tenantId, attemptId, {
     answers: updatedAnswers,
     score: totalScore,
     percentage,
@@ -657,7 +754,7 @@ module.exports = {
   listQuizzes, getQuiz, createQuiz, updateQuiz, setQuizQuestions,
   publishQuiz, archiveQuiz, deleteQuiz,
   duplicateQuiz,
-  startAttempt, submitAttempt, gradeEssayAnswers,
+  startAttempt, submitAttempt, saveAttemptProgress, gradeEssayAnswers,
   getMyAttempts, getAllAttempts, getAttemptDetail,
   getQuizAnalytics,
 };

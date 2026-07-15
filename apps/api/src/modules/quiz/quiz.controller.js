@@ -126,6 +126,16 @@ async function submitAttempt(req, res, next) {
   } catch (err) { next(err); }
 }
 
+async function saveAttemptProgress(req, res, next) {
+  try {
+    const { answers } = req.body;
+    const attempt = await quizService.saveAttemptProgress(
+      req.tenant.tenantId, req.params.id, req.params.attemptId, answers, req.user
+    );
+    R.success(res, { attempt }, 'Progress saved');
+  } catch (err) { next(err); }
+}
+
 async function gradeAttempt(req, res, next) {
   try {
     validateGradeAnswers(req.body.grades);
@@ -185,6 +195,6 @@ module.exports = {
   listQuizzes, getQuiz, createQuiz, updateQuiz, setQuestions,
   publishQuiz, archiveQuiz, deleteQuiz,
   duplicateQuiz,
-  startAttempt, submitAttempt, gradeAttempt,
+  startAttempt, submitAttempt, saveAttemptProgress, gradeAttempt,
   myAttempts, allAttempts, getAttemptDetail, getAnalytics,
 };

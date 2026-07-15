@@ -39,8 +39,8 @@ class QuizAttemptRepository {
     return QuizAttempt.create(data);
   }
 
-  updateById(id, update) {
-    return QuizAttempt.findByIdAndUpdate(id, update, { new: true });
+  updateById(tenantId, id, update) {
+    return QuizAttempt.findOneAndUpdate({ _id: id, tenantId }, update, { new: true });
   }
 
   // Analytics aggregation
