@@ -7,6 +7,7 @@ import { AxiosError } from 'axios';
 import api from '@/lib/api';
 import { Button, Badge, Spinner, Alert } from '@/components/ui';
 import { formatDate } from '@/lib/utils';
+import { useAuthStore } from '@/stores/auth.store';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface User { _id: string; firstName: string; lastName: string; email: string; avatar: string | null; }
@@ -259,6 +260,8 @@ type TabKey = 'all' | 'pending_manual' | 'auto_graded' | 'manually_graded';
 export default function QuizAttemptsPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const { user } = useAuthStore();
+  const isManager = user?.role === 'tenant_admin' || user?.role === 'instructor' || user?.role === 'super_admin';
   const [tab, setTab] = useState<TabKey>('all');
   const [selected, setSelected] = useState<Attempt | null>(null);
 
@@ -272,6 +275,7 @@ export default function QuizAttemptsPage() {
       const { data } = await api.get(`/quizzes/${id}/attempts?${params}`);
       return data.data;
     },
+    enabled: isManager,
   });
 
   const { data: quizData } = useQuery<{ quiz: Quiz }>({
@@ -293,6 +297,15 @@ export default function QuizAttemptsPage() {
   ];
 
   const fullName = (u: User) => `${u.firstName} ${u.lastName}`;
+
+  if (!isManager) {
+    return (
+      <div className="max-w-4xl p-6 text-center">
+        <p className="text-gray-500">You don't have access to this page.</p>
+        <Button className="mt-4" onClick={() => router.push('/quizzes')}>Back to Quizzes</Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-4xl">

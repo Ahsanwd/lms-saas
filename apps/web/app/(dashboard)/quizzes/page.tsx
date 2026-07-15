@@ -7,6 +7,7 @@ import { AxiosError } from 'axios';
 import api from '@/lib/api';
 import { Button, Badge, Spinner, Alert } from '@/components/ui';
 import { formatDate } from '@/lib/utils';
+import { useAuthStore } from '@/stores/auth.store';
 
 interface QuizSummary {
   _id: string;
@@ -135,6 +136,8 @@ function CreateQuizModal({ onClose, prefillLessonId, prefillCourseId }: CreateQu
 export default function QuizzesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { user } = useAuthStore();
+  const isManager = user?.role === 'tenant_admin' || user?.role === 'instructor' || user?.role === 'super_admin';
   const [showCreate, setShowCreate] = useState(false);
 
   const lessonIdParam = searchParams.get('lessonId');
@@ -162,12 +165,14 @@ export default function QuizzesPage() {
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Quizzes</h1>
           <p className="text-sm text-gray-500 mt-0.5">{quizzes.length} quiz{quizzes.length !== 1 ? 'zes' : ''}</p>
         </div>
-        <Button size="sm" onClick={() => setShowCreate(true)} className="flex-shrink-0">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          New Quiz
-        </Button>
+        {isManager && (
+          <Button size="sm" onClick={() => setShowCreate(true)} className="flex-shrink-0">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            New Quiz
+          </Button>
+        )}
       </div>
 
       {isLoading ? (
@@ -180,8 +185,10 @@ export default function QuizzesPage() {
             </svg>
           </div>
           <p className="text-gray-900 font-medium">No quizzes yet</p>
-          <p className="text-gray-500 text-sm mt-1">Create your first quiz to get started.</p>
-          <Button className="mt-4" onClick={() => setShowCreate(true)}>Create Quiz</Button>
+          <p className="text-gray-500 text-sm mt-1">
+            {isManager ? 'Create your first quiz to get started.' : 'Check back once your instructor publishes a quiz.'}
+          </p>
+          {isManager && <Button className="mt-4" onClick={() => setShowCreate(true)}>Create Quiz</Button>}
         </div>
       ) : (
         <>
@@ -198,9 +205,11 @@ export default function QuizzesPage() {
                 >
                   <div className="flex items-start justify-between gap-2">
                     <p className="font-semibold text-gray-900 text-sm leading-snug">{quiz.title}</p>
-                    <Badge variant={STATUS_BADGE[quiz.status] ?? 'default'} className="flex-shrink-0">
-                      {quiz.status}
-                    </Badge>
+                    {isManager && (
+                      <Badge variant={STATUS_BADGE[quiz.status] ?? 'default'} className="flex-shrink-0">
+                        {quiz.status}
+                      </Badge>
+                    )}
                   </div>
                   {courseName && (
                     <p className="text-xs text-primary-700 bg-primary-50 border border-primary-100 rounded-lg px-2 py-1 inline-block font-medium">
@@ -210,8 +219,11 @@ export default function QuizzesPage() {
                   <div className="flex items-center gap-4 text-xs text-gray-500 flex-wrap">
                     <span>{quiz.totalQuestions} questions</span>
                     <span>{quiz.settings?.passingScore ?? 70}% to pass</span>
-                    <span>{quiz.attemptCount} attempts</span>
+                    {isManager && <span>{quiz.attemptCount} attempts</span>}
                   </div>
+                  {!isManager && (
+                    <Button size="sm" className="w-full">Take Quiz →</Button>
+                  )}
                 </div>
               );
             })}
@@ -225,11 +237,11 @@ export default function QuizzesPage() {
                   <tr className="border-b border-gray-100 bg-gray-50">
                     <th className="text-left px-5 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Title</th>
                     <th className="text-left px-5 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Course</th>
-                    <th className="text-left px-5 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
+                    {isManager && <th className="text-left px-5 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>}
                     <th className="text-left px-5 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Questions</th>
                     <th className="text-left px-5 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Passing</th>
-                    <th className="text-left px-5 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Attempts</th>
-                    <th className="text-left px-5 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Created</th>
+                    {isManager && <th className="text-left px-5 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Attempts</th>}
+                    <th className="text-left px-5 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">{isManager ? 'Created' : 'Attempts left'}</th>
                     <th className="px-5 py-3" />
                   </tr>
                 </thead>
@@ -238,6 +250,8 @@ export default function QuizzesPage() {
                     const courseName = typeof quiz.courseId === 'object' && quiz.courseId
                       ? quiz.courseId.title
                       : null;
+                    const maxAttempts = quiz.settings?.maxAttempts ?? 0;
+                    const attemptsLeft = maxAttempts > 0 ? Math.max(maxAttempts - quiz.attemptCount, 0) : null;
 
                     return (
                       <tr
@@ -255,29 +269,44 @@ export default function QuizzesPage() {
                             <span className="text-xs text-gray-400 italic">No course</span>
                           )}
                         </td>
-                        <td className="px-5 py-3.5">
-                          <Badge variant={STATUS_BADGE[quiz.status] ?? 'default'}>{quiz.status}</Badge>
-                        </td>
+                        {isManager && (
+                          <td className="px-5 py-3.5">
+                            <Badge variant={STATUS_BADGE[quiz.status] ?? 'default'}>{quiz.status}</Badge>
+                          </td>
+                        )}
                         <td className="px-5 py-3.5 text-gray-600">{quiz.totalQuestions}</td>
                         <td className="px-5 py-3.5 text-gray-600">{quiz.settings?.passingScore ?? 70}%</td>
-                        <td className="px-5 py-3.5 text-gray-600">{quiz.attemptCount}</td>
-                        <td className="px-5 py-3.5 text-gray-500">{formatDate(quiz.createdAt)}</td>
+                        {isManager && <td className="px-5 py-3.5 text-gray-600">{quiz.attemptCount}</td>}
+                        <td className="px-5 py-3.5 text-gray-500">
+                          {isManager ? formatDate(quiz.createdAt) : (attemptsLeft === null ? 'Unlimited' : attemptsLeft)}
+                        </td>
                         <td className="px-4 py-3.5">
-                          <div className="flex items-center gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={(e) => { e.stopPropagation(); router.push(`/quizzes/${quiz._id}`); }}
-                            >
-                              Edit
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={(e) => { e.stopPropagation(); router.push(`/quizzes/${quiz._id}`); }}
-                            >
-                              Open →
-                            </Button>
+                          <div className="flex items-center justify-end gap-2">
+                            {isManager ? (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={(e) => { e.stopPropagation(); router.push(`/quizzes/${quiz._id}`); }}
+                                >
+                                  Edit
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={(e) => { e.stopPropagation(); router.push(`/quizzes/${quiz._id}`); }}
+                                >
+                                  Open →
+                                </Button>
+                              </>
+                            ) : (
+                              <Button
+                                size="sm"
+                                onClick={(e) => { e.stopPropagation(); router.push(`/quizzes/${quiz._id}`); }}
+                              >
+                                Take Quiz →
+                              </Button>
+                            )}
                           </div>
                         </td>
                       </tr>
