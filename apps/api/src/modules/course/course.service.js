@@ -244,6 +244,24 @@ async function deleteCourse(tenantId, courseId, user) {
   return courseRepo.softDelete(tenantId, courseId, user.sub);
 }
 
+// The raw storage URL for locally-hosted media (video/audio/file, provider
+// 'local' or 's3') must never reach a student directly — it points at a
+// publicly-readable R2/CDN path with no access control of its own; the only
+// real gate is the app never handing it out. Students always fetch playable
+// URLs through the dedicated video-token/audio-token/file-token endpoints,
+// which enforce enrollment (and preview/drip) at request time instead.
+// External providers (YouTube, Vimeo, SoundCloud, Spotify, external links,
+// embeds) are intentionally public — left untouched.
+function redactHostedMediaUrls(lessonObj) {
+  for (const field of ['video', 'audio', 'file']) {
+    const media = lessonObj[field];
+    if (media && (media.provider === 'local' || media.provider === 's3')) {
+      lessonObj[field] = { ...media, url: null };
+    }
+  }
+  return lessonObj;
+}
+
 // ─── Sections ─────────────────────────────────────────────────────────────────
 async function getSections(tenantId, courseId, user) {
   const course = await courseRepo.findById(tenantId, courseId);
@@ -303,6 +321,7 @@ async function getSections(tenantId, courseId, user) {
             if (unlockDate > now) lockedUntil = unlockDate;
           }
           lessonObj.dripLockedUntil = lockedUntil;
+          redactHostedMediaUrls(lessonObj);
         } else {
           lessonObj.dripLockedUntil = null;
         }
@@ -347,7 +366,17 @@ async function deleteSection(tenantId, courseId, sectionId, user) {
   if (!canEditCourse(course, user)) throw new AppError('Forbidden', 403);
 
   const section = await sectionRepo.findById(tenantId, sectionId);
-  if (!section) throw new AppError('Section not found', 404);
+  if (!section || section.courseId.toString() !== courseId) throw new AppError('Section not found', 404);
+
+  // Cascade: a deleted section's lessons must not become orphaned — otherwise
+  // they vanish from the curriculum list but stay fully live and reachable
+  // (and playable/downloadable) through every lesson-scoped endpoint, and
+  // keep counting toward the course's lesson total. Reuses deleteLesson so
+  // storage reclaim logic stays in one place.
+  const lessons = await lessonRepo.findBySection(tenantId, courseId, sectionId);
+  for (const lesson of lessons) {
+    await deleteLesson(tenantId, courseId, sectionId, lesson._id.toString(), user);
+  }
 
   await sectionRepo.softDelete(tenantId, sectionId, user.sub);
   await courseRepo.incrementCounter(tenantId, courseId, { totalSections: -1 });
@@ -367,7 +396,10 @@ async function getLessons(tenantId, courseId, sectionId, user) {
   if (!course) throw new AppError('Course not found', 404);
   const lessons = await lessonRepo.findBySection(tenantId, courseId, sectionId);
   const isEditor = canEditCourse(course, user);
-  return isEditor ? lessons : lessons.filter(l => l.isPublished);
+  if (isEditor) return lessons;
+  return lessons
+    .filter(l => l.isPublished)
+    .map(l => redactHostedMediaUrls(l.toObject ? l.toObject() : { ...l }));
 }
 
 async function createLesson(tenantId, courseId, sectionId, data, user) {
@@ -488,7 +520,7 @@ async function uploadLessonVideo(tenantId, courseId, lessonId, file, user) {
   if (!canEditCourse(course, user)) throw new AppError('Forbidden', 403);
 
   const lesson = await lessonRepo.findById(tenantId, lessonId);
-  if (!lesson) throw new AppError('Lesson not found', 404);
+  if (!lesson || lesson.courseId.toString() !== courseId) throw new AppError('Lesson not found', 404);
   if (lesson.video?.url) {
     if (lesson.video.provider === 'cloudflare') {
       cleanupCloudflareVideo(tenantId, lesson.video);
@@ -519,7 +551,7 @@ async function confirmCfStreamVideo(tenantId, courseId, lessonId, videoUid, user
   if (!canEditCourse(course, user)) throw new AppError('Forbidden', 403);
 
   const lesson = await lessonRepo.findById(tenantId, lessonId);
-  if (!lesson) throw new AppError('Lesson not found', 404);
+  if (!lesson || lesson.courseId.toString() !== courseId) throw new AppError('Lesson not found', 404);
 
   const updated = await lessonRepo.updateById(tenantId, lessonId, {
     'video.url':      videoUid,
@@ -542,7 +574,7 @@ async function syncCfStreamDuration(tenantId, courseId, lessonId, planId, durati
   if (!canEditCourse(course, user)) throw new AppError('Forbidden', 403);
 
   const lesson = await lessonRepo.findById(tenantId, lessonId);
-  if (!lesson) throw new AppError('Lesson not found', 404);
+  if (!lesson || lesson.courseId.toString() !== courseId) throw new AppError('Lesson not found', 404);
   if (lesson.video?.provider !== 'cloudflare' || !lesson.video.url) return lesson;
   if (lesson.video.durationSeconds > 0) return lesson; // already synced
 
@@ -588,7 +620,7 @@ async function confirmBunnyVideo(tenantId, courseId, lessonId, videoGuid, user) 
   if (!canEditCourse(course, user)) throw new AppError('Forbidden', 403);
 
   const lesson = await lessonRepo.findById(tenantId, lessonId);
-  if (!lesson) throw new AppError('Lesson not found', 404);
+  if (!lesson || lesson.courseId.toString() !== courseId) throw new AppError('Lesson not found', 404);
 
   const updated = await lessonRepo.updateById(tenantId, lessonId, {
     'video.url':      videoGuid,
@@ -605,7 +637,7 @@ async function uploadLessonAudio(tenantId, courseId, lessonId, file, user) {
   if (!canEditCourse(course, user)) throw new AppError('Forbidden', 403);
 
   const lesson = await lessonRepo.findById(tenantId, lessonId);
-  if (!lesson) throw new AppError('Lesson not found', 404);
+  if (!lesson || lesson.courseId.toString() !== courseId) throw new AppError('Lesson not found', 404);
   if (lesson.audio?.url) {
     const oldSize = getFileSizeBytes(lesson.audio.url);
     deleteFile(lesson.audio.url);
@@ -631,7 +663,7 @@ async function uploadLessonFile(tenantId, courseId, lessonId, file, user) {
   if (!canEditCourse(course, user)) throw new AppError('Forbidden', 403);
 
   const lesson = await lessonRepo.findById(tenantId, lessonId);
-  if (!lesson) throw new AppError('Lesson not found', 404);
+  if (!lesson || lesson.courseId.toString() !== courseId) throw new AppError('Lesson not found', 404);
 
   // Per-type size limit (multer global ceiling is 100 MB; we enforce finer limits here)
   const { getPerTypeLimit, USE_S3 } = require('../../services/storage/storage.service');
@@ -692,7 +724,7 @@ async function addLessonAttachment(tenantId, courseId, lessonId, file, user) {
   if (!canEditCourse(course, user)) throw new AppError('Forbidden', 403);
 
   const lesson = await lessonRepo.findById(tenantId, lessonId);
-  if (!lesson) throw new AppError('Lesson not found', 404);
+  if (!lesson || lesson.courseId.toString() !== courseId) throw new AppError('Lesson not found', 404);
 
   const url = getPublicUrl(file.path);
   const attachment = { name: file.originalname, url, mimeType: file.mimetype, sizeBytes: file.size };
@@ -709,7 +741,7 @@ async function removeLessonAttachment(tenantId, courseId, lessonId, attachmentId
   if (!canEditCourse(course, user)) throw new AppError('Forbidden', 403);
 
   const lesson = await lessonRepo.findById(tenantId, lessonId);
-  if (!lesson) throw new AppError('Lesson not found', 404);
+  if (!lesson || lesson.courseId.toString() !== courseId) throw new AppError('Lesson not found', 404);
 
   const attachment = lesson.attachments?.find(a => a._id.toString() === attachmentId);
   if (!attachment) throw new AppError('Attachment not found', 404);
@@ -733,7 +765,7 @@ async function deleteLesson(tenantId, courseId, sectionId, lessonId, user) {
   if (!canEditCourse(course, user)) throw new AppError('Forbidden', 403);
 
   const lesson = await lessonRepo.findById(tenantId, lessonId);
-  if (!lesson) throw new AppError('Lesson not found', 404);
+  if (!lesson || lesson.courseId.toString() !== courseId) throw new AppError('Lesson not found', 404);
 
   // Reclaim all storage used by this lesson's media files
   let reclaimBytes = 0;
@@ -771,6 +803,10 @@ async function reorderLessons(tenantId, courseId, sectionId, items, user) {
   const course = await courseRepo.findById(tenantId, courseId);
   if (!course) throw new AppError('Course not found', 404);
   if (!canEditCourse(course, user)) throw new AppError('Forbidden', 403);
+
+  const section = await sectionRepo.findById(tenantId, sectionId);
+  if (!section || section.courseId.toString() !== courseId) throw new AppError('Section not found', 404);
+
   return lessonRepo.reorder(tenantId, sectionId, items);
 }
 
@@ -1214,7 +1250,11 @@ async function verifyCertificate(certificateId) {
 }
 
 // ─── Revoke Certificate ───────────────────────────────────────────────────────
-async function revokeCertificate(tenantId, courseId, userId, adminId, reason) {
+async function revokeCertificate(tenantId, courseId, userId, user, reason) {
+  const course = await courseRepo.findById(tenantId, courseId);
+  if (!course) throw new AppError('Course not found', 404);
+  if (!canEditCourse(course, user)) throw new AppError('Forbidden', 403);
+
   const enrollment = await enrollmentRepo.findByUserAndCourse(tenantId, userId, courseId);
   if (!enrollment) throw new AppError('Enrollment not found', 404);
   if (!enrollment.certificateIssued) throw new AppError('No certificate has been issued for this enrollment', 400);
@@ -1223,7 +1263,7 @@ async function revokeCertificate(tenantId, courseId, userId, adminId, reason) {
   await enrollmentRepo.updateByUserAndCourse(tenantId, userId, courseId, {
     certificateRevoked:      true,
     certificateRevokedAt:    new Date(),
-    certificateRevokedBy:    adminId,
+    certificateRevokedBy:    user.sub,
     certificateRevokeReason: reason || null,
   });
 

@@ -390,7 +390,7 @@ async function revokeCertificate(req, res, next) {
   try {
     const { reason } = req.body;
     const result = await courseService.revokeCertificate(
-      req.tenant.tenantId, req.params.id, req.params.userId, req.user.sub, reason
+      req.tenant.tenantId, req.params.id, req.params.userId, req.user, reason
     );
     R.success(res, result, 'Certificate revoked');
   } catch (err) { next(err); }
@@ -608,6 +608,38 @@ async function audioToken(req, res, next) {
   } catch (err) { next(err); }
 }
 
+async function videoToken(req, res, next) {
+  try {
+    const { tenantId }            = req.tenant;
+    const { id: courseId, lessonId } = req.params;
+
+    const Lesson     = require('../../database/models/Lesson.model');
+    const Enrollment = require('../../database/models/Enrollment.model');
+
+    const lesson = await Lesson.findOne({ _id: lessonId, tenantId, deletedAt: null }).lean();
+    if (!lesson?.video?.url) return R.error(res, 'Lesson video not found', 404);
+
+    // Only local/R2-hosted video gets signed — external URLs (YouTube, Vimeo,
+    // Cloudflare Stream, Bunny, embeds) pass through and are handled by their
+    // own dedicated player logic on the frontend, never this endpoint.
+    if (lesson.video.provider !== 'local' && lesson.video.provider !== 's3') {
+      return R.success(res, { signedUrl: lesson.video.url, signed: false });
+    }
+
+    // Students must be enrolled, unless this lesson is marked Free Preview
+    if (req.user.role === 'student' && !lesson.isPreview) {
+      const enrolled = await Enrollment.findOne({
+        tenantId, courseId, userId: req.user.sub, status: 'active',
+      }).lean();
+      if (!enrolled) return R.error(res, 'Not enrolled in this course', 403);
+    }
+
+    const { generatePresignedGetUrl } = require('../../services/storage/storage.service');
+    const signedUrl = await generatePresignedGetUrl(lesson.video.url, 7200); // 2-hour window
+    R.success(res, { signedUrl, signed: true, expiresIn: 7200 });
+  } catch (err) { next(err); }
+}
+
 async function importScorm(req, res, next) {
   try {
     if (!req.file) return R.error(res, 'SCORM .zip file required', 400);
@@ -628,6 +660,7 @@ module.exports = {
   removeAttachment, deleteLesson, reorderLessons,
   getLessonQuiz, createLessonQuiz, detachLessonQuiz,
   audioToken,
+  videoToken,
   presignVideoUpload,
   importScorm,
   cfStreamUploadUrl, cfStreamConfirm, cfStreamStatus, cfStreamToken,

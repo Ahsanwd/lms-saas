@@ -303,6 +303,7 @@ router.post('/:id/lessons/:lessonId/audio',
   ctrl.uploadAudio
 );
 router.get('/:id/lessons/:lessonId/audio-token', requirePermission('course:read'), ctrl.audioToken);
+router.get('/:id/lessons/:lessonId/video-token', requirePermission('course:read'), ctrl.videoToken);
 router.post('/:id/lessons/:lessonId/file',
   requirePermission('course:update'),
   guardStorageLimit(),
