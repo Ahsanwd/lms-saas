@@ -130,7 +130,7 @@ async function gradeAttempt(req, res, next) {
   try {
     validateGradeAnswers(req.body.grades);
     const attempt = await quizService.gradeEssayAnswers(
-      req.tenant.tenantId, req.params.attemptId, req.body.grades, req.user
+      req.tenant.tenantId, req.params.id, req.params.attemptId, req.body.grades, req.user
     );
     R.success(res, { attempt }, 'Grading complete');
   } catch (err) { next(err); }

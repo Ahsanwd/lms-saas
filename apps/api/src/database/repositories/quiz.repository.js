@@ -8,7 +8,13 @@ class QuizRepository {
       Quiz.find(query)
         .populate('instructorId', 'name avatar')
         .populate('courseId', 'title')
-        .sort({ createdAt: -1 })
+        // publishedAt ascending — earliest-published quiz first, later ones
+        // below. Unpublished drafts have publishedAt:null, which MongoDB
+        // sorts first in ascending order — a reasonable side effect, since
+        // in-progress drafts naturally bubble to the top for the instructor
+        // who still needs to work on them (students never see drafts at
+        // all, filtered out above). createdAt is just the tiebreaker.
+        .sort({ publishedAt: 1, createdAt: -1 })
         .skip(skip)
         .limit(Number(limit)),
       Quiz.countDocuments(query),

@@ -59,6 +59,7 @@ const quizSchema = new mongoose.Schema(
       enum: ['draft', 'published', 'archived'],
       default: 'draft',
     },
+    publishedAt: { type: Date, default: null },
 
     // Denormalized
     totalQuestions: { type: Number, default: 0 },

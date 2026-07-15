@@ -93,12 +93,26 @@ async function getQuiz(tenantId, id, user) {
   if (quiz.status !== 'published' && !canManageQuiz(quiz, user))
     throw new AppError('Quiz not found', 404);
 
-  // Hide correct answers from students unless showCorrectAnswers is enabled
-  if (user.role === 'student' && !quiz.settings.showCorrectAnswers) {
+  // Hide correct answers from students by default. showCorrectAnswers only
+  // reveals them for REVIEW, after the student has actually finished an
+  // attempt — never on the initial fetch used to view/start the quiz.
+  // Previously this checked quiz.settings.showCorrectAnswers alone, which
+  // meant the full answer key (options[].isCorrect, correctAnswer,
+  // correctOrder) was sent to the browser the moment the quiz info screen
+  // loaded, before the student had even started — whenever an instructor
+  // had that setting on.
+  let revealAnswers = false;
+  if (user.role === 'student' && quiz.settings.showCorrectAnswers) {
+    const attempts = await quizAttemptRepo.findByUserAndQuiz(tenantId, id, user.sub);
+    revealAnswers = attempts.some(a => a.status !== 'in_progress');
+  }
+
+  if (user.role === 'student' && !revealAnswers) {
     quiz.questions.forEach(q => {
       if (q.questionId) {
         q.questionId.options?.forEach(o => { o.isCorrect = undefined; });
         q.questionId.correctAnswer = undefined;
+        q.questionId.explanation = undefined;
         if (q.questionId.type === 'ordering') {
           // Shuffle items so student sees them in random order (not the correct sequence)
           const items = [...(q.questionId.correctOrder || [])];
@@ -109,6 +123,18 @@ async function getQuiz(tenantId, id, user) {
           q.questionId.correctOrder = items;
         } else {
           q.questionId.correctOrder = undefined;
+        }
+        if (q.questionId.type === 'matching' && q.questionId.matchingPairs?.length) {
+          // The left/right pairing itself IS the answer key — shuffle the
+          // right-hand values across pairs so the student still gets the
+          // full pool of options to match against, without the correct
+          // correspondence being readable straight from the response.
+          const rights = q.questionId.matchingPairs.map(p => p.right);
+          for (let i = rights.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [rights[i], rights[j]] = [rights[j], rights[i]];
+          }
+          q.questionId.matchingPairs = q.questionId.matchingPairs.map((p, i) => ({ left: p.left, right: rights[i] }));
         }
       }
     });
@@ -209,7 +235,7 @@ async function publishQuiz(tenantId, id, user) {
   if (!quiz.randomConfig?.enabled && quiz.questions.length === 0)
     throw new AppError('Cannot publish quiz with no questions', 400);
 
-  const updated = await quizRepo.updateById(tenantId, id, { status: 'published', updatedBy: user.sub });
+  const updated = await quizRepo.updateById(tenantId, id, { status: 'published', publishedAt: new Date(), updatedBy: user.sub });
 
   // Notify all enrolled students
   try {
@@ -375,9 +401,13 @@ async function submitAttempt(tenantId, quizId, attemptId, answers, user) {
   return updated;
 }
 
-async function gradeEssayAnswers(tenantId, attemptId, grades, user) {
+async function gradeEssayAnswers(tenantId, quizId, attemptId, grades, user) {
+  const quiz = await quizRepo.findById(tenantId, quizId);
+  if (!quiz) throw new AppError('Quiz not found', 404);
+  if (!canManageQuiz(quiz, user)) throw new AppError('Forbidden', 403);
+
   const attempt = await quizAttemptRepo.findById(tenantId, attemptId);
-  if (!attempt) throw new AppError('Attempt not found', 404);
+  if (!attempt || attempt.quizId.toString() !== quizId) throw new AppError('Attempt not found', 404);
   if (!['pending_manual', 'manually_graded'].includes(attempt.status))
     throw new AppError('Attempt is not pending manual grading', 400);
 
@@ -398,11 +428,14 @@ async function gradeEssayAnswers(tenantId, attemptId, grades, user) {
     const grade = grades.find(g => g.questionId === qid);
     // Guard: only apply manual grade if question is confirmed essay type
     if (grade && essayIds.has(qid)) {
+      // Clamp to [0, maxPoints] — never trust the raw client-supplied value,
+      // same class of gap already fixed in Assignment's rubric grading.
+      const clampedPoints = Math.max(0, Math.min(Number(grade.pointsAwarded) || 0, answer.maxPoints));
       return {
         ...answer.toObject(),
-        pointsAwarded: grade.pointsAwarded,
+        pointsAwarded: clampedPoints,
         feedback: grade.feedback || null,
-        isCorrect: grade.pointsAwarded >= answer.maxPoints,
+        isCorrect: clampedPoints >= answer.maxPoints,
       };
     }
     return answer.toObject();
@@ -411,7 +444,6 @@ async function gradeEssayAnswers(tenantId, attemptId, grades, user) {
   totalScore = updatedAnswers.reduce((s, a) => s + (a.pointsAwarded || 0), 0);
   const maxScore = attempt.maxScore;
   const percentage = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0;
-  const quiz = await quizRepo.findById(tenantId, attempt.quizId);
   const passed = percentage >= (quiz?.settings.passingScore || 70);
 
   const result = await quizAttemptRepo.updateById(attemptId, {
