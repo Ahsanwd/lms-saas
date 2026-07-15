@@ -194,13 +194,12 @@ const NAV_ENTRIES: NavEntry[] = [
       { href: '/website-builder',  label: 'Website Builder',  icon: <WebsiteIcon />,    roles: ['tenant_admin'] },
       { href: '/bundles',          label: 'Bundles',          icon: <BundleIcon />,     roles: ['tenant_admin', 'instructor', 'student'] },
       { href: '/coupons',          label: 'Coupons',          icon: <CouponIcon />,     roles: ['tenant_admin'] },
+      { href: '/groups',           label: 'Groups',           icon: <GroupIcon />,      roles: ['tenant_admin'] },
+      { href: '/cohorts',          label: 'Cohorts',          icon: <CohortIcon />,     roles: ['tenant_admin'] },
       { href: '/membership-plans', label: 'Membership Plans', icon: <MembershipIcon />, roles: ['tenant_admin'] },
       { href: '/membership',       label: 'Membership',       icon: <MembershipIcon />, roles: ['student'] },
       { href: '/my-payments',      label: 'Payment History',  icon: <CreditCardIcon />, roles: ['student'] },
       { href: '/bookmarks',        label: 'Saved Courses',    icon: <BookmarkIcon />,   roles: ['student'] },
-      { href: '/billing',          label: 'Billing',          icon: <CreditCardIcon />, roles: ['tenant_admin'] },
-      { href: '/admin/billing',    label: 'Billing',          icon: <CreditCardIcon />, roles: ['super_admin'] },
-      { href: '/admin/refunds',    label: 'Refund Requests',  icon: <RefundIcon />,     roles: ['tenant_admin'] },
     ],
   },
 
@@ -208,13 +207,11 @@ const NAV_ENTRIES: NavEntry[] = [
   {
     key: 'engage', label: 'Engage', icon: <ChatIcon />,
     items: [
-      { href: '/notifications', label: 'Notifications', icon: <BellIcon />,      roles: ['tenant_admin', 'instructor', 'student'], badge: 'notif-count' },
       { href: '/chat',          label: 'Chat',           icon: <ChatIcon />,      roles: ['tenant_admin', 'instructor', 'student'], badge: 'chat-count' },
       { href: '/announcements', label: 'Announcements',  icon: <MegaphoneIcon />, roles: ['tenant_admin', 'instructor', 'student'] },
+      { href: '/notifications', label: 'Notifications', icon: <BellIcon />,      roles: ['tenant_admin', 'instructor', 'student'], badge: 'notif-count' },
       { href: '/contact-submissions', label: 'Contact Submissions', icon: <MailIcon />, roles: ['tenant_admin'] },
       { href: '/course-applications', label: 'Course Applications', icon: <ClipboardCheckIcon />, roles: ['tenant_admin'] },
-      { href: '/groups',        label: 'Groups',         icon: <GroupIcon />,     roles: ['tenant_admin'] },
-      { href: '/cohorts',       label: 'Cohorts',        icon: <CohortIcon />,    roles: ['tenant_admin'] },
     ],
   },
 
@@ -234,6 +231,9 @@ const NAV_ENTRIES: NavEntry[] = [
       { href: '/users',         label: 'Users',   icon: <UsersIcon />,    roles: ['tenant_admin'] },
       { href: '/media',         label: 'Media Library', icon: <MediaIcon />, roles: ['tenant_admin', 'instructor'] },
       { href: '/admin/tenants', label: 'Tenants', icon: <BuildingIcon />, roles: ['super_admin'] },
+      { href: '/billing',          label: 'Billing',          icon: <CreditCardIcon />, roles: ['tenant_admin'] },
+      { href: '/admin/billing',    label: 'Billing',          icon: <CreditCardIcon />, roles: ['super_admin'] },
+      { href: '/admin/refunds',    label: 'Refund Requests',  icon: <RefundIcon />,     roles: ['tenant_admin'] },
     ],
   },
 
