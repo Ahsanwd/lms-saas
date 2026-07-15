@@ -58,6 +58,10 @@ export function GradeQueue({ submissions, assignment, onClose, onGraded }: Grade
   const [saving, setSaving]       = useState(false);
   const [showPDF, setShowPDF]     = useState(false);
   const [done, setDone]           = useState(false);
+  // True when this submission's rubricScores were graded under a rubric
+  // that's since been edited/renamed — matching by criterion NAME (no
+  // stable id in the schema) means a renamed criterion silently resets to 0.
+  const [rubricChangedSinceGrading, setRubricChangedSinceGrading] = useState(false);
 
   const current = localSubs[currentIndex] ?? null;
   const total   = localSubs.length;
@@ -73,6 +77,10 @@ export function GradeQueue({ submissions, assignment, onClose, onGraded }: Grade
         const ex = sub.rubricScores?.find(s => s.criterion === r.criterion);
         return { criterion: r.criterion, maxPoints: r.maxPoints, awardedPoints: ex?.awardedPoints ?? 0 };
       }) ?? []
+    );
+    const currentCriteria = new Set((assignment.rubric ?? []).map(r => r.criterion));
+    setRubricChangedSinceGrading(
+      !!sub.rubricScores?.length && sub.rubricScores.some(s => !currentCriteria.has(s.criterion))
     );
     setError('');
     setShowPDF(false);
@@ -322,6 +330,13 @@ export function GradeQueue({ submissions, assignment, onClose, onGraded }: Grade
                 {/* Rubric or simple marks */}
                 {hasRubric ? (
                   <div className="space-y-3">
+                    {rubricChangedSinceGrading && (
+                      <Alert variant="warning">
+                        This assignment's rubric was changed since this submission was last graded —
+                        one or more previous criterion scores couldn't be matched and were reset to 0.
+                        Review all scores below before saving.
+                      </Alert>
+                    )}
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-medium text-gray-600">Rubric Scoring</span>
                       <span className="text-sm font-bold text-primary-600">

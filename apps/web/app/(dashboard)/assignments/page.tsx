@@ -52,7 +52,7 @@ export default function AssignmentsPage() {
   const [status, setStatus] = useState('');
   const [page, setPage]     = useState(1);
 
-  const isManager = user?.role === 'tenant_admin' || user?.role === 'instructor';
+  const isManager = user?.role === 'tenant_admin' || user?.role === 'instructor' || user?.role === 'super_admin';
   const isStudent = user?.role === 'student';
 
   // ── Assignment list ──

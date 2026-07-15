@@ -354,7 +354,14 @@ function GradeModal({ submission, assignment, onClose, onGraded }: GradeModalPro
   const [error, setError]       = useState('');
   const [showPDF, setShowPDF]   = useState(false);
 
-  // Rubric scores state — seed from existing rubricScores or zeros
+  // Rubric scores state — seed from existing rubricScores or zeros. Matched
+  // by criterion NAME (the schema has no stable per-criterion id) — if the
+  // rubric was edited/renamed since this submission was last graded, a
+  // previously-scored criterion won't match and silently resets to 0.
+  const currentCriteria = new Set((rubric ?? []).map(r => r.criterion));
+  const rubricChangedSinceGrading = !!submission.rubricScores?.length &&
+    submission.rubricScores.some(s => !currentCriteria.has(s.criterion));
+
   const [rubricScores, setRubricScores] = useState<RubricScore[]>(() =>
     rubric?.map((r) => {
       const existing = submission.rubricScores?.find(s => s.criterion === r.criterion);
@@ -453,6 +460,13 @@ function GradeModal({ submission, assignment, onClose, onGraded }: GradeModalPro
 
             {hasRubric ? (
               <div>
+                {rubricChangedSinceGrading && (
+                  <Alert variant="warning">
+                    This assignment's rubric was changed since this submission was last graded —
+                    one or more previous criterion scores couldn't be matched and were reset to 0.
+                    Review all scores below before saving.
+                  </Alert>
+                )}
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-sm font-medium text-gray-700">Rubric Scoring</label>
                   <span className="text-sm font-semibold text-primary-600">
@@ -1749,7 +1763,7 @@ export default function AssignmentDetailPage() {
     queryClient.setQueryData(['assignment', id], updated);
   }
 
-  const isManager = user?.role === 'tenant_admin' || user?.role === 'instructor';
+  const isManager = user?.role === 'tenant_admin' || user?.role === 'instructor' || user?.role === 'super_admin';
 
   if (isLoading || isPending) return (
     <div className="flex items-center justify-center h-64"><Spinner size="lg" /></div>
