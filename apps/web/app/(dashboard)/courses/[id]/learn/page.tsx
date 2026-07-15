@@ -874,6 +874,7 @@ function CfStreamPlayer({ lesson, courseId, watermark, watermarkText }: {
       return data.data;
     },
     staleTime: 50 * 60 * 1000, // token is valid 1h; refresh at 50min
+    refetchInterval: 50 * 60 * 1000, // proactively renew during long-focused viewing
     retry: 1,
   });
 
@@ -1837,7 +1838,12 @@ function LessonContent({ lesson }: { lesson: Lesson }) {
   }
 
   if (lesson.type === 'video') {
-    return <VideoPlayer lesson={lesson} courseId={lesson.courseId} />;
+    // key forces a full remount per lesson — without it, VideoPlayer's
+    // internal `resumed` flag (and other per-video state) carries over from
+    // the previous lesson, so only the very first video watched in a
+    // session ever seeks to its saved position; every one after silently
+    // doesn't.
+    return <VideoPlayer key={lesson._id} lesson={lesson} courseId={lesson.courseId} />;
   }
 
   if (lesson.type === 'audio') {
