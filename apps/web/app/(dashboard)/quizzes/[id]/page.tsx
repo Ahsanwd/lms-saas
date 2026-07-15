@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
@@ -73,6 +73,15 @@ interface ActiveAttempt {
   _id: string;
   servedQuestions: Array<string | QuizQuestion>;
   startedAt: string;
+  // Raw, ungraded answers from a previous autosave — present when resuming
+  // an in-progress attempt via "Continue Attempt".
+  answers?: Array<{
+    questionId: string;
+    selectedOptionId?: string | null;
+    selectedOptionIds?: string[];
+    textAnswer?: string | null;
+    orderingAnswer?: string[];
+  }>;
 }
 
 // answer shape per question
@@ -84,6 +93,21 @@ type Answer =
   | { matchingAnswer: Array<{ left: string; right: string }> };
 
 type Answers = Record<string, Answer>;
+
+// Converts a saved (autosaved) attempt's raw answers array back into the
+// in-memory Answers map used while taking the quiz, so "Continue Attempt"
+// resumes with previously-entered answers instead of a blank slate.
+function savedAnswersToMap(saved: ActiveAttempt['answers']): Answers {
+  const map: Answers = {};
+  if (!saved) return map;
+  for (const a of saved) {
+    if (a.selectedOptionId) map[a.questionId] = { selectedOptionId: a.selectedOptionId };
+    else if (a.selectedOptionIds?.length) map[a.questionId] = { selectedOptionIds: a.selectedOptionIds };
+    else if (a.textAnswer) map[a.questionId] = { textAnswer: a.textAnswer };
+    else if (a.orderingAnswer?.length) map[a.questionId] = { orderingAnswer: a.orderingAnswer };
+  }
+  return map;
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -477,7 +501,7 @@ function QuizInfoScreen({
 function QuizTakingScreen({
   quiz,
   questions,
-  attempt: _attempt,
+  attempt,
   onSubmit,
   submitting,
   submitError,
@@ -489,8 +513,10 @@ function QuizTakingScreen({
   submitting: boolean;
   submitError: string;
 }) {
+  const router = useRouter();
   const [current, setCurrent]     = useState(0);
-  const [answers, setAnswers]     = useState<Answers>({});
+  // Resume with previously-autosaved answers instead of a blank slate.
+  const [answers, setAnswers]     = useState<Answers>(() => savedAnswersToMap(attempt.answers));
   const [flagged, setFlagged]     = useState<Set<string>>(new Set());
   const [timeLeft, setTimeLeft]   = useState<number | null>(
     quiz.settings.timer?.enabled ? quiz.settings.timer.durationMinutes * 60 : null
@@ -504,6 +530,27 @@ function QuizTakingScreen({
     setFlagged(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
 
   const handleSubmit = useCallback(() => onSubmit(answers), [answers, onSubmit]);
+
+  // Autosave — debounced so it doesn't fire on every keystroke, and
+  // best-effort (a failed autosave shouldn't interrupt the student; worst
+  // case they lose only the last few seconds of progress on refresh).
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveProgress = useCallback(() => {
+    const answersArr = Object.entries(answers).map(([questionId, ans]) => ({ questionId, ...ans }));
+    return api.patch(`/quizzes/${quiz._id}/attempt/${attempt._id}/save`, { answers: answersArr }).catch(() => {});
+  }, [answers, quiz._id, attempt._id]);
+
+  useEffect(() => {
+    if (Object.keys(answers).length === 0) return; // nothing to save yet
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => { saveProgress(); }, 3000);
+    return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
+  }, [answers, saveProgress]);
+
+  const handleSaveAndExit = () => {
+    saveProgress();
+    router.push('/quizzes');
+  };
 
   // Quiz-level timer countdown
   useEffect(() => {
@@ -642,7 +689,7 @@ function QuizTakingScreen({
 
       {/* Navigation */}
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" onClick={() => handleSubmit()}
+        <Button variant="ghost" size="sm" onClick={handleSaveAndExit}
           className="text-gray-400 hover:text-gray-600 text-xs">
           Save & Exit
         </Button>
@@ -2280,7 +2327,9 @@ function GradeModal({
     mutationFn: () => {
       const gradesArr = essayAnswers.map(a => ({
         questionId: a.questionId._id,
-        pointsAwarded: parseFloat(grades[a.questionId._id] ?? '0') || 0,
+        // Clamp client-side too — the server also enforces this, but this
+        // avoids a confusing round-trip error for an obvious typo.
+        pointsAwarded: Math.max(0, Math.min(parseFloat(grades[a.questionId._id] ?? '0') || 0, a.questionId.points)),
       }));
       return api.patch(`/quizzes/${quizId}/attempts/${attempt._id}/grade`, { grades: gradesArr });
     },
@@ -2388,7 +2437,7 @@ function AttemptsTab({ quizId, quiz }: { quizId: string; quiz: QuizDetail }) {
   const { data, isLoading } = useQuery({
     queryKey: ['quiz-attempts', quizId],
     queryFn: async () => {
-      const { data } = await api.get(`/quizzes/${quizId}/attempts?limit=100`);
+      const { data } = await api.get(`/quizzes/${quizId}/attempts?limit=1000`);
       return data.data as { attempts: AttemptSummary[]; total: number };
     },
   });
@@ -2436,6 +2485,11 @@ function AttemptsTab({ quizId, quiz }: { quizId: string; quiz: QuizDetail }) {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
           <p className="text-sm text-gray-500">{data?.total ?? 0} total attempts</p>
+          {(data?.total ?? 0) > attempts.length && (
+            <span className="text-xs text-amber-600">
+              Showing first {attempts.length} — refine with course filters to see more
+            </span>
+          )}
           {(() => {
             const n = attempts.filter(a => a.status === 'pending_manual').length;
             return n > 0 ? (

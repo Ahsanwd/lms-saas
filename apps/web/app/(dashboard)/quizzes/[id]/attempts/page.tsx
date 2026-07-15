@@ -91,7 +91,9 @@ function GradingPanel({
     mutationFn: () => api.patch(`/quizzes/${id}/attempts/${attempt._id}/grade`, {
       grades: shortAnswers.map(a => ({
         questionId: a.questionId,
-        pointsAwarded: Number(grades[a.questionId]?.pointsAwarded ?? 0),
+        // Clamp client-side too — the server also enforces this, but this
+        // avoids a confusing round-trip error for an obvious typo.
+        pointsAwarded: Math.max(0, Math.min(Number(grades[a.questionId]?.pointsAwarded ?? 0) || 0, a.maxPoints)),
         feedback: grades[a.questionId]?.feedback?.trim() || null,
       })),
     }),
@@ -264,13 +266,15 @@ export default function QuizAttemptsPage() {
   const isManager = user?.role === 'tenant_admin' || user?.role === 'instructor' || user?.role === 'super_admin';
   const [tab, setTab] = useState<TabKey>('all');
   const [selected, setSelected] = useState<Attempt | null>(null);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 20;
 
   const statusParam = tab === 'all' ? '' : tab;
 
   const { data, isLoading } = useQuery<{ attempts: Attempt[]; total: number; quiz: { title: string } }>({
-    queryKey: ['quiz-attempts', id, tab],
+    queryKey: ['quiz-attempts', id, tab, page],
     queryFn: async () => {
-      const params = new URLSearchParams({ limit: '100' });
+      const params = new URLSearchParams({ limit: String(PAGE_SIZE), page: String(page) });
       if (statusParam) params.set('status', statusParam);
       const { data } = await api.get(`/quizzes/${id}/attempts?${params}`);
       return data.data;
@@ -331,7 +335,7 @@ export default function QuizAttemptsPage() {
       <div className="border-b border-gray-200">
         <nav className="-mb-px flex gap-6">
           {tabs.map(t => (
-            <button key={t.key} onClick={() => setTab(t.key)}
+            <button key={t.key} onClick={() => { setTab(t.key); setPage(1); }}
               className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
                 tab === t.key
                   ? 'border-primary-600 text-primary-600'
@@ -401,6 +405,28 @@ export default function QuizAttemptsPage() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Pagination */}
+      {!isLoading && (data?.total ?? 0) > PAGE_SIZE && (
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-gray-500">
+            Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, data?.total ?? 0)} of {data?.total} attempts
+          </p>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
+              Previous
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={page * PAGE_SIZE >= (data?.total ?? 0)}
+              onClick={() => setPage(p => p + 1)}
+            >
+              Next
+            </Button>
+          </div>
         </div>
       )}
 
