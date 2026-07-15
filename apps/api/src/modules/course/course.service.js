@@ -492,6 +492,19 @@ async function updateLesson(tenantId, courseId, sectionId, lessonId, data, user)
     }
   }
 
+  // Switching a lesson's type (e.g. video → audio) must clear the previous
+  // type's media subdocument — otherwise it's never touched again (the
+  // frontend only ever sends the field matching the current type) and stays
+  // in the DB forever, showing up as a stale duration/provider in the
+  // curriculum list and leaking storage that's no longer reachable to delete.
+  if (data.type !== undefined && data.type !== lesson.type) {
+    for (const mediaField of ['video', 'audio', 'file']) {
+      if (mediaField !== data.type && data[mediaField] === undefined) {
+        update[mediaField] = null;
+      }
+    }
+  }
+
   const updated = await lessonRepo.updateById(tenantId, lessonId, update);
   await recalcCourseCounters(tenantId, courseId);
 
