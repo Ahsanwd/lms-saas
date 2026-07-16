@@ -110,7 +110,7 @@ function CertPreview({ t }: { t: CertTemplate }) {
           </div>
         )}
 
-        {t.showBadge && (
+        {t.showBadge && !t.logoUrl && (
           <div style={{ width: 56, height: 56, borderRadius: '50%', background: `${accent}18`, border: `3px solid ${accent}33`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
             <svg width="30" height="30" fill="none" stroke={accent} strokeWidth={1.5} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
@@ -545,6 +545,9 @@ export default function CertificateBuilderPage() {
               className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
             <span className="text-sm text-gray-700">Show badge icon</span>
           </label>
+          {form.showBadge && form.logoUrl && (
+            <p className="text-xs text-gray-400 -mt-2">Hidden automatically while a logo is set — remove the logo to show it instead.</p>
+          )}
 
           <Section title="Validity / Expiry" />
           <div>

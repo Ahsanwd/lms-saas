@@ -240,7 +240,7 @@ export default function CertificatePage() {
               </div>
             )}
 
-            {(t?.showBadge ?? true) && (
+            {(t?.showBadge ?? true) && !t?.logoUrl && (
               <div className="w-16 h-16 rounded-full mb-5 flex items-center justify-center"
                 style={{ background: `${accent}18`, border: `3px solid ${accent}33` }}>
                 <svg className="w-8 h-8" fill="none" stroke={accent} strokeWidth={1.5} viewBox="0 0 24 24">
