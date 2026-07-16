@@ -32,8 +32,9 @@ const enrollmentSchema = new mongoose.Schema(
     certificateIssued:    { type: Boolean, default: false },
     certificateIssuedAt:  { type: Date, default: null },
     certificateExpiresAt: { type: Date, default: null },
-    // Unique human-readable ID for QR verification (e.g. CERT-AB12C-XY34Z)
-    certificateId: { type: String, default: null, index: true, sparse: true },
+    // Human-readable ID for QR verification (e.g. CERT-AB12C-XY34Z) — see
+    // the partial unique index below.
+    certificateId: { type: String, default: null },
 
     // Revocation (immutable audit trail once set)
     certificateRevoked:      { type: Boolean, default: false },
@@ -48,5 +49,13 @@ const enrollmentSchema = new mongoose.Schema(
 enrollmentSchema.index({ tenantId: 1, courseId: 1, userId: 1 }, { unique: true });
 enrollmentSchema.index({ tenantId: 1, userId: 1, status: 1 });
 enrollmentSchema.index({ tenantId: 1, courseId: 1, status: 1 });
+// Partial unique — only enforced where certificateId is an actual string, so
+// the many enrollments with certificateId still null (never completed) don't
+// collide with each other under the index. Guards against the (astronomically
+// unlikely, but free to prevent) case of generateCertificateId() colliding.
+enrollmentSchema.index(
+  { certificateId: 1 },
+  { unique: true, partialFilterExpression: { certificateId: { $type: 'string' } } }
+);
 
 module.exports = mongoose.model('Enrollment', enrollmentSchema);

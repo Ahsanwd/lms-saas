@@ -220,7 +220,11 @@ const { trackMediaAsset } = require('../../middlewares/mediaTracking.middleware'
  */
 
 // ── Public routes (no auth required) ─────────────────────────────────────────
-router.get('/verify-certificate/:certificateId', ctrl.verifyCertificate);
+// Certificate verification lives at the top-level /api/verify-certificate/:id
+// (routes/index.js, mounted before resolveTenant/requireActivePlan) — it must
+// stay reachable regardless of the caller's own tenant/plan status. Do not
+// re-add a copy here: nesting it under /courses puts it behind those
+// middlewares, which could 402 a verification for an unrelated tenant.
 router.get('/public', ctrl.listPublicCourses);
 
 router.use(authenticate);
