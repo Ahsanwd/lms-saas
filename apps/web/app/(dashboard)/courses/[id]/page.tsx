@@ -2549,6 +2549,7 @@ function CurriculumTab({ courseId }: { courseId: string }) {
 
 function OverviewTab({ courseId, course, onFirstSave }: { courseId: string; course: Course; onFirstSave?: () => void }) {
   const qc = useQueryClient();
+  const router = useRouter();
   const thumbnailRef = useRef<HTMLInputElement>(null);
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
   const [uploadingThumb, setUploadingThumb] = useState(false);
@@ -3019,6 +3020,15 @@ function OverviewTab({ courseId, course, onFirstSave }: { courseId: string; cour
                 <p className="text-[11px] text-gray-400">Award a certificate on completion</p>
               </div>
             </label>
+            {certificateEnabled && (
+              <button type="button" onClick={() => router.push(`/certificate-builder?courseId=${courseId}`)}
+                className="mt-2 text-xs font-medium text-primary-600 hover:text-primary-700 flex items-center gap-1">
+                Customize this course's certificate
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            )}
           </div>
 
           {/* Pricing */}

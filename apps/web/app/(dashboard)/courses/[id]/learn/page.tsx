@@ -2237,7 +2237,7 @@ export default function LearnPage() {
   const goPrev = () => { if (activeIndex > 0) goTo(allLessons[activeIndex - 1]); };
 
   const markAndNext = () => {
-    completeMutation.mutate(activeLessonId);
+    if (!completedIds.has(activeLessonId)) completeMutation.mutate(activeLessonId);
     if (activeIndex < allLessons.length - 1) goTo(allLessons[activeIndex + 1]);
   };
 

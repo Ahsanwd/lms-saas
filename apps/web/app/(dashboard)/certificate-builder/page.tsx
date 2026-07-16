@@ -1,13 +1,15 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { Button, Spinner } from '@/components/ui';
 import { AxiosError } from 'axios';
+import { cn } from '@/lib/utils';
 
 interface CertTemplate {
+  isCourseSpecific?: boolean;
   organizationName: string;
   logoUrl: string | null;
   heading: string;
@@ -185,6 +187,10 @@ const inputCls = 'w-full px-3 py-2 text-sm border border-gray-200 rounded-lg foc
 export default function CertificateBuilderPage() {
   const router = useRouter();
   const qc = useQueryClient();
+  const searchParams = useSearchParams();
+  const courseId = searchParams.get('courseId');
+  const qs = courseId ? `?courseId=${courseId}` : '';
+
   const [form, setForm]           = useState<CertTemplate>(DEFAULTS);
   const [saved, setSaved]         = useState(false);
   const [saveError, setSaveError] = useState('');
@@ -193,10 +199,19 @@ export default function CertificateBuilderPage() {
   const signatureRef              = useRef<HTMLInputElement>(null);
   const secondSignatureRef        = useRef<HTMLInputElement>(null);
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['cert-template'],
+  const { data: courseData } = useQuery({
+    queryKey: ['course-title', courseId],
     queryFn: async () => {
-      const { data } = await api.get('/certificate-templates');
+      const { data } = await api.get(`/courses/${courseId}`);
+      return data.data.course as { title: string };
+    },
+    enabled: !!courseId,
+  });
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['cert-template', courseId],
+    queryFn: async () => {
+      const { data } = await api.get(`/certificate-templates${qs}`);
       return data.data.template as Partial<CertTemplate>;
     },
     staleTime: 30_000,
@@ -214,7 +229,7 @@ export default function CertificateBuilderPage() {
     setForm(prev => ({ ...prev, [k]: v }));
 
   const saveMutation = useMutation({
-    mutationFn: () => api.post('/certificate-templates', form),
+    mutationFn: () => api.post(`/certificate-templates${qs}`, form),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['cert-template'] });
       setSaved(true); setSaveError('');
@@ -225,12 +240,15 @@ export default function CertificateBuilderPage() {
   });
 
   const resetMutation = useMutation({
-    mutationFn: () => api.delete('/certificate-templates/reset'),
+    mutationFn: () => api.delete(`/certificate-templates/reset${qs}`),
     onSuccess: () => { setForm(DEFAULTS); setLoaded(false); qc.invalidateQueries({ queryKey: ['cert-template'] }); },
   });
 
   function handleReset() {
-    if (confirm('Reset the certificate template to default? This cannot be undone.')) {
+    const msg = courseId
+      ? 'Remove this course\'s custom certificate template and go back to using the organization default?'
+      : 'Reset the organization default certificate template? This cannot be undone.';
+    if (confirm(msg)) {
       resetMutation.mutate();
     }
   }
@@ -240,7 +258,7 @@ export default function CertificateBuilderPage() {
       const fd = new FormData();
       const fieldKey = field === 'second-signature' ? 'secondSignature' : field;
       fd.append(fieldKey, file);
-      return api.post(`/certificate-templates/${field}`, fd, {
+      return api.post(`/certificate-templates/${field}${qs}`, fd, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
     },
@@ -261,9 +279,9 @@ export default function CertificateBuilderPage() {
       {/* ── Top toolbar ── */}
       <div className="flex-shrink-0 h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4">
         <div className="flex items-center gap-3 min-w-0">
-          <button onClick={() => router.push('/settings')}
+          <button onClick={() => router.push(courseId ? `/courses/${courseId}` : '/settings')}
             className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors flex-shrink-0"
-            title="Back to Settings">
+            title={courseId ? 'Back to Course' : 'Back to Settings'}>
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
@@ -275,8 +293,24 @@ export default function CertificateBuilderPage() {
             </svg>
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-gray-900 leading-tight">Certificate Builder</p>
-            <p className="text-[11px] text-gray-400 leading-tight truncate">Design the certificate students receive on course completion</p>
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-semibold text-gray-900 leading-tight truncate">
+                {courseId ? (courseData?.title ?? 'Course') : 'Certificate Builder'}
+              </p>
+              {courseId && (
+                <span className={cn(
+                  'text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0',
+                  form.isCourseSpecific ? 'bg-primary-100 text-primary-700' : 'bg-gray-100 text-gray-500'
+                )}>
+                  {form.isCourseSpecific ? 'Custom' : 'Using organization default'}
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-gray-400 leading-tight truncate">
+              {courseId
+                ? 'Editing the certificate for this course — saving creates a course-specific override'
+                : 'Design the organization-wide default certificate for all courses'}
+            </p>
           </div>
         </div>
 
@@ -290,10 +324,12 @@ export default function CertificateBuilderPage() {
               Saved
             </span>
           )}
-          <button onClick={handleReset} disabled={resetMutation.isPending}
-            className="text-xs text-gray-400 hover:text-red-500 px-2 transition-colors">
-            Reset
-          </button>
+          {(!courseId || form.isCourseSpecific) && (
+            <button onClick={handleReset} disabled={resetMutation.isPending}
+              className="text-xs text-gray-400 hover:text-red-500 px-2 transition-colors">
+              {courseId ? 'Use organization default' : 'Reset'}
+            </button>
+          )}
           <Button size="sm" loading={saveMutation.isPending} onClick={() => saveMutation.mutate()}>
             Save Template
           </Button>

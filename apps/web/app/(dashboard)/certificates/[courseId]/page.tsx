@@ -52,8 +52,8 @@ function formatLongDate(iso: string) {
   });
 }
 
-function LinkedInShareButton({ courseTitle, issuedAt, certId }: {
-  courseTitle: string; issuedAt: string; certId: string;
+function LinkedInShareButton({ courseTitle, issuedAt, certId, organizationName }: {
+  courseTitle: string; issuedAt: string; certId: string; organizationName: string;
 }) {
   const issueYear  = new Date(issuedAt).getFullYear();
   const issueMonth = new Date(issuedAt).getMonth() + 1;
@@ -64,7 +64,7 @@ function LinkedInShareButton({ courseTitle, issuedAt, certId }: {
   const params = new URLSearchParams({
     startTask: 'CERTIFICATION_NAME',
     name: courseTitle,
-    organizationName: 'LMS Platform',
+    organizationName,
     issueYear:  String(issueYear),
     issueMonth: String(issueMonth),
     certUrl:    verifyUrl,
@@ -184,6 +184,7 @@ export default function CertificatePage() {
               courseTitle={data.courseTitle}
               issuedAt={data.issuedAt}
               certId={data.certificateId}
+              organizationName={t?.organizationName || 'LMS Platform'}
             />
             <a
               href={verifyUrl}
