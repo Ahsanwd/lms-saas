@@ -33,8 +33,8 @@ async function addMembers(req, res, next) {
   try {
     const { userIds } = req.body;
     if (!Array.isArray(userIds)) return R.error(res, 'userIds array required', 400);
-    const group = await svc.addMembers(req.tenant.tenantId, req.params.id, userIds);
-    R.success(res, { group }, 'Members added');
+    const { group, backfilledCourses } = await svc.addMembers(req.tenant.tenantId, req.params.id, userIds);
+    R.success(res, { group, backfilledCourses }, 'Members added');
   } catch (err) { next(err); }
 }
 

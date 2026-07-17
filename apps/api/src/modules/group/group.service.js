@@ -49,7 +49,22 @@ async function addMembers(tenantId, groupId, userIds) {
   if (!group) throw new AppError('Group not found', 404);
   const newIds = userIds.filter(id => !group.members.map(m => m.toString()).includes(id.toString()));
   group.members.push(...newIds);
-  return group.save();
+  await group.save();
+
+  // A group's "enrolled in" list is meant to describe every CURRENT member's
+  // access, not a one-time snapshot from whenever "Enroll in Course" was
+  // last clicked — otherwise someone added later silently has no access to
+  // courses the rest of the group already has. Backfill them in now.
+  const backfilledCourses = [];
+  if (newIds.length > 0 && group.enrolledCourses.length > 0) {
+    const courses = await Course.find({ _id: { $in: group.enrolledCourses }, tenantId, deletedAt: null });
+    for (const course of courses) {
+      await _enrollUsersInCourse(tenantId, course, newIds);
+      backfilledCourses.push(course.title);
+    }
+  }
+
+  return { group, backfilledCourses };
 }
 
 async function removeMembers(tenantId, groupId, userIds) {
@@ -57,6 +72,34 @@ async function removeMembers(tenantId, groupId, userIds) {
   if (!group) throw new AppError('Group not found', 404);
   group.members = group.members.filter(m => !userIds.map(String).includes(m.toString()));
   return group.save();
+}
+
+// Shared by enrollGroupInCourse (explicit bulk-enroll action) and addMembers'
+// backfill (implicit — keeping a late-joining member's access in sync with
+// the rest of the group).
+async function _enrollUsersInCourse(tenantId, course, userIds) {
+  const expiresAt = calcExpiresAt(course.accessDurationDays);
+  const results = { enrolled: [], skipped: [] };
+
+  for (const userId of userIds) {
+    const existing = await Enrollment.findOne({ tenantId, courseId: course._id, userId });
+    if (existing?.status === 'active') { results.skipped.push(userId.toString()); continue; }
+
+    if (existing) {
+      await Enrollment.updateOne({ _id: existing._id }, {
+        status: 'active', enrolledAt: new Date(), droppedAt: null, expiresAt,
+      });
+    } else {
+      await Enrollment.create({
+        tenantId, courseId: course._id, userId,
+        pricePaid: 0, discountAmount: 0, couponCode: null, expiresAt,
+      });
+      await Course.updateOne({ _id: course._id, tenantId }, { $inc: { enrollmentCount: 1 } });
+    }
+    results.enrolled.push(userId.toString());
+  }
+
+  return results;
 }
 
 // ─── Bulk-enroll group into a course ──────────────────────────────────────────
@@ -68,26 +111,7 @@ async function enrollGroupInCourse(tenantId, groupId, courseId, actingUser) {
   if (!group)  throw new AppError('Group not found', 404);
   if (!course) throw new AppError('Course not found', 404);
 
-  const expiresAt = calcExpiresAt(course.accessDurationDays);
-  const results = { enrolled: [], skipped: [] };
-
-  for (const userId of group.members) {
-    const existing = await Enrollment.findOne({ tenantId, courseId, userId });
-    if (existing?.status === 'active') { results.skipped.push(userId.toString()); continue; }
-
-    if (existing) {
-      await Enrollment.updateOne({ _id: existing._id }, {
-        status: 'active', enrolledAt: new Date(), droppedAt: null, expiresAt,
-      });
-    } else {
-      await Enrollment.create({
-        tenantId, courseId, userId,
-        pricePaid: 0, discountAmount: 0, couponCode: null, expiresAt,
-      });
-      await Course.updateOne({ _id: courseId, tenantId }, { $inc: { enrollmentCount: 1 } });
-    }
-    results.enrolled.push(userId.toString());
-  }
+  const results = await _enrollUsersInCourse(tenantId, course, group.members);
 
   if (!group.enrolledCourses.map(c => c.toString()).includes(courseId.toString())) {
     group.enrolledCourses.push(courseId);
