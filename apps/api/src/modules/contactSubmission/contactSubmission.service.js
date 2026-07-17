@@ -36,6 +36,21 @@ async function submit(tenantId, pageId, data, meta) {
     ip: meta?.ip || null,
   });
 
+  // In-app notification to every tenant admin — the actual "someone
+  // contacted us" indicator (the outbound email above depends on Brevo
+  // delivery and a correctly-configured recipient; this doesn't).
+  const User = require('../../database/models/User.model');
+  const admins = await User.find({ tenantId, role: 'tenant_admin', deletedAt: null }).select('_id').lean();
+  if (admins.length > 0) {
+    const notifySvc = require('../notification/notification.service');
+    notifySvc.createBulk(tenantId, admins.map((a) => a._id), {
+      type: 'contact_submission',
+      title: 'New contact form submission',
+      message: `${name || email}: ${subject || message.slice(0, 100)}`,
+      link: '/contact-submissions',
+    }).catch(() => {});
+  }
+
   // Resolve recipient: the contactForm section's own override, else the
   // tenant's registered contact email. Never client-supplied.
   let recipientEmail = null;
@@ -75,6 +90,10 @@ function listSubmissions(tenantId, query) {
   return contactSubmissionRepo.findAll(tenantId, query);
 }
 
+function getUnreadCount(tenantId) {
+  return contactSubmissionRepo.countUnread(tenantId);
+}
+
 async function markStatus(tenantId, id, status) {
   if (!['new', 'read'].includes(status)) throw new AppError('Invalid status', 400);
   const submission = await contactSubmissionRepo.updateById(tenantId, id, { status });
@@ -82,4 +101,4 @@ async function markStatus(tenantId, id, status) {
   return submission;
 }
 
-module.exports = { submit, listSubmissions, markStatus };
+module.exports = { submit, listSubmissions, markStatus, getUnreadCount };

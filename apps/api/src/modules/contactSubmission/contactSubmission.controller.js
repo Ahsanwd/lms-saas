@@ -31,4 +31,11 @@ async function updateStatus(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { submit, list, updateStatus };
+async function unreadCount(req, res, next) {
+  try {
+    const count = await contactSubmissionService.getUnreadCount(req.tenant.tenantId);
+    R.success(res, { count });
+  } catch (err) { next(err); }
+}
+
+module.exports = { submit, list, updateStatus, unreadCount };

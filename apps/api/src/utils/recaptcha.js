@@ -5,7 +5,11 @@ const AppError = require('./AppError');
 // optional third-party integrations left unconfigured in an environment.
 async function verifyRecaptcha(token) {
   const secret = process.env.RECAPTCHA_SECRET_KEY;
-  if (!secret || !token) return;
+  if (!secret) return; // reCAPTCHA not configured in this environment — skip
+  // Once a secret IS configured, a missing token must fail closed —
+  // otherwise anyone can bypass verification simply by omitting
+  // recaptchaToken from the request, defeating the point of configuring it.
+  if (!token) throw new AppError('Bot protection check failed. Please try again.', 422, 'RECAPTCHA_FAILED');
   const res = await fetch('https://www.google.com/recaptcha/api/siteverify', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
