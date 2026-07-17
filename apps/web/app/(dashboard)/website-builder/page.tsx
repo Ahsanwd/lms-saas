@@ -11,6 +11,7 @@ import {
   PageSectionsRenderer,
   LandingNavBar,
   LandingFooter,
+  SOCIAL_ICON_PATHS,
   type PageSection,
   type WebsiteContent,
   type PublicCourse,
@@ -38,6 +39,30 @@ const SECTION_LABELS: Record<SectionType, string> = {
   testimonials: 'Testimonials', cta: 'Call To Action', contact: 'Contact', custom: 'Custom Code',
   contactForm: 'Contact Form', courseApplication: 'Course Application', team: 'Team / Instructors',
 };
+
+// One icon per section type, so the outline is scannable at a glance instead
+// of every card reading as an identical gray bar (matches the colored
+// icon-chip pattern already used for lesson types in the course curriculum).
+const SECTION_ICON_PATHS: Record<SectionType, string> = {
+  hero: 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M14 8h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z',
+  about: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+  coursesSection: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253',
+  team: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z',
+  testimonials: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z',
+  cta: 'M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z',
+  contact: 'M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z',
+  contactForm: 'M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z',
+  courseApplication: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-5 9l2 2 4-4',
+  custom: 'M10 20l4-16M6 8l-4 4 4 4M18 8l4 4-4 4',
+};
+
+function SectionIcon({ type, className = 'w-4 h-4' }: { type: SectionType; className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={SECTION_ICON_PATHS[type]} />
+    </svg>
+  );
+}
 
 const DEFAULT_SECTION_DATA: Record<SectionType, unknown> = {
   hero: { headline: '', subheadline: '', ctaText: '', ctaLink: '', backgroundImageUrl: null },
@@ -580,13 +605,15 @@ function PageEditorScreen({ pageId, onBack }: { pageId: string; onBack: () => vo
                 <div className="flex flex-wrap gap-1.5">
                   {availableToAdd.map((t) => (
                     <button key={t} onClick={() => addSection(t)}
-                      className="text-xs px-2.5 py-1 rounded-full border border-dashed border-gray-300 text-gray-500 hover:border-primary-400 hover:text-primary-600 transition-colors">
-                      + {SECTION_LABELS[t]}
+                      className="flex items-center gap-1.5 text-xs pl-2 pr-2.5 py-1.5 rounded-full border border-dashed border-gray-300 text-gray-500 hover:border-primary-400 hover:bg-primary-50 hover:text-primary-600 transition-colors">
+                      <SectionIcon type={t} className="w-3.5 h-3.5" />
+                      {SECTION_LABELS[t]}
                     </button>
                   ))}
                   <button onClick={() => addSection('custom')}
-                    className="text-xs px-2.5 py-1 rounded-full border border-dashed border-gray-300 text-gray-500 hover:border-primary-400 hover:text-primary-600 transition-colors">
-                    + Custom Code
+                    className="flex items-center gap-1.5 text-xs pl-2 pr-2.5 py-1.5 rounded-full border border-dashed border-gray-300 text-gray-500 hover:border-primary-400 hover:bg-primary-50 hover:text-primary-600 transition-colors">
+                    <SectionIcon type="custom" className="w-3.5 h-3.5" />
+                    Custom Code
                   </button>
                 </div>
               </div>
@@ -595,7 +622,10 @@ function PageEditorScreen({ pageId, onBack }: { pageId: string; onBack: () => vo
             {sections.map((section, idx) => (
               <div key={section._id ?? idx} className="border border-gray-200 rounded-xl overflow-hidden">
                 <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-b border-gray-200">
-                  <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">
+                  <span className="flex items-center gap-1.5 text-xs font-bold text-gray-500 uppercase tracking-wide">
+                    <span className="w-5 h-5 rounded-md bg-primary-50 text-primary-600 flex items-center justify-center flex-shrink-0">
+                      <SectionIcon type={section.type as SectionType} className="w-3 h-3" />
+                    </span>
                     {SECTION_LABELS[section.type as SectionType]}
                     {section.type === 'custom' && ` #${sections.slice(0, idx + 1).filter((s) => s.type === 'custom').length}`}
                   </span>
@@ -776,10 +806,6 @@ function PageEditorScreen({ pageId, onBack }: { pageId: string; onBack: () => vo
                     <>
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-gray-400">{testimonialsData.length} / 6</span>
-                        {testimonialsData.length < 6 && (
-                          <button onClick={() => setSectionWholeAt(idx, [...testimonialsData, { name: '', role: '', quote: '', avatarUrl: null }])}
-                            className="text-xs text-primary-600 font-medium hover:text-primary-700">+ Add</button>
-                        )}
                       </div>
                       {testimonialsData.map((t, i) => (
                         <div key={i} className="border border-gray-200 rounded-lg p-3 space-y-2">
@@ -800,6 +826,15 @@ function PageEditorScreen({ pageId, onBack }: { pageId: string; onBack: () => vo
                         </div>
                       ))}
                       {testimonialsData.length === 0 && <p className="text-xs text-gray-400">No testimonials yet — add up to 6.</p>}
+                      {testimonialsData.length < 6 && (
+                        <button onClick={() => setSectionWholeAt(idx, [...testimonialsData, { name: '', role: '', quote: '', avatarUrl: null }])}
+                          className="w-full flex items-center justify-center gap-1.5 text-xs font-medium text-primary-600 border-2 border-dashed border-primary-200 rounded-lg py-2 hover:border-primary-400 hover:bg-primary-50 transition-colors">
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                          </svg>
+                          Add Testimonial
+                        </button>
+                      )}
                     </>
                     );
                   })()}
@@ -810,10 +845,6 @@ function PageEditorScreen({ pageId, onBack }: { pageId: string; onBack: () => vo
                     <>
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-gray-400">{teamData.length} / 20</span>
-                        {teamData.length < 20 && (
-                          <button onClick={() => setSectionWholeAt(idx, [...teamData, { name: '', role: '', bio: '', photoUrl: null, linkedinUrl: null }])}
-                            className="text-xs text-primary-600 font-medium hover:text-primary-700">+ Add</button>
-                        )}
                       </div>
                       {teamData.map((m, i) => (
                         <div key={i} className="border border-gray-200 rounded-lg p-3 space-y-2">
@@ -850,6 +881,15 @@ function PageEditorScreen({ pageId, onBack }: { pageId: string; onBack: () => vo
                         </div>
                       ))}
                       {teamData.length === 0 && <p className="text-xs text-gray-400">No team members yet — add up to 20.</p>}
+                      {teamData.length < 20 && (
+                        <button onClick={() => setSectionWholeAt(idx, [...teamData, { name: '', role: '', bio: '', photoUrl: null, linkedinUrl: null }])}
+                          className="w-full flex items-center justify-center gap-1.5 text-xs font-medium text-primary-600 border-2 border-dashed border-primary-200 rounded-lg py-2 hover:border-primary-400 hover:bg-primary-50 transition-colors">
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                          </svg>
+                          Add Team Member
+                        </button>
+                      )}
                     </>
                     );
                   })()}
@@ -999,7 +1039,15 @@ function PageEditorScreen({ pageId, onBack }: { pageId: string; onBack: () => vo
             ))}
 
             {sections.length === 0 && (
-              <p className="text-sm text-gray-400 text-center py-8">No sections yet — add one above to start building this page.</p>
+              <div className="flex flex-col items-center justify-center text-center py-10 border border-dashed border-gray-200 rounded-xl">
+                <div className="w-12 h-12 rounded-full bg-primary-50 flex items-center justify-center mb-3">
+                  <svg className="w-6 h-6 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 13h6m-6 4h6m2 5H7a2 2 0 01-2-2V4a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V20a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <p className="text-sm font-medium text-gray-700">No sections yet</p>
+                <p className="text-xs text-gray-400 mt-0.5">Add one above to start building this page.</p>
+              </div>
             )}
 
             <div className="pb-6" />
@@ -1277,15 +1325,19 @@ function HeaderEditorScreen({ onBack }: { onBack: () => void }) {
           <div className="flex-shrink-0 flex items-center justify-between px-6 py-3 bg-white border-b border-gray-200">
             <p className="text-sm font-semibold text-gray-800">Live Preview</p>
           </div>
-          <div className="flex-1 overflow-auto">
-            <LandingNavBar
-              logoUrl={tenantInfo?.settings?.logo ?? null}
-              displayName={tenantInfo?.name ?? 'Your School'}
-              linksDisabled
-              pages={navPages}
-              headerConfig={form}
-            />
-            <div className="p-10 text-center text-sm text-gray-400">Page content appears below the header.</div>
+          <div className="flex-1 overflow-auto p-6">
+            <div className="max-w-3xl mx-auto bg-white rounded-xl shadow-sm overflow-hidden">
+              <LandingNavBar
+                logoUrl={tenantInfo?.settings?.logo ?? null}
+                displayName={tenantInfo?.name ?? 'Your School'}
+                linksDisabled
+                pages={navPages}
+                headerConfig={form}
+              />
+              <div className="h-40 bg-gradient-to-b from-gray-50 to-white flex items-center justify-center text-xs text-gray-300">
+                Your page content
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1354,7 +1406,17 @@ function FooterEditorScreen({ onBack }: { onBack: () => void }) {
 
   const socialLinks = form.socialLinks;
   const usedPlatforms = new Set(socialLinks.map((s) => s.platform));
-  const availablePlatforms = (Object.keys(SOCIAL_PLATFORM_LABELS) as SocialPlatform[]).filter((p) => !usedPlatforms.has(p));
+
+  function toggleSocial(platform: SocialPlatform) {
+    if (usedPlatforms.has(platform)) {
+      set('socialLinks', socialLinks.filter((s) => s.platform !== platform));
+    } else if (socialLinks.length < 6) {
+      set('socialLinks', [...socialLinks, { platform, url: '' }]);
+    }
+  }
+  function updateSocialUrl(platform: SocialPlatform, url: string) {
+    set('socialLinks', socialLinks.map((s) => (s.platform === platform ? { ...s, url } : s)));
+  }
 
   if (hfLoading || !loaded) return <div className="flex justify-center py-24"><Spinner size="lg" /></div>;
 
@@ -1421,31 +1483,44 @@ function FooterEditorScreen({ onBack }: { onBack: () => void }) {
             </div>
 
             <Section title="Social Links" />
-            <div className="space-y-2">
-              {socialLinks.map((link, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <select className={`${inputCls} w-32 flex-shrink-0`} value={link.platform}
-                    onChange={(e) => set('socialLinks', socialLinks.map((s, j) => (j === i ? { ...s, platform: e.target.value as SocialPlatform } : s)))}>
-                    {(Object.keys(SOCIAL_PLATFORM_LABELS) as SocialPlatform[])
-                      .filter((p) => p === link.platform || !usedPlatforms.has(p))
-                      .map((p) => <option key={p} value={p}>{SOCIAL_PLATFORM_LABELS[p]}</option>)}
-                  </select>
-                  <input className={`${inputCls} flex-1`} value={link.url}
-                    onChange={(e) => set('socialLinks', socialLinks.map((s, j) => (j === i ? { ...s, url: e.target.value } : s)))}
-                    placeholder="https://..." />
-                  <button onClick={() => set('socialLinks', socialLinks.filter((_, j) => j !== i))} className="p-1 text-gray-300 hover:text-red-500 transition-colors flex-shrink-0" title="Remove">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
+            <p className="text-xs text-gray-400 -mt-2">Click an icon to connect it, then paste your profile link.</p>
+            <div className="grid grid-cols-6 gap-2">
+              {(Object.keys(SOCIAL_PLATFORM_LABELS) as SocialPlatform[]).map((p) => {
+                const connected = usedPlatforms.has(p);
+                return (
+                  <button key={p} type="button" onClick={() => toggleSocial(p)}
+                    title={connected ? `Remove ${SOCIAL_PLATFORM_LABELS[p]}` : `Add ${SOCIAL_PLATFORM_LABELS[p]}`}
+                    className={`aspect-square rounded-xl flex items-center justify-center border-2 transition-colors ${
+                      connected ? 'bg-primary-600 border-primary-600 text-white' : 'bg-white border-gray-200 text-gray-400 hover:border-primary-300 hover:text-primary-500'
+                    }`}>
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d={SOCIAL_ICON_PATHS[p]} /></svg>
                   </button>
-                </div>
-              ))}
-              {availablePlatforms.length > 0 && socialLinks.length < 6 && (
-                <button onClick={() => set('socialLinks', [...socialLinks, { platform: availablePlatforms[0], url: '' }])}
-                  className="text-xs text-primary-600 font-medium hover:text-primary-700">+ Add social link</button>
-              )}
-              {socialLinks.length === 0 && <p className="text-xs text-gray-400">No social links yet.</p>}
+                );
+              })}
             </div>
+
+            {socialLinks.length > 0 ? (
+              <div className="space-y-2">
+                {socialLinks.map((link) => (
+                  <div key={link.platform} className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg p-2">
+                    <div className="w-7 h-7 rounded-lg bg-primary-600 text-white flex items-center justify-center flex-shrink-0">
+                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d={SOCIAL_ICON_PATHS[link.platform]} /></svg>
+                    </div>
+                    <input className={`${inputCls} flex-1 bg-white`} value={link.url}
+                      onChange={(e) => updateSocialUrl(link.platform, e.target.value)}
+                      placeholder={`https://${link.platform}.com/yourpage`}
+                      autoFocus={link.url === ''} />
+                    <button onClick={() => toggleSocial(link.platform)} className="p-1 text-gray-300 hover:text-red-500 transition-colors flex-shrink-0" title="Remove">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-gray-400">No social links connected yet — click an icon above to add one.</p>
+            )}
             <div className="pb-6" />
           </div>
         </div>
@@ -1454,9 +1529,13 @@ function FooterEditorScreen({ onBack }: { onBack: () => void }) {
           <div className="flex-shrink-0 flex items-center justify-between px-6 py-3 bg-white border-b border-gray-200">
             <p className="text-sm font-semibold text-gray-800">Live Preview</p>
           </div>
-          <div className="flex-1 overflow-auto flex flex-col justify-end">
-            <div className="p-10 text-center text-sm text-gray-400">Page content appears above the footer.</div>
-            <LandingFooter displayName={tenantInfo?.name ?? 'Your School'} linksDisabled footerConfig={form} />
+          <div className="flex-1 overflow-auto p-6">
+            <div className="max-w-3xl mx-auto bg-white rounded-xl shadow-sm overflow-hidden">
+              <div className="h-40 bg-gradient-to-b from-gray-50 to-white flex items-center justify-center text-xs text-gray-300">
+                Your page content
+              </div>
+              <LandingFooter displayName={tenantInfo?.name ?? 'Your School'} linksDisabled footerConfig={form} />
+            </div>
           </div>
         </div>
       </div>
