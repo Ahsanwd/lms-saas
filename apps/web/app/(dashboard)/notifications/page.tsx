@@ -62,6 +62,7 @@ const ICON: Record<string, string> = {
   assignment_due:        '⏰',
   assignment_published:  '📘',
   announcement:          '📢',
+  group_announcement:    '📣',
   course_published:      '🆕',
   course_completed:      '🏆',
   certificate_issued:    '🏅',
