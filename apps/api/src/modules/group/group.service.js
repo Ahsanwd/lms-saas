@@ -183,6 +183,21 @@ async function createAnnouncement(tenantId, groupId, authorId, { title, body }) 
     title: title.trim(),
     body:  body.trim(),
   });
+
+  // Group announcements have no student-facing page of their own — the only
+  // way a member ever sees one is via their Notifications bell, same as
+  // every other announcement/event in the app.
+  if (group.members.length > 0) {
+    const notifySvc = require('../notification/notification.service');
+    const preview = body.trim().length > 140 ? `${body.trim().slice(0, 140)}…` : body.trim();
+    notifySvc.createBulk(tenantId, group.members, {
+      type: 'group_announcement',
+      title: title.trim(),
+      message: preview,
+      link: null,
+    }).catch(() => {});
+  }
+
   return GroupAnnouncement.findById(ann._id)
     .populate('authorId', 'firstName lastName')
     .lean();

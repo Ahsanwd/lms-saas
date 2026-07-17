@@ -30,6 +30,7 @@ const notificationSchema = new mongoose.Schema(
         'email_delivery_failed', // dead-letter alert for tenant admin
         'discussion_comment',   // student posted in lesson discussion
         'discussion_reply',     // someone replied to your discussion post
+        'group_announcement',   // announcement posted in a group you're a member of
       ],
       required: true,
     },
