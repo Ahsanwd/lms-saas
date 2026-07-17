@@ -134,6 +134,7 @@ function AddMemberModal({ group, onClose, onSaved }: { group: Group; onClose: ()
   const [found, setFound]     = useState<GroupMember | null>(null);
   const [msgType, setMsgType] = useState<'error' | 'info'>('info');
   const [msg, setMsg]         = useState('');
+  const [added, setAdded]     = useState<{ name: string; backfilledCourses: string[] } | null>(null);
 
   const lookupMutation = useMutation({
     mutationFn: (e: string) => api.get(`/groups/find-user?email=${encodeURIComponent(e)}`),
@@ -149,12 +150,52 @@ function AddMemberModal({ group, onClose, onSaved }: { group: Group; onClose: ()
 
   const addMutation = useMutation({
     mutationFn: () => api.post(`/groups/${group._id}/members`, { userIds: [found!._id] }),
-    onSuccess: () => { onSaved(); onClose(); },
+    onSuccess: (res) => {
+      onSaved();
+      setAdded({ name: `${found!.firstName} ${found!.lastName}`, backfilledCourses: res.data.data.backfilledCourses ?? [] });
+    },
     onError: (err: AxiosError<{ message: string }>) => {
       setMsgType('error');
       setMsg(err.response?.data?.message ?? 'Failed to add member');
     },
   });
+
+  if (added) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+          <div className="flex items-center gap-2 text-green-700">
+            <svg className="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
+            </svg>
+            <h2 className="text-lg font-semibold">{added.name} added to {group.name}</h2>
+          </div>
+          {added.backfilledCourses.length > 0 ? (
+            <div className="bg-primary-50 border border-primary-200 rounded-lg px-3 py-2.5">
+              <p className="text-sm text-primary-800">
+                Since this group is already enrolled in {added.backfilledCourses.length} course{added.backfilledCourses.length !== 1 ? 's' : ''}, {added.name.split(' ')[0]} was automatically enrolled too:
+              </p>
+              <ul className="mt-1.5 space-y-0.5">
+                {added.backfilledCourses.map((title) => (
+                  <li key={title} className="text-sm text-primary-700 flex items-center gap-1.5">
+                    <svg className="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    {title}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500">This group isn't enrolled in any courses yet, so there's nothing to sync them into.</p>
+          )}
+          <div className="flex justify-end pt-1">
+            <Button onClick={onClose}>Done</Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
@@ -558,7 +599,9 @@ export default function GroupsPage() {
                   {/* Enrolled courses tags */}
                   {g.enrolledCourses?.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 mt-2">
-                      <span className="text-xs text-gray-400">Enrolled in:</span>
+                      <span className="text-xs text-gray-400" title="Every current member has access to these courses — newly added members are enrolled automatically to keep this true.">
+                        All members enrolled in:
+                      </span>
                       {g.enrolledCourses.map(c => (
                         <span key={c._id}
                           className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-50 text-primary-700 border border-primary-200">
@@ -572,10 +615,13 @@ export default function GroupsPage() {
                   )}
                 </div>
 
-                {/* Action buttons */}
+                {/* Action buttons — grouped: enroll/membership · collaboration · manage */}
                 <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
                   <Button size="sm" onClick={() => setEnrolling(g)}>Enroll in Course</Button>
                   <Button size="sm" variant="outline" onClick={() => setAddMember(g)}>+ Member</Button>
+
+                  <div className="w-px h-5 bg-gray-200 mx-0.5" />
+
                   <button
                     onClick={() => setChatGroup(g)}
                     title="Group Chat"
@@ -596,8 +642,19 @@ export default function GroupsPage() {
                     </svg>
                     Announce
                   </button>
+
+                  <div className="w-px h-5 bg-gray-200 mx-0.5" />
+
                   <button onClick={() => setEditing(g)} className="text-xs text-gray-400 hover:text-gray-700 px-2 py-1">Edit</button>
-                  <button onClick={() => deleteMutation.mutate(g._id)} className="text-xs text-gray-400 hover:text-red-600 px-2 py-1">Delete</button>
+                  <button
+                    onClick={() => {
+                      if (confirm(`Delete group "${g.name}"? This won't remove members' access to any courses — it only deletes the group itself.`)) {
+                        deleteMutation.mutate(g._id);
+                      }
+                    }}
+                    className="text-xs text-gray-400 hover:text-red-600 px-2 py-1">
+                    Delete
+                  </button>
                 </div>
               </div>
 
@@ -616,7 +673,11 @@ export default function GroupsPage() {
                         </div>
                       </div>
                       <button
-                        onClick={() => removeMemberMutation.mutate({ groupId: g._id, userId: m._id })}
+                        onClick={() => {
+                          if (confirm(`Remove ${m.firstName} ${m.lastName} from "${g.name}"? Their access to courses this group is enrolled in won't be affected.`)) {
+                            removeMemberMutation.mutate({ groupId: g._id, userId: m._id });
+                          }
+                        }}
                         className="text-xs text-gray-400 hover:text-red-600 transition-colors">
                         Remove
                       </button>
