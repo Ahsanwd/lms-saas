@@ -77,6 +77,7 @@ const ICON: Record<string, string> = {
   discussion_comment:    '💭',
   discussion_reply:      '↩️',
   email_delivery_failed: '📭',
+  contact_submission:    '✉️',
 };
 
 const PREF_LABELS: { type: string; label: string; hasEmail: boolean }[] = [

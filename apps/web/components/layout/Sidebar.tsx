@@ -14,7 +14,7 @@ interface NavLeaf {
   label: string;
   icon: React.ReactNode;
   roles: Role[];
-  badge?: 'notif-count' | 'chat-count';
+  badge?: 'notif-count' | 'chat-count' | 'contact-count';
 }
 
 interface NavGroup {
@@ -210,7 +210,7 @@ const NAV_ENTRIES: NavEntry[] = [
       { href: '/chat',          label: 'Chat',           icon: <ChatIcon />,      roles: ['tenant_admin', 'instructor', 'student'], badge: 'chat-count' },
       { href: '/announcements', label: 'Announcements',  icon: <MegaphoneIcon />, roles: ['tenant_admin', 'instructor', 'student'] },
       { href: '/notifications', label: 'Notifications', icon: <BellIcon />,      roles: ['tenant_admin', 'instructor', 'student'], badge: 'notif-count' },
-      { href: '/contact-submissions', label: 'Contact Submissions', icon: <MailIcon />, roles: ['tenant_admin'] },
+      { href: '/contact-submissions', label: 'Contact Submissions', icon: <MailIcon />, roles: ['tenant_admin'], badge: 'contact-count' },
       { href: '/course-applications', label: 'Course Applications', icon: <ClipboardCheckIcon />, roles: ['tenant_admin'] },
     ],
   },
@@ -312,8 +312,23 @@ export function Sidebar({ role, tenantName, logoUrl, isOpen = false, onClose, ef
   });
   const chatUnreadCount = chatCountData?.count ?? 0;
 
+  const { data: contactCountData } = useQuery({
+    queryKey: ['contact-submissions-unread'],
+    queryFn: async () => {
+      const { data } = await api.get('/tenant/contact-submissions/unread-count');
+      return data.data as { count: number };
+    },
+    enabled: navRole === 'tenant_admin',
+    refetchInterval: 30_000,
+    staleTime: 10_000,
+  });
+  const contactUnreadCount = contactCountData?.count ?? 0;
+
   const getBadgeCount = (item: NavLeaf) =>
-    item.badge === 'notif-count' ? unreadCount : item.badge === 'chat-count' ? chatUnreadCount : 0;
+    item.badge === 'notif-count' ? unreadCount
+      : item.badge === 'chat-count' ? chatUnreadCount
+      : item.badge === 'contact-count' ? contactUnreadCount
+      : 0;
 
   const renderLeaf = (item: NavLeaf, nested = false) => {
     const active = isActiveHref(item.href);
