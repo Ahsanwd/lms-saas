@@ -6,7 +6,7 @@ import axios from 'axios';
 import { applyBrandColor, applySecondaryColor, applyFontFamily } from '@/lib/brandColor';
 import { useTenantSubdomain } from '@/lib/useTenantSubdomain';
 import { resolveSectionCourses } from '@/lib/tenantPageFetch';
-import { PageSectionsRenderer, type PageSection, type PublicCourse, type NavPage, type HeaderConfig, type FooterConfig } from '@/components/website/LandingPageSections';
+import { PageSectionsRenderer, type PageSection, type PublicCourse, type NavPage, type HeaderConfig, type FooterConfig, type PublicBundle } from '@/components/website/LandingPageSections';
 
 // Tenant-created pages beyond Home (e.g. /about-us). The root platform
 // domain has no tenant pages at all, so it 404s immediately. Reserved slugs
@@ -27,6 +27,7 @@ export default function TenantCustomPage() {
   const [navPages, setNavPages] = useState<NavPage[]>([]);
   const [headerConfig, setHeaderConfig] = useState<HeaderConfig | null>(null);
   const [footerConfig, setFooterConfig] = useState<FooterConfig | null>(null);
+  const [bundles, setBundles] = useState<PublicBundle[]>([]);
 
   useEffect(() => {
     if (subdomain === null) return; // not yet resolved
@@ -37,8 +38,9 @@ export default function TenantCustomPage() {
       axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/courses/public`, { headers }),
       axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/tenant/pages/public/${pageSlug}`, { headers }).catch(() => null),
       axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/tenant/pages/public`, { headers }).catch(() => null),
+      axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/bundles/public`, { headers }).catch(() => null),
     ])
-      .then(async ([coursesRes, pageRes, navRes]) => {
+      .then(async ([coursesRes, pageRes, navRes, bundlesRes]) => {
         setTenantName(coursesRes.data.data.tenantName ?? '');
         setLogoUrl(coursesRes.data.data.branding?.logoUrl ?? null);
         if (coursesRes.data.data.branding?.primaryColor) applyBrandColor(coursesRes.data.data.branding.primaryColor);
@@ -47,6 +49,7 @@ export default function TenantCustomPage() {
         setNavPages(navRes?.data?.data?.pages ?? []);
         setHeaderConfig(coursesRes.data.data.branding?.header ?? null);
         setFooterConfig(coursesRes.data.data.branding?.footer ?? null);
+        setBundles(bundlesRes?.data?.data?.bundles ?? []);
 
         const page = pageRes?.data?.data;
         if (!page?.isPublished) { setNotPublished(true); return; }
@@ -82,6 +85,7 @@ export default function TenantCustomPage() {
       pageId={pageId}
       headerConfig={headerConfig}
       footerConfig={footerConfig}
+      bundles={bundles}
     />
   );
 }

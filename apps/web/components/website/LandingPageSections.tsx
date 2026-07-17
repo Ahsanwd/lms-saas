@@ -24,6 +24,22 @@ export interface PublicCourse {
   categoryId: { _id: string; name: string } | null;
 }
 
+export interface PublicBundle {
+  _id: string;
+  title: string;
+  description: string | null;
+  courseIds: { _id: string; title: string; thumbnail: string | null; price: number }[];
+  price: number;
+}
+
+export interface BundlesSectionData {
+  heading: string | null;
+  subheading: string | null;
+  displayMode: 'all' | 'selected';
+  bundleIds: string[];
+  layout: 'grid' | 'slider';
+}
+
 export interface Testimonial {
   name: string;
   role: string;
@@ -647,6 +663,136 @@ export function CoursesGrid({
   );
 }
 
+// ─── Bundles ──────────────────────────────────────────────────────────────────
+
+export function BundleCard({ bundle, linksDisabled }: { bundle: PublicBundle; linksDisabled?: boolean }) {
+  const worth = bundle.courseIds.reduce((sum, c) => sum + (c.price || 0), 0);
+  const savings = worth - bundle.price;
+  const thumb = bundle.courseIds.find((c) => c.thumbnail)?.thumbnail ?? null;
+
+  return (
+    <MaybeLink
+      href="/login?redirect=/bundles"
+      disabled={linksDisabled}
+      className="group flex flex-col rounded-2xl border border-gray-200 bg-white overflow-hidden shadow-sm hover:shadow-md hover:border-primary-200 transition-all cursor-pointer"
+    >
+      <div className="relative w-full aspect-video bg-secondary-50 overflow-hidden">
+        {thumb ? (
+          <img src={thumb} alt={bundle.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <svg className="w-12 h-12 text-secondary-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+            </svg>
+          </div>
+        )}
+        <span className="absolute top-2 left-2 text-xs font-bold px-2 py-1 rounded-full shadow bg-white text-primary-600">
+          {bundle.courseIds.length} courses
+        </span>
+        {savings > 0 && (
+          <span className="absolute top-2 right-2 text-xs font-bold px-2 py-1 rounded-full shadow bg-secondary-600 text-white">
+            Save ${savings.toFixed(0)}
+          </span>
+        )}
+      </div>
+
+      <div className="flex flex-col flex-1 p-4">
+        <h3 className="font-semibold text-gray-900 text-sm leading-snug mb-1 line-clamp-2 group-hover:text-primary-600 transition-colors">
+          {bundle.title}
+        </h3>
+        {bundle.description && <p className="text-xs text-gray-500 line-clamp-2 mb-3">{bundle.description}</p>}
+
+        <div className="mt-auto space-y-2">
+          <ul className="space-y-0.5">
+            {bundle.courseIds.slice(0, 3).map((c) => (
+              <li key={c._id} className="text-xs text-gray-500 flex items-center gap-1.5 truncate">
+                <svg className="w-3 h-3 text-primary-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+                <span className="truncate">{c.title}</span>
+              </li>
+            ))}
+            {bundle.courseIds.length > 3 && (
+              <li className="text-xs text-gray-400">+{bundle.courseIds.length - 3} more</li>
+            )}
+          </ul>
+          <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
+            <span className="text-lg font-bold text-gray-900">${bundle.price.toFixed(0)}</span>
+            {savings > 0 && <span className="text-xs text-gray-400 line-through">${worth.toFixed(0)}</span>}
+          </div>
+        </div>
+      </div>
+    </MaybeLink>
+  );
+}
+
+// Applies the builder's displayMode/bundleIds settings — same shape and
+// zero-config-default behavior as selectCourses above.
+function selectBundles(bundles: PublicBundle[], bs: BundlesSectionData): PublicBundle[] {
+  if (bs.displayMode === 'selected' && bs.bundleIds?.length > 0) {
+    const byId = new Map(bundles.map((b) => [b._id, b]));
+    return bs.bundleIds.map((id) => byId.get(id)).filter((b): b is PublicBundle => !!b);
+  }
+  return bundles;
+}
+
+export function BundlesGrid({
+  bundles, loading, bundlesSection, linksDisabled,
+}: {
+  bundles: PublicBundle[]; loading: boolean; bundlesSection: BundlesSectionData; linksDisabled?: boolean;
+}) {
+  const shown = selectBundles(bundles, bundlesSection);
+  return (
+    <section id="bundles" className="py-14 px-6 bg-gray-50 scroll-mt-16">
+      <div className="max-w-6xl mx-auto">
+        <div className="text-center mb-8">
+          <h2 className="text-2xl font-bold text-gray-900">
+            {bundlesSection.heading || (loading ? 'Loading bundles…' : shown.length > 0 ? 'Course Bundles' : 'No bundles yet')}
+          </h2>
+          {bundlesSection.subheading && <p className="text-gray-500 mt-2 max-w-lg mx-auto">{bundlesSection.subheading}</p>}
+        </div>
+
+        {loading ? (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="rounded-2xl border border-gray-100 overflow-hidden animate-pulse">
+                <div className="aspect-video bg-gray-100" />
+                <div className="p-4 space-y-2">
+                  <div className="h-3 bg-gray-100 rounded w-1/3" />
+                  <div className="h-4 bg-gray-100 rounded w-full" />
+                  <div className="h-3 bg-gray-100 rounded w-2/3" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : shown.length === 0 ? (
+          <div className="text-center py-20 text-gray-400">
+            <svg className="w-16 h-16 mx-auto mb-4 text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+            </svg>
+            <p className="text-lg font-medium">No bundles published yet</p>
+            <p className="text-sm mt-1">Check back soon!</p>
+          </div>
+        ) : bundlesSection.layout === 'slider' ? (
+          <div className="flex gap-6 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-2" style={{ scrollbarWidth: 'none' }}>
+            {shown.map((bundle) => (
+              <div key={bundle._id} className="snap-start flex-shrink-0 w-72">
+                <BundleCard bundle={bundle} linksDisabled={linksDisabled} />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {shown.map((bundle) => (
+              <BundleCard key={bundle._id} bundle={bundle} linksDisabled={linksDisabled} />
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 // ─── Testimonials ─────────────────────────────────────────────────────────────
 
 export function TestimonialsSection({ testimonials }: { testimonials: Testimonial[] }) {
@@ -1040,7 +1186,7 @@ export function LandingFooter({ displayName, linksDisabled, footerConfig }: { di
 
 export interface PageSection {
   _id?: string; // Mongoose-assigned; absent for a section not yet saved
-  type: 'hero' | 'about' | 'coursesSection' | 'testimonials' | 'cta' | 'contact' | 'custom' | 'contactForm' | 'courseApplication' | 'team';
+  type: 'hero' | 'about' | 'coursesSection' | 'testimonials' | 'cta' | 'contact' | 'custom' | 'contactForm' | 'courseApplication' | 'team' | 'bundlesSection';
   order: number;
   data: unknown;
 }
@@ -1055,6 +1201,7 @@ export interface CustomCodeData {
 
 export function PageSectionsRenderer({
   sections, courses, coursesLoading, displayName, logoUrl, linksDisabled, pages, subdomain, pageId, headerConfig, footerConfig,
+  bundles = [], bundlesLoading = false,
 }: {
   sections: PageSection[];
   courses: PublicCourse[];
@@ -1067,6 +1214,8 @@ export function PageSectionsRenderer({
   pageId?: string;
   headerConfig?: HeaderConfig | null;
   footerConfig?: FooterConfig | null;
+  bundles?: PublicBundle[];
+  bundlesLoading?: boolean;
 }) {
   const hasAbout = sections.some((s) => {
     if (s.type !== 'about') return false;
@@ -1126,6 +1275,16 @@ export function PageSectionsRenderer({
             return <ContactFormSection key={i} data={section.data as ContactFormData} subdomain={subdomain} pageId={pageId} linksDisabled={linksDisabled} />;
           case 'courseApplication':
             return <CourseApplicationSection key={i} data={section.data as CourseApplicationData} courses={courses} subdomain={subdomain} pageId={pageId} linksDisabled={linksDisabled} />;
+          case 'bundlesSection':
+            return (
+              <BundlesGrid
+                key={i}
+                bundles={bundles}
+                loading={bundlesLoading}
+                bundlesSection={section.data as BundlesSectionData}
+                linksDisabled={linksDisabled}
+              />
+            );
           default:
             return null;
         }

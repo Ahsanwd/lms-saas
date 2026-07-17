@@ -25,19 +25,22 @@ import {
   type FooterConfig,
   type MenuOverride,
   type SocialPlatform,
+  type BundlesSectionData,
+  type PublicBundle,
 } from '@/components/website/LandingPageSections';
 
 // Fixed types: 0-or-1 per page. 'custom' is the one repeatable type — any
 // number of Custom Code sections are allowed per page.
-type FixedSectionType = 'hero' | 'about' | 'coursesSection' | 'testimonials' | 'cta' | 'contact' | 'contactForm' | 'courseApplication' | 'team';
+type FixedSectionType = 'hero' | 'about' | 'coursesSection' | 'testimonials' | 'cta' | 'contact' | 'contactForm' | 'courseApplication' | 'team' | 'bundlesSection';
 type SectionType = FixedSectionType | 'custom';
 type InstituteType = 'school' | 'academy' | 'college' | 'university';
 
-const SECTION_TYPE_ORDER: FixedSectionType[] = ['hero', 'about', 'coursesSection', 'team', 'testimonials', 'cta', 'contact', 'contactForm', 'courseApplication'];
+const SECTION_TYPE_ORDER: FixedSectionType[] = ['hero', 'about', 'coursesSection', 'bundlesSection', 'team', 'testimonials', 'cta', 'contact', 'contactForm', 'courseApplication'];
 const SECTION_LABELS: Record<SectionType, string> = {
   hero: 'Hero', about: 'About', coursesSection: 'Courses Section',
   testimonials: 'Testimonials', cta: 'Call To Action', contact: 'Contact', custom: 'Custom Code',
   contactForm: 'Contact Form', courseApplication: 'Course Application', team: 'Team / Instructors',
+  bundlesSection: 'Bundles Section',
 };
 
 // One icon per section type, so the outline is scannable at a glance instead
@@ -54,6 +57,7 @@ const SECTION_ICON_PATHS: Record<SectionType, string> = {
   contactForm: 'M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z',
   courseApplication: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-5 9l2 2 4-4',
   custom: 'M10 20l4-16M6 8l-4 4 4 4M18 8l4 4-4 4',
+  bundlesSection: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4',
 };
 
 function SectionIcon({ type, className = 'w-4 h-4' }: { type: SectionType; className?: string }) {
@@ -75,6 +79,7 @@ const DEFAULT_SECTION_DATA: Record<SectionType, unknown> = {
   custom: { html: '', css: '', js: '', heightPx: 400, isEnabled: true } as CustomCodeData,
   contactForm: { heading: 'Get in touch', subheading: '', fields: { name: true, phone: false, subject: true }, recipientEmail: null } as ContactFormData,
   courseApplication: { heading: 'Apply Now', subheading: '' } as CourseApplicationData,
+  bundlesSection: { heading: '', subheading: '', displayMode: 'all', bundleIds: [], layout: 'grid' } as BundlesSectionData,
 };
 
 const INSTITUTE_LABELS: Record<InstituteType, string> = {
@@ -419,6 +424,16 @@ function PageEditorScreen({ pageId, onBack }: { pageId: string; onBack: () => vo
   });
   const allCourses = coursesData ?? [];
   const previewCourses = allCourses.length > 0 ? allCourses.map(toPublicCourse) : SAMPLE_COURSES;
+
+  const { data: bundlesData } = useQuery({
+    queryKey: ['bundles-website-builder'],
+    queryFn: async () => {
+      const { data } = await api.get('/bundles/admin?status=published&limit=200');
+      return (data.data?.bundles ?? []) as PublicBundle[];
+    },
+    staleTime: 60_000,
+  });
+  const allBundles = bundlesData ?? [];
 
   useEffect(() => {
     if (pageData && !loaded) {
@@ -800,6 +815,82 @@ function PageEditorScreen({ pageId, onBack }: { pageId: string; onBack: () => vo
                     );
                   })()}
 
+                  {section.type === 'bundlesSection' && (() => {
+                    const bundlesSectionData = section.data as BundlesSectionData;
+                    return (
+                    <>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Heading</label>
+                        <input className={inputCls} value={bundlesSectionData.heading ?? ''} onChange={(e) => setSectionFieldAt<BundlesSectionData>(idx, 'heading', e.target.value)} placeholder="Course Bundles" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Subheading</label>
+                        <input className={inputCls} value={bundlesSectionData.subheading ?? ''} onChange={(e) => setSectionFieldAt<BundlesSectionData>(idx, 'subheading', e.target.value)} placeholder="Optional subheading" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-2">Which Bundles to Show</label>
+                        <div className="grid grid-cols-2 gap-2">
+                          {(['all', 'selected'] as const).map((mode) => (
+                            <button key={mode} onClick={() => setSectionFieldAt<BundlesSectionData>(idx, 'displayMode', mode)}
+                              className={`py-2 text-xs rounded-lg border font-medium transition-colors ${
+                                bundlesSectionData.displayMode === mode ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                              }`}>
+                              {mode === 'all' ? 'All Bundles' : 'Selected'}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      {bundlesSectionData.displayMode === 'selected' && (
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">
+                            Choose Bundles <span className="text-gray-400 font-normal">(check to add, arrows to reorder)</span>
+                          </label>
+                          {allBundles.length === 0 ? (
+                            <p className="text-xs text-gray-400 italic">No published bundles yet</p>
+                          ) : (
+                            <div className="border border-gray-200 rounded-xl max-h-60 overflow-y-auto divide-y divide-gray-50">
+                              {allBundles.map((b) => {
+                                const ids = bundlesSectionData.bundleIds;
+                                const idx2 = ids.indexOf(b._id);
+                                const selected = idx2 !== -1;
+                                return (
+                                  <div key={b._id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50">
+                                    <input type="checkbox" checked={selected}
+                                      onChange={() => setSectionFieldAt<BundlesSectionData>(idx, 'bundleIds', selected ? ids.filter((x) => x !== b._id) : [...ids, b._id])}
+                                      className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 flex-shrink-0" />
+                                    <span className="text-sm text-gray-700 truncate flex-1">{selected ? `${idx2 + 1}. ` : ''}{b.title}</span>
+                                    {selected && (
+                                      <ReorderControls index={idx2} length={ids.length}
+                                        onMove={(dir) => setSectionFieldAt<BundlesSectionData>(idx, 'bundleIds', moveArrayItem(ids, idx2, dir))} />
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                          <p className="text-xs text-gray-400 mt-1">{bundlesSectionData.bundleIds.length} selected</p>
+                        </div>
+                      )}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-2">Layout</label>
+                        <div className="grid grid-cols-2 gap-2">
+                          {(['grid', 'slider'] as const).map((l) => (
+                            <button key={l} onClick={() => setSectionFieldAt<BundlesSectionData>(idx, 'layout', l)}
+                              className={`py-2 text-xs rounded-lg border capitalize font-medium transition-colors ${
+                                bundlesSectionData.layout === l ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                              }`}>
+                              {l}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      {allBundles.length === 0 && (
+                        <p className="text-xs text-amber-600">You don't have any published bundles yet — create one under Bundles first.</p>
+                      )}
+                    </>
+                    );
+                  })()}
+
                   {section.type === 'testimonials' && (() => {
                     const testimonialsData = section.data as Testimonial[];
                     return (
@@ -1070,6 +1161,7 @@ function PageEditorScreen({ pageId, onBack }: { pageId: string; onBack: () => vo
               displayName="Your School"
               logoUrl={null}
               linksDisabled
+              bundles={allBundles}
             />
           </div>
         </div>

@@ -13,6 +13,7 @@ import {
   type NavPage,
   type HeaderConfig,
   type FooterConfig,
+  type PublicBundle,
 } from '@/components/website/LandingPageSections';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -134,6 +135,7 @@ function TenantLandingPage({ subdomain }: { subdomain: string }) {
   const [navPages, setNavPages] = useState<NavPage[]>([]);
   const [headerConfig, setHeaderConfig] = useState<HeaderConfig | null>(null);
   const [footerConfig, setFooterConfig] = useState<FooterConfig | null>(null);
+  const [bundles, setBundles] = useState<PublicBundle[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -142,8 +144,9 @@ function TenantLandingPage({ subdomain }: { subdomain: string }) {
       axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/courses/public`, { headers }),
       axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/tenant/pages/public/home`, { headers }).catch(() => null),
       axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/tenant/pages/public`, { headers }).catch(() => null),
+      axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/bundles/public`, { headers }).catch(() => null),
     ])
-      .then(async ([coursesRes, pageRes, navRes]) => {
+      .then(async ([coursesRes, pageRes, navRes, bundlesRes]) => {
         let finalCourses = coursesRes.data.data.courses ?? [];
         setTenantName(coursesRes.data.data.tenantName ?? '');
         setLogoUrl(coursesRes.data.data.branding?.logoUrl ?? null);
@@ -153,6 +156,7 @@ function TenantLandingPage({ subdomain }: { subdomain: string }) {
         setNavPages(navRes?.data?.data?.pages ?? []);
         setHeaderConfig(coursesRes.data.data.branding?.header ?? null);
         setFooterConfig(coursesRes.data.data.branding?.footer ?? null);
+        setBundles(bundlesRes?.data?.data?.bundles ?? []);
 
         const page = pageRes?.data?.data;
         if (page?.isPublished) {
@@ -193,6 +197,7 @@ function TenantLandingPage({ subdomain }: { subdomain: string }) {
         pageId={pageId}
         headerConfig={headerConfig}
         footerConfig={footerConfig}
+        bundles={bundles}
       />
     );
   }
