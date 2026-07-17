@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
-import { connectSocket, disconnectSocket } from '@/lib/socket';
+import { connectSocket } from '@/lib/socket';
 import { useAuthStore } from '@/stores/auth.store';
 import { Button, Spinner } from '@/components/ui';
 import { formatDate } from '@/lib/utils';
@@ -285,7 +285,10 @@ function GroupChatModal({ group, onClose }: { group: Group; onClose: () => void 
     return () => {
       socket.emit('leave_group', group._id);
       socket.off('group:message', onMessage);
-      disconnectSocket();
+      // NOT disconnectSocket() here — this is the one shared app-wide socket
+      // (also used by notifications, the sidebar's unread badge, DM chat,
+      // etc.), so tearing it down on modal close would break those too.
+      // Leaving the room + removing this listener is enough cleanup.
     };
   }, [group._id]);
 
@@ -296,7 +299,17 @@ function GroupChatModal({ group, onClose }: { group: Group; onClose: () => void 
 
   const sendMutation = useMutation({
     mutationFn: () => api.post(`/groups/${group._id}/messages`, { text }),
-    onSuccess: () => { setText(''); inputRef.current?.focus(); },
+    onSuccess: (res) => {
+      // Show the sender's own message immediately from the REST response —
+      // don't rely solely on the socket echo round-trip, which can be
+      // delayed or miss the join_group race on a freshly opened modal.
+      // The dedup check in onMessage above prevents a double-render if the
+      // socket event arrives too.
+      const sent = res.data.data.message as ChatMessage;
+      setMessages(prev => (prev.some(m => m._id === sent._id) ? prev : [...prev, sent]));
+      setText('');
+      inputRef.current?.focus();
+    },
   });
 
   function handleSend() {

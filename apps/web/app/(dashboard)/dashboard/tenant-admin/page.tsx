@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
-import { connectSocket, disconnectSocket } from '@/lib/socket';
+import { connectSocket } from '@/lib/socket';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { Spinner } from '@/components/ui';
 
@@ -139,7 +139,9 @@ export default function TenantAdminDashboardPage() {
     return () => {
       socket.off('dashboard:updated', invalidate);
       socket.off('billing:updated',   invalidate);
-      disconnectSocket();
+      // Not disconnectSocket() — this is the one shared app-wide socket
+      // (notifications, sidebar unread badges, chat, etc.), so tearing it
+      // down when this dashboard unmounts would break those elsewhere.
     };
   }, [qc]);
 

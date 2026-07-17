@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
 import api from '@/lib/api';
-import { connectSocket, disconnectSocket } from '@/lib/socket';
+import { connectSocket } from '@/lib/socket';
 import { useAuthStore } from '@/stores/auth.store';
 import { cn, avatarColor, getInitials, formatBytes } from '@/lib/utils';
 
@@ -120,7 +120,9 @@ export default function ConversationPage() {
       socket.off('message_deleted');
       socket.off('typing');
       socket.off('chat_notification');
-      disconnectSocket();
+      // Not disconnectSocket() — this is the one shared app-wide socket
+      // (notifications, sidebar unread badges, other chat windows, etc.),
+      // so tearing it down when this conversation unmounts would break those.
     };
   }, [conversationId, qc]);
 

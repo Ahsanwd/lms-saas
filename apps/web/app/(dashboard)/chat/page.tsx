@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { formatDistanceToNow } from 'date-fns';
 import { AxiosError } from 'axios';
 import api from '@/lib/api';
-import { connectSocket, disconnectSocket } from '@/lib/socket';
+import { connectSocket } from '@/lib/socket';
 import { useAuthStore } from '@/stores/auth.store';
 import { cn, avatarColor, getInitials } from '@/lib/utils';
 
@@ -57,7 +57,9 @@ export default function ChatPage() {
     });
     return () => {
       socket.off('chat_notification');
-      disconnectSocket();
+      // Not disconnectSocket() — this is the one shared app-wide socket
+      // (notifications, sidebar unread badges, other chat windows, etc.),
+      // so tearing it down when this component unmounts would break those.
     };
   }, [qc]);
 

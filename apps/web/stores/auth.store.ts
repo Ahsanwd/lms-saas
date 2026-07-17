@@ -5,6 +5,7 @@ import api, {
   setTenantSubdomain, clearTenantSubdomain,
   setImpersonationSubdomain, clearImpersonationSubdomain,
 } from '@/lib/api';
+import { disconnectSocket } from '@/lib/socket';
 import type { User } from '@/types';
 
 export interface ImpersonatedTenant {
@@ -61,6 +62,10 @@ export const useAuthStore = create<AuthState>()(
         clearAccessToken();
         clearTenantSubdomain();
         clearImpersonationSubdomain();
+        // The one legitimate place to fully tear down the shared socket —
+        // there's no valid session left for it to represent. Every other
+        // component only removes its own listeners on unmount.
+        disconnectSocket();
         set({ user: null, subdomain: null, isAuthenticated: false, impersonation: null });
       },
 

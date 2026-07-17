@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
 import api from '@/lib/api';
-import { connectSocket, disconnectSocket } from '@/lib/socket';
+import { connectSocket } from '@/lib/socket';
 import { Badge, Button, Spinner, Alert } from '@/components/ui';
 import { formatDate, cn } from '@/lib/utils';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
@@ -1238,7 +1238,9 @@ export default function BillingPage() {
     socket.on('billing:updated', onBillingUpdated);
     return () => {
       socket.off('billing:updated', onBillingUpdated);
-      disconnectSocket();
+      // Not disconnectSocket() — this is the one shared app-wide socket
+      // (notifications, sidebar unread badges, chat, etc.), so tearing it
+      // down when this component unmounts would break those elsewhere.
     };
   }, [qcPage]);
 

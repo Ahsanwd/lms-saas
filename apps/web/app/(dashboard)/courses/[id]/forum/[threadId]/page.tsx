@@ -7,7 +7,7 @@ import api from '@/lib/api';
 import { Button, Spinner } from '@/components/ui';
 import { useAuthStore } from '@/stores/auth.store';
 import { cn } from '@/lib/utils';
-import { connectSocket, disconnectSocket } from '@/lib/socket';
+import { connectSocket } from '@/lib/socket';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -349,7 +349,10 @@ export default function ThreadDetailPage() {
       }
       qc.invalidateQueries({ queryKey: qKey });
     });
-    return () => { socket.off('forum_notification'); disconnectSocket(); };
+    // Not disconnectSocket() — this is the one shared app-wide socket
+    // (notifications, sidebar unread badges, chat, etc.), so tearing it
+    // down when this thread unmounts would break those elsewhere.
+    return () => { socket.off('forum_notification'); };
   }, [threadId, qc, qKey]);
 
   if (!user) return null;
