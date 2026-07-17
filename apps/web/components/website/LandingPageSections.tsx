@@ -31,6 +31,14 @@ export interface Testimonial {
   avatarUrl: string | null;
 }
 
+export interface TeamMember {
+  name: string;
+  role: string;
+  bio: string;
+  photoUrl: string | null;
+  linkedinUrl: string | null;
+}
+
 export interface WebsiteContent {
   instituteType: 'school' | 'academy' | 'college' | 'university' | null;
   isPublished: boolean;
@@ -67,9 +75,9 @@ const LEVEL_LABEL: Record<string, string> = {
 
 // Renders a real Link when enabled, or an inert span with the same classes when
 // disabled (used in the builder's preview, where nothing should navigate away).
-function MaybeLink({ href, disabled, className, children, onClick }: { href: string; disabled?: boolean; className: string; children: React.ReactNode; onClick?: () => void }) {
-  if (disabled) return <span className={className} onClick={onClick}>{children}</span>;
-  return <Link href={href} className={className} onClick={onClick}>{children}</Link>;
+function MaybeLink({ href, disabled, className, children, onClick, style }: { href: string; disabled?: boolean; className: string; children: React.ReactNode; onClick?: () => void; style?: React.CSSProperties }) {
+  if (disabled) return <span className={className} onClick={onClick} style={style}>{children}</span>;
+  return <Link href={href} className={className} onClick={onClick} style={style}>{children}</Link>;
 }
 
 // ─── Nav Bar ──────────────────────────────────────────────────────────────────
@@ -80,37 +88,148 @@ export interface NavPage {
   isHomePage: boolean;
 }
 
+export interface MenuOverride {
+  pageSlug: string;
+  label: string | null;
+  hidden: boolean;
+  order: number;
+  parentSlug: string | null;
+}
+
+export interface HeaderConfig {
+  logoHeightPx: number;
+  backgroundColor: string;
+  menuTextColor: string;
+  signInText: string;
+  signUpText: string;
+  buttonStyle: 'solid' | 'outline';
+  menuOverrides: MenuOverride[];
+}
+
+export type SocialPlatform = 'facebook' | 'twitter' | 'instagram' | 'linkedin' | 'youtube' | 'tiktok';
+
+export interface FooterConfig {
+  backgroundColor: string;
+  textColor: string;
+  tagline: string | null;
+  copyrightText: string | null;
+  socialLinks: { platform: SocialPlatform; url: string }[];
+}
+
+interface NavItem {
+  href: string;
+  label: string;
+  children?: NavItem[];
+}
+
+// Merges the tenant's real pages with the Header Builder's menuOverrides
+// (rename/hide/reorder/nest) into a ready-to-render tree, one level deep by
+// construction — the editor only ever lets a page be nested under a
+// TOP-LEVEL page, so a child can never itself have children here. Falls back
+// to today's flat, page-order behavior when there are no overrides at all
+// (every tenant who hasn't opened the Header Builder yet).
+export function buildNavMenu(pages: NavPage[], overrides: MenuOverride[] | undefined): NavItem[] {
+  if (!overrides || overrides.length === 0) {
+    return pages.map((p) => ({ href: p.isHomePage ? '/' : `/${p.slug}`, label: p.title }));
+  }
+  const overrideBySlug = new Map(overrides.map((o) => [o.pageSlug, o]));
+
+  type Entry = { slug: string; href: string; label: string; order: number; parentSlug: string | null };
+  const visibleSlugs = new Set<string>();
+  pages.forEach((p) => {
+    const slug = p.isHomePage ? 'home' : p.slug;
+    if (!overrideBySlug.get(slug)?.hidden) visibleSlugs.add(slug);
+  });
+
+  const visible: Entry[] = pages.reduce<Entry[]>((acc, p, i) => {
+    const slug = p.isHomePage ? 'home' : p.slug;
+    const o = overrideBySlug.get(slug);
+    if (o?.hidden) return acc;
+    const parentSlug = o?.parentSlug && o.parentSlug !== slug && visibleSlugs.has(o.parentSlug) ? o.parentSlug : null;
+    acc.push({ slug, href: p.isHomePage ? '/' : `/${p.slug}`, label: o?.label || p.title, order: o?.order ?? i, parentSlug });
+    return acc;
+  }, []);
+
+  const topLevel = visible.filter((e) => !e.parentSlug).sort((a, b) => a.order - b.order);
+  return topLevel.map((e) => {
+    const children = visible
+      .filter((c) => c.parentSlug === e.slug)
+      .sort((a, b) => a.order - b.order)
+      .map((c) => ({ href: c.href, label: c.label }));
+    return { href: e.href, label: e.label, ...(children.length ? { children } : {}) };
+  });
+}
+
+// One-level dropdown, hover-revealed on desktop. Used for any nav item that
+// has children (a page another page was nested under via the Header Builder).
+function NavDropdown({ item, linkStyle, linkClass, disabled }: { item: NavItem; linkStyle?: React.CSSProperties; linkClass: string; disabled?: boolean }) {
+  return (
+    <div className="relative group">
+      <MaybeLink href={item.href} disabled={disabled} className={`${linkClass} flex items-center gap-1`}>
+        <span style={linkStyle}>{item.label}</span>
+        <svg className="w-3 h-3 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </MaybeLink>
+      <div className="absolute left-0 top-full pt-2 hidden group-hover:block z-10">
+        <div className="bg-white rounded-lg shadow-lg border border-gray-100 py-1.5 min-w-[160px]">
+          {item.children!.map((c) => (
+            <MaybeLink key={c.href} href={c.href} disabled={disabled}
+              className="block px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-primary-600 transition-colors cursor-pointer">
+              {c.label}
+            </MaybeLink>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function LandingNavBar({
-  logoUrl, displayName, linksDisabled, hasAbout = true, hasTestimonials = true, hasContact = true, pages,
+  logoUrl, displayName, linksDisabled, hasAbout = true, hasTestimonials = true, hasContact = true, hasTeam = true, pages, headerConfig,
 }: {
   logoUrl: string | null; displayName: string; linksDisabled?: boolean;
-  hasAbout?: boolean; hasTestimonials?: boolean; hasContact?: boolean;
+  hasAbout?: boolean; hasTestimonials?: boolean; hasContact?: boolean; hasTeam?: boolean;
   // When provided (the real multi-page site), the nav links to actual pages
   // instead of same-page anchors. Omitted in the builder's single-page
   // preview, which falls back to anchor-jumping within that one page.
   pages?: NavPage[];
+  // Header Builder settings — omitted (or any individual field unset) falls
+  // back to today's exact hardcoded look, so existing tenants see no change.
+  headerConfig?: HeaderConfig | null;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   const usingRealPages = !!pages && pages.length > 0;
 
-  const pageLinks = usingRealPages
-    ? pages!.map((p) => ({ href: p.isHomePage ? '/' : `/${p.slug}`, label: p.title }))
-    : [];
+  const navItems: NavItem[] = usingRealPages ? buildNavMenu(pages!, headerConfig?.menuOverrides) : [];
 
   const anchorLinks = [
     { href: '#home', label: 'Home', show: true },
     { href: '#about', label: 'About', show: hasAbout },
     { href: '#courses', label: 'Courses', show: true },
+    { href: '#team', label: 'Team', show: hasTeam },
     { href: '#testimonials', label: 'Testimonials', show: hasTestimonials },
     { href: '#contact', label: 'Contact', show: hasContact },
   ].filter((l) => l.show);
 
+  const hasCustomMenuColor = !!headerConfig?.menuTextColor;
+  const linkStyle = hasCustomMenuColor ? { color: headerConfig!.menuTextColor } : undefined;
+  const linkClass = hasCustomMenuColor
+    ? 'text-sm font-medium transition-opacity hover:opacity-70 cursor-pointer'
+    : 'text-sm font-medium text-gray-600 hover:text-primary-600 transition-colors cursor-pointer';
+
+  const navStyle = headerConfig?.backgroundColor ? { backgroundColor: headerConfig.backgroundColor } : undefined;
+  const logoHeight = headerConfig?.logoHeightPx ?? 36;
+  const signInText = headerConfig?.signInText || 'Sign in';
+  const signUpText = headerConfig?.signUpText || 'Sign up free';
+  const outlineButton = headerConfig?.buttonStyle === 'outline';
+
   return (
-    <nav className="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm">
+    <nav className="sticky top-0 z-50 border-b border-gray-100 shadow-sm" style={navStyle ?? { backgroundColor: '#ffffff' }}>
       <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
         {logoUrl ? (
-          <img src={logoUrl} alt={displayName} className="h-9 object-contain flex-shrink-0" />
+          <img src={logoUrl} alt={displayName} className="object-contain flex-shrink-0" style={{ height: logoHeight }} />
         ) : (
           <span className="text-xl font-bold text-primary-600 tracking-tight capitalize flex-shrink-0">{displayName}</span>
         )}
@@ -118,25 +237,36 @@ export function LandingNavBar({
         {/* Desktop links */}
         <div className="hidden lg:flex items-center gap-7">
           {usingRealPages
-            ? pageLinks.map((l) => (
-                <MaybeLink key={l.href} href={l.href} disabled={linksDisabled} className="text-sm font-medium text-gray-600 hover:text-primary-600 transition-colors cursor-pointer">
-                  {l.label}
-                </MaybeLink>
-              ))
+            ? navItems.map((item) =>
+                item.children?.length ? (
+                  <NavDropdown key={item.href} item={item} linkStyle={linkStyle} linkClass={linkClass} disabled={linksDisabled} />
+                ) : (
+                  <MaybeLink key={item.href} href={item.href} disabled={linksDisabled} className={linkClass}>
+                    <span style={linkStyle}>{item.label}</span>
+                  </MaybeLink>
+                )
+              )
             : anchorLinks.map((l) => (
-                <a key={l.href} href={l.href} className="text-sm font-medium text-gray-600 hover:text-primary-600 transition-colors">
+                <a key={l.href} href={l.href} className={hasCustomMenuColor ? linkClass : 'text-sm font-medium text-gray-600 hover:text-primary-600 transition-colors'} style={linkStyle}>
                   {l.label}
                 </a>
               ))}
         </div>
 
         <div className="hidden lg:flex items-center gap-3 flex-shrink-0">
-          <MaybeLink href="/login" disabled={linksDisabled} className="text-sm font-medium text-gray-600 hover:text-primary-600 transition-colors cursor-pointer">
-            Sign in
+          <MaybeLink href="/login" disabled={linksDisabled} className={linkClass}>
+            <span style={linkStyle}>{signInText}</span>
           </MaybeLink>
-          <MaybeLink href="/register" disabled={linksDisabled} className="text-sm font-semibold bg-secondary-600 text-white px-4 py-2 rounded-lg hover:bg-secondary-700 transition-colors cursor-pointer">
-            Sign up free
-          </MaybeLink>
+          {outlineButton ? (
+            <MaybeLink href="/register" disabled={linksDisabled}
+              className="text-sm font-semibold border-2 border-secondary-600 text-secondary-600 px-4 py-2 rounded-lg hover:bg-secondary-600 hover:text-white transition-colors cursor-pointer">
+              {signUpText}
+            </MaybeLink>
+          ) : (
+            <MaybeLink href="/register" disabled={linksDisabled} className="text-sm font-semibold bg-secondary-600 text-white px-4 py-2 rounded-lg hover:bg-secondary-700 transition-colors cursor-pointer">
+              {signUpText}
+            </MaybeLink>
+          )}
         </div>
 
         {/* Mobile hamburger */}
@@ -164,11 +294,23 @@ export function LandingNavBar({
         <div className="lg:hidden border-t border-gray-100 bg-white px-6 py-4">
           <div className="flex flex-col">
             {usingRealPages
-              ? pageLinks.map((l) => (
-                  <MaybeLink key={l.href} href={l.href} disabled={linksDisabled} onClick={() => setMenuOpen(false)}
-                    className="py-2.5 text-sm font-medium text-gray-600 hover:text-primary-600 transition-colors cursor-pointer">
-                    {l.label}
-                  </MaybeLink>
+              ? navItems.map((item) => (
+                  <div key={item.href}>
+                    <MaybeLink href={item.href} disabled={linksDisabled} onClick={() => setMenuOpen(false)}
+                      className="py-2.5 text-sm font-medium text-gray-600 hover:text-primary-600 transition-colors cursor-pointer block">
+                      {item.label}
+                    </MaybeLink>
+                    {item.children?.length ? (
+                      <div className="pl-4 flex flex-col">
+                        {item.children.map((c) => (
+                          <MaybeLink key={c.href} href={c.href} disabled={linksDisabled} onClick={() => setMenuOpen(false)}
+                            className="py-2 text-sm text-gray-500 hover:text-primary-600 transition-colors cursor-pointer">
+                            {c.label}
+                          </MaybeLink>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
                 ))
               : anchorLinks.map((l) => (
                   <a
@@ -186,13 +328,15 @@ export function LandingNavBar({
               href="/login" disabled={linksDisabled}
               className="text-center text-sm font-medium text-gray-600 hover:text-primary-600 py-2.5 rounded-lg border border-gray-200 cursor-pointer"
             >
-              Sign in
+              {signInText}
             </MaybeLink>
             <MaybeLink
               href="/register" disabled={linksDisabled}
-              className="text-center text-sm font-semibold bg-secondary-600 text-white py-2.5 rounded-lg hover:bg-secondary-700 transition-colors cursor-pointer"
+              className={outlineButton
+                ? 'text-center text-sm font-semibold border-2 border-secondary-600 text-secondary-600 py-2.5 rounded-lg hover:bg-secondary-600 hover:text-white transition-colors cursor-pointer'
+                : 'text-center text-sm font-semibold bg-secondary-600 text-white py-2.5 rounded-lg hover:bg-secondary-700 transition-colors cursor-pointer'}
             >
-              Sign up free
+              {signUpText}
             </MaybeLink>
           </div>
         </div>
@@ -536,6 +680,43 @@ export function TestimonialsSection({ testimonials }: { testimonials: Testimonia
   );
 }
 
+// ─── Team ─────────────────────────────────────────────────────────────────────
+
+export function TeamSection({ team }: { team: TeamMember[] }) {
+  if (!team || team.length === 0) return null;
+  return (
+    <section id="team" className="py-14 px-6 bg-white scroll-mt-16">
+      <div className="max-w-6xl mx-auto">
+        <h2 className="text-2xl font-bold text-gray-900 text-center mb-10">Meet the Team</h2>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {team.map((m, i) => (
+            <div key={i} className="bg-white rounded-2xl border border-gray-200 p-6 text-center">
+              {m.photoUrl ? (
+                <img src={m.photoUrl} alt={m.name} className="w-20 h-20 rounded-full object-cover mx-auto mb-4" />
+              ) : (
+                <div className="w-20 h-20 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 text-xl font-bold mx-auto mb-4">
+                  {m.name?.[0] ?? '?'}
+                </div>
+              )}
+              <p className="text-sm font-semibold text-gray-900">{m.name || 'Team member'}</p>
+              {m.role && <p className="text-xs text-primary-600 font-medium mt-0.5">{m.role}</p>}
+              {m.bio && <p className="text-xs text-gray-500 mt-2 leading-relaxed">{m.bio}</p>}
+              {m.linkedinUrl && (
+                <a href={m.linkedinUrl} target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center mt-3 text-gray-400 hover:text-[#0077b5] transition-colors">
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+                  </svg>
+                </a>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 // ─── CTA ──────────────────────────────────────────────────────────────────────
 
 export function CTASection({ cta, linksDisabled }: { cta: WebsiteContent['cta']; linksDisabled?: boolean }) {
@@ -793,15 +974,59 @@ export function CourseApplicationSection({
 
 // ─── Footer ───────────────────────────────────────────────────────────────────
 
-export function LandingFooter({ displayName, linksDisabled }: { displayName: string; linksDisabled?: boolean }) {
+const SOCIAL_ICON_PATHS: Record<SocialPlatform, string> = {
+  facebook: 'M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z',
+  twitter: 'M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z',
+  instagram: 'M12 2c-2.72 0-3.06.01-4.12.06-1.06.05-1.79.22-2.43.47a4.92 4.92 0 00-1.78 1.16A4.9 4.9 0 002.5 5.47c-.25.64-.42 1.37-.47 2.43C1.99 8.96 1.98 9.3 1.98 12s.01 3.04.06 4.1c.05 1.06.22 1.79.47 2.43a4.9 4.9 0 001.16 1.78 4.9 4.9 0 001.78 1.16c.64.25 1.37.42 2.43.47 1.06.05 1.4.06 4.12.06s3.06-.01 4.12-.06c1.06-.05 1.79-.22 2.43-.47a4.9 4.9 0 001.78-1.16 4.9 4.9 0 001.16-1.78c.25-.64.42-1.37.47-2.43.05-1.06.06-1.4.06-4.1s-.01-3.04-.06-4.1c-.05-1.06-.22-1.79-.47-2.43a4.9 4.9 0 00-1.16-1.78A4.9 4.9 0 0018.6 2.53c-.64-.25-1.37-.42-2.43-.47C15.11 2.01 14.77 2 12.05 2H12zm0 1.8c2.67 0 2.99.01 4.04.06.98.04 1.51.2 1.86.34.47.18.8.4 1.15.75.35.35.57.68.75 1.15.14.35.3.88.34 1.86.05 1.05.06 1.37.06 4.04s-.01 2.99-.06 4.04c-.04.98-.2 1.51-.34 1.86-.18.47-.4.8-.75 1.15-.35.35-.68.57-1.15.75-.35.14-.88.3-1.86.34-1.05.05-1.37.06-4.04.06s-2.99-.01-4.04-.06c-.98-.04-1.51-.2-1.86-.34a3.1 3.1 0 01-1.15-.75 3.1 3.1 0 01-.75-1.15c-.14-.35-.3-.88-.34-1.86-.05-1.05-.06-1.37-.06-4.04s.01-2.99.06-4.04c.04-.98.2-1.51.34-1.86.18-.47.4-.8.75-1.15.35-.35.68-.57 1.15-.75.35-.14.88-.3 1.86-.34C9.01 3.81 9.33 3.8 12 3.8zm0 3.05a5.15 5.15 0 100 10.3 5.15 5.15 0 000-10.3zm0 8.5a3.35 3.35 0 110-6.7 3.35 3.35 0 010 6.7zm5.35-8.7a1.2 1.2 0 11-2.4 0 1.2 1.2 0 012.4 0z',
+  linkedin: 'M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z',
+  youtube: 'M23.5 6.2a3.02 3.02 0 00-2.12-2.14C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.38.56A3.02 3.02 0 00.5 6.2 31.6 31.6 0 000 12a31.6 31.6 0 00.5 5.8 3.02 3.02 0 002.12 2.14c1.88.56 9.38.56 9.38.56s7.5 0 9.38-.56a3.02 3.02 0 002.12-2.14A31.6 31.6 0 0024 12a31.6 31.6 0 00-.5-5.8zM9.6 15.4V8.6l6.4 3.4-6.4 3.4z',
+  tiktok: 'M16.6 5.82a4.28 4.28 0 01-3.14-1.36V14.9a5.6 5.6 0 11-4.83-5.55v2.62a3 3 0 103 3.09V.06h2.7a4.28 4.28 0 004.27 4.27v2.7a6.9 6.9 0 01-2-.3z',
+};
+
+function resolveCopyrightText(template: string, tenantName: string) {
+  return template
+    .replace(/\{\{\s*year\s*\}\}/gi, String(new Date().getFullYear()))
+    .replace(/\{\{\s*tenantName\s*\}\}/gi, tenantName);
+}
+
+export function LandingFooter({ displayName, linksDisabled, footerConfig }: { displayName: string; linksDisabled?: boolean; footerConfig?: FooterConfig | null }) {
+  const style = footerConfig?.backgroundColor ? { backgroundColor: footerConfig.backgroundColor } : undefined;
+  const textStyle = footerConfig?.textColor ? { color: footerConfig.textColor } : undefined;
+  const hasSocial = !!footerConfig?.socialLinks?.length;
+
   return (
-    <footer className="py-8 px-6 border-t border-gray-100 bg-white">
-      <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-gray-400">
-        <span className="font-semibold text-primary-600 capitalize">{displayName}</span>
-        <span>Powered by <a href="https://coursel.space" className="hover:text-primary-500 transition-colors">Coursel</a></span>
-        <div className="flex gap-5">
-          <MaybeLink href="/login" disabled={linksDisabled} className="hover:text-gray-600 transition-colors cursor-pointer">Sign in</MaybeLink>
-          <MaybeLink href="/register" disabled={linksDisabled} className="hover:text-gray-600 transition-colors cursor-pointer">Sign up</MaybeLink>
+    <footer className="py-8 px-6 border-t border-gray-100" style={style ?? { backgroundColor: '#ffffff' }}>
+      <div className="max-w-6xl mx-auto space-y-4">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-sm" style={textStyle ?? { color: '#9ca3af' }}>
+          <div className="text-center sm:text-left">
+            <span className="font-semibold text-primary-600 capitalize">{displayName}</span>
+            {footerConfig?.tagline && <p className="text-xs mt-0.5" style={textStyle}>{footerConfig.tagline}</p>}
+          </div>
+
+          {hasSocial && (
+            <div className="flex items-center gap-4">
+              {footerConfig!.socialLinks.map((s, i) => (
+                <a key={i} href={s.url} target="_blank" rel="noopener noreferrer"
+                  className="hover:opacity-70 transition-opacity" style={textStyle} aria-label={s.platform}>
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                    <path d={SOCIAL_ICON_PATHS[s.platform]} />
+                  </svg>
+                </a>
+              ))}
+            </div>
+          )}
+
+          <div className="flex gap-5">
+            <MaybeLink href="/login" disabled={linksDisabled} className="hover:opacity-70 transition-opacity cursor-pointer" style={textStyle}>Sign in</MaybeLink>
+            <MaybeLink href="/register" disabled={linksDisabled} className="hover:opacity-70 transition-opacity cursor-pointer" style={textStyle}>Sign up</MaybeLink>
+          </div>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-xs pt-3 border-t border-gray-100" style={textStyle ?? { color: '#9ca3af' }}>
+          {footerConfig?.copyrightText ? (
+            <span>{resolveCopyrightText(footerConfig.copyrightText, displayName)}</span>
+          ) : <span />}
+          <span>Powered by <a href="https://coursel.space" className="hover:opacity-70 transition-opacity">Coursel</a></span>
         </div>
       </div>
     </footer>
@@ -815,7 +1040,7 @@ export function LandingFooter({ displayName, linksDisabled }: { displayName: str
 
 export interface PageSection {
   _id?: string; // Mongoose-assigned; absent for a section not yet saved
-  type: 'hero' | 'about' | 'coursesSection' | 'testimonials' | 'cta' | 'contact' | 'custom' | 'contactForm' | 'courseApplication';
+  type: 'hero' | 'about' | 'coursesSection' | 'testimonials' | 'cta' | 'contact' | 'custom' | 'contactForm' | 'courseApplication' | 'team';
   order: number;
   data: unknown;
 }
@@ -829,7 +1054,7 @@ export interface CustomCodeData {
 }
 
 export function PageSectionsRenderer({
-  sections, courses, coursesLoading, displayName, logoUrl, linksDisabled, pages, subdomain, pageId,
+  sections, courses, coursesLoading, displayName, logoUrl, linksDisabled, pages, subdomain, pageId, headerConfig, footerConfig,
 }: {
   sections: PageSection[];
   courses: PublicCourse[];
@@ -840,6 +1065,8 @@ export function PageSectionsRenderer({
   pages?: NavPage[];
   subdomain?: string;
   pageId?: string;
+  headerConfig?: HeaderConfig | null;
+  footerConfig?: FooterConfig | null;
 }) {
   const hasAbout = sections.some((s) => {
     if (s.type !== 'about') return false;
@@ -847,6 +1074,7 @@ export function PageSectionsRenderer({
     return !!(d?.heading || d?.body);
   });
   const hasTestimonials = sections.some((s) => s.type === 'testimonials' && Array.isArray(s.data) && s.data.length > 0);
+  const hasTeam = sections.some((s) => s.type === 'team' && Array.isArray(s.data) && s.data.length > 0);
   const hasContact = sections.some((s) => {
     if (s.type !== 'contact') return false;
     const d = s.data as WebsiteContent['contact'];
@@ -864,7 +1092,9 @@ export function PageSectionsRenderer({
         hasAbout={hasAbout}
         hasTestimonials={hasTestimonials}
         hasContact={hasContact}
+        hasTeam={hasTeam}
         pages={pages}
+        headerConfig={headerConfig}
       />
       {ordered.map((section, i) => {
         switch (section.type) {
@@ -884,6 +1114,8 @@ export function PageSectionsRenderer({
             );
           case 'testimonials':
             return <TestimonialsSection key={i} testimonials={section.data as Testimonial[]} />;
+          case 'team':
+            return <TeamSection key={i} team={section.data as TeamMember[]} />;
           case 'cta':
             return <CTASection key={i} cta={section.data as WebsiteContent['cta']} linksDisabled={linksDisabled} />;
           case 'contact':
@@ -898,7 +1130,7 @@ export function PageSectionsRenderer({
             return null;
         }
       })}
-      <LandingFooter displayName={displayName} linksDisabled={linksDisabled} />
+      <LandingFooter displayName={displayName} linksDisabled={linksDisabled} footerConfig={footerConfig} />
     </div>
   );
 }

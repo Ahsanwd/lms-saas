@@ -11,6 +11,8 @@ import {
   type PageSection,
   type PublicCourse,
   type NavPage,
+  type HeaderConfig,
+  type FooterConfig,
 } from '@/components/website/LandingPageSections';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -130,6 +132,8 @@ function TenantLandingPage({ subdomain }: { subdomain: string }) {
   const [sections, setSections] = useState<PageSection[]>([]);
   const [pageId, setPageId] = useState<string | undefined>(undefined);
   const [navPages, setNavPages] = useState<NavPage[]>([]);
+  const [headerConfig, setHeaderConfig] = useState<HeaderConfig | null>(null);
+  const [footerConfig, setFooterConfig] = useState<FooterConfig | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -147,6 +151,8 @@ function TenantLandingPage({ subdomain }: { subdomain: string }) {
         if (coursesRes.data.data.branding?.secondaryColor) applySecondaryColor(coursesRes.data.data.branding.secondaryColor);
         applyFontFamily(coursesRes.data.data.branding?.fontFamily);
         setNavPages(navRes?.data?.data?.pages ?? []);
+        setHeaderConfig(coursesRes.data.data.branding?.header ?? null);
+        setFooterConfig(coursesRes.data.data.branding?.footer ?? null);
 
         const page = pageRes?.data?.data;
         if (page?.isPublished) {
@@ -185,6 +191,8 @@ function TenantLandingPage({ subdomain }: { subdomain: string }) {
         pages={navPages}
         subdomain={subdomain}
         pageId={pageId}
+        headerConfig={headerConfig}
+        footerConfig={footerConfig}
       />
     );
   }

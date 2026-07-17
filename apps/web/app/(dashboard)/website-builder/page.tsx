@@ -9,26 +9,34 @@ import { moveArrayItem } from '@/lib/utils';
 import { AxiosError } from 'axios';
 import {
   PageSectionsRenderer,
+  LandingNavBar,
+  LandingFooter,
   type PageSection,
   type WebsiteContent,
   type PublicCourse,
   type Testimonial,
+  type TeamMember,
   type CustomCodeData,
   type ContactFormData,
   type CourseApplicationData,
+  type NavPage,
+  type HeaderConfig,
+  type FooterConfig,
+  type MenuOverride,
+  type SocialPlatform,
 } from '@/components/website/LandingPageSections';
 
 // Fixed types: 0-or-1 per page. 'custom' is the one repeatable type — any
 // number of Custom Code sections are allowed per page.
-type FixedSectionType = 'hero' | 'about' | 'coursesSection' | 'testimonials' | 'cta' | 'contact' | 'contactForm' | 'courseApplication';
+type FixedSectionType = 'hero' | 'about' | 'coursesSection' | 'testimonials' | 'cta' | 'contact' | 'contactForm' | 'courseApplication' | 'team';
 type SectionType = FixedSectionType | 'custom';
 type InstituteType = 'school' | 'academy' | 'college' | 'university';
 
-const SECTION_TYPE_ORDER: FixedSectionType[] = ['hero', 'about', 'coursesSection', 'testimonials', 'cta', 'contact', 'contactForm', 'courseApplication'];
+const SECTION_TYPE_ORDER: FixedSectionType[] = ['hero', 'about', 'coursesSection', 'team', 'testimonials', 'cta', 'contact', 'contactForm', 'courseApplication'];
 const SECTION_LABELS: Record<SectionType, string> = {
   hero: 'Hero', about: 'About', coursesSection: 'Courses Section',
   testimonials: 'Testimonials', cta: 'Call To Action', contact: 'Contact', custom: 'Custom Code',
-  contactForm: 'Contact Form', courseApplication: 'Course Application',
+  contactForm: 'Contact Form', courseApplication: 'Course Application', team: 'Team / Instructors',
 };
 
 const DEFAULT_SECTION_DATA: Record<SectionType, unknown> = {
@@ -36,6 +44,7 @@ const DEFAULT_SECTION_DATA: Record<SectionType, unknown> = {
   about: { heading: '', body: '', imageUrl: null, ctaText: '', ctaLink: '' },
   coursesSection: { heading: '', subheading: '', displayMode: 'all', categoryId: null, courseIds: [], layout: 'grid' },
   testimonials: [] as Testimonial[],
+  team: [] as TeamMember[],
   cta: { heading: '', subtext: '', buttonText: '', buttonLink: '' },
   contact: { email: '', phone: '', address: '' },
   custom: { html: '', css: '', js: '', heightPx: 400, isEnabled: true } as CustomCodeData,
@@ -164,7 +173,7 @@ const textareaCls = `${inputCls} resize-none`;
 // ═══════════════════════════════════════════════════════════════════════════
 // Pages List screen
 // ═══════════════════════════════════════════════════════════════════════════
-function PagesListScreen({ onEditPage }: { onEditPage: (id: string) => void }) {
+function PagesListScreen({ onEditPage, onEditChrome }: { onEditPage: (id: string) => void; onEditChrome: (chrome: 'header' | 'footer') => void }) {
   const router = useRouter();
   const qc = useQueryClient();
   const [newTitle, setNewTitle] = useState('');
@@ -233,6 +242,36 @@ function PagesListScreen({ onEditPage }: { onEditPage: (id: string) => void }) {
 
       <div className="flex-1 overflow-y-auto px-6 py-8">
         <div className="max-w-2xl mx-auto">
+          <div className="mb-8">
+            <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Site-wide</h2>
+            <div className="grid grid-cols-2 gap-3">
+              <button onClick={() => onEditChrome('header')}
+                className="flex items-center gap-3 p-4 bg-white border border-gray-200 rounded-xl hover:border-primary-300 hover:shadow-sm transition-all text-left">
+                <div className="w-9 h-9 rounded-lg bg-primary-50 text-primary-600 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 6a2 2 0 012-2h12a2 2 0 012 2m-16 0v10a2 2 0 002 2h12a2 2 0 002-2V6" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">Header</p>
+                  <p className="text-[11px] text-gray-400">Logo, menu, buttons</p>
+                </div>
+              </button>
+              <button onClick={() => onEditChrome('footer')}
+                className="flex items-center gap-3 p-4 bg-white border border-gray-200 rounded-xl hover:border-primary-300 hover:shadow-sm transition-all text-left">
+                <div className="w-9 h-9 rounded-lg bg-primary-50 text-primary-600 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 18h16M4 18a2 2 0 01-2-2V6a2 2 0 012-2h16a2 2 0 012 2v10a2 2 0 01-2 2" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">Footer</p>
+                  <p className="text-[11px] text-gray-400">Colors, social links, copyright</p>
+                </div>
+              </button>
+            </div>
+          </div>
+
           <div className="flex items-center justify-between mb-6">
             <div>
               <h1 className="text-xl font-bold text-gray-900">Your Pages</h1>
@@ -381,12 +420,21 @@ function PageEditorScreen({ pageId, onBack }: { pageId: string; onBack: () => vo
   });
 
   const uploadMutation = useMutation({
-    mutationFn: ({ file }: { field: 'hero' | 'about'; file: File }) => {
+    mutationFn: ({ file }: { field: 'hero' | 'about' | 'team'; file: File; sectionIndex?: number; memberIndex?: number }) => {
       const fd = new FormData();
       fd.append('image', file);
       return api.post('/tenant/pages/image', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
     },
     onSuccess: (res, vars) => {
+      if (vars.field === 'team') {
+        // Team members are repeatable (array within one section), so unlike
+        // hero/about below, the target isn't found by type — the caller
+        // passes the exact section + member index instead.
+        if (vars.sectionIndex === undefined || vars.memberIndex === undefined) return;
+        const team = sections[vars.sectionIndex].data as TeamMember[];
+        setSectionWholeAt(vars.sectionIndex, team.map((m, j) => j === vars.memberIndex ? { ...m, photoUrl: res.data.data.url } : m));
+        return;
+      }
       // Hero/About are still 0-or-1 per page, so looking up by type is safe here.
       const idx = sections.findIndex((s) => s.type === vars.field);
       if (idx === -1) return;
@@ -756,6 +804,56 @@ function PageEditorScreen({ pageId, onBack }: { pageId: string; onBack: () => vo
                     );
                   })()}
 
+                  {section.type === 'team' && (() => {
+                    const teamData = section.data as TeamMember[];
+                    return (
+                    <>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-400">{teamData.length} / 20</span>
+                        {teamData.length < 20 && (
+                          <button onClick={() => setSectionWholeAt(idx, [...teamData, { name: '', role: '', bio: '', photoUrl: null, linkedinUrl: null }])}
+                            className="text-xs text-primary-600 font-medium hover:text-primary-700">+ Add</button>
+                        )}
+                      </div>
+                      {teamData.map((m, i) => (
+                        <div key={i} className="border border-gray-200 rounded-lg p-3 space-y-2">
+                          <div className="flex items-center justify-between -mt-0.5 -mr-0.5">
+                            <span className="text-xs font-medium text-gray-400">Member {i + 1}</span>
+                            <div className="flex items-center gap-1">
+                              <ReorderControls index={i} length={teamData.length} onMove={(dir) => setSectionWholeAt(idx, moveArrayItem(teamData, i, dir))} />
+                              <button onClick={() => setSectionWholeAt(idx, teamData.filter((_, j) => j !== i))} className="p-1 text-gray-300 hover:text-red-500 transition-colors" title="Remove">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {m.photoUrl ? (
+                              <img src={m.photoUrl} alt={m.name} className="w-10 h-10 rounded-full object-cover border border-gray-200" />
+                            ) : (
+                              <div className="w-10 h-10 rounded-full bg-gray-100 flex-shrink-0" />
+                            )}
+                            <label className="text-xs px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-600 transition-colors cursor-pointer">
+                              {m.photoUrl ? 'Change' : 'Upload Photo'}
+                              <input type="file" accept="image/*" className="hidden"
+                                onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadMutation.mutate({ field: 'team', file: f, sectionIndex: idx, memberIndex: i }); e.target.value = ''; }} />
+                            </label>
+                            {m.photoUrl && (
+                              <button onClick={() => setSectionWholeAt(idx, teamData.map((x, j) => j === i ? { ...x, photoUrl: null } : x))} className="text-xs text-red-400 hover:text-red-600">Remove</button>
+                            )}
+                          </div>
+                          <input className={inputCls} value={m.name} onChange={(e) => setSectionWholeAt(idx, teamData.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} placeholder="Name" />
+                          <input className={inputCls} value={m.role} onChange={(e) => setSectionWholeAt(idx, teamData.map((x, j) => j === i ? { ...x, role: e.target.value } : x))} placeholder="Role (e.g. Lead Instructor)" />
+                          <textarea className={textareaCls} rows={2} value={m.bio} onChange={(e) => setSectionWholeAt(idx, teamData.map((x, j) => j === i ? { ...x, bio: e.target.value } : x))} placeholder="Short bio (optional)" />
+                          <input className={inputCls} value={m.linkedinUrl ?? ''} onChange={(e) => setSectionWholeAt(idx, teamData.map((x, j) => j === i ? { ...x, linkedinUrl: e.target.value || null } : x))} placeholder="LinkedIn URL (optional)" />
+                        </div>
+                      ))}
+                      {teamData.length === 0 && <p className="text-xs text-gray-400">No team members yet — add up to 20.</p>}
+                    </>
+                    );
+                  })()}
+
                   {section.type === 'cta' && (() => {
                     const ctaData = section.data as WebsiteContent['cta'];
                     return (
@@ -933,13 +1031,454 @@ function PageEditorScreen({ pageId, onBack }: { pageId: string; onBack: () => vo
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// Header Builder
+// ═══════════════════════════════════════════════════════════════════════════
+const DEFAULT_HEADER: HeaderConfig = {
+  logoHeightPx: 36, backgroundColor: '#ffffff', menuTextColor: '#4b5563',
+  signInText: 'Sign in', signUpText: 'Sign up free', buttonStyle: 'solid', menuOverrides: [],
+};
+
+function HeaderEditorScreen({ onBack }: { onBack: () => void }) {
+  const qc = useQueryClient();
+  const [form, setForm] = useState<HeaderConfig>(DEFAULT_HEADER);
+  const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const [loaded, setLoaded] = useState(false);
+
+  const { data: hfData, isLoading: hfLoading } = useQuery({
+    queryKey: ['header-footer'],
+    queryFn: async () => {
+      const { data } = await api.get('/tenant/header-footer');
+      return data.data as { header: HeaderConfig; footer: FooterConfig };
+    },
+  });
+
+  const { data: pages, isLoading: pagesLoading } = useQuery({
+    queryKey: ['tenant-pages'],
+    queryFn: async () => {
+      const { data } = await api.get('/tenant/pages');
+      return (data.data?.pages ?? []) as TenantPageSummary[];
+    },
+  });
+
+  const { data: tenantInfo } = useQuery({
+    queryKey: ['my-tenant'],
+    queryFn: async () => {
+      const { data } = await api.get('/tenant');
+      return data.data.tenant as { name: string; settings?: { logo?: string | null } };
+    },
+  });
+
+  // Materialize one override row per current page — merges any saved
+  // override with a default for pages that don't have one yet — so Save
+  // always writes a complete, unambiguous list rather than a partial diff.
+  useEffect(() => {
+    if (!hfData || !pages || loaded) return;
+    const savedBySlug = new Map(hfData.header.menuOverrides.map((o) => [o.pageSlug, o]));
+    const merged: MenuOverride[] = pages.map((p, i) => {
+      const slug = p.isHomePage ? 'home' : p.slug;
+      return savedBySlug.get(slug) ?? { pageSlug: slug, label: null, hidden: false, order: i, parentSlug: null };
+    });
+    setForm({ ...DEFAULT_HEADER, ...hfData.header, menuOverrides: merged });
+    setLoaded(true);
+  }, [hfData, pages, loaded]);
+
+  const set = <K extends keyof HeaderConfig>(k: K, v: HeaderConfig[K]) => setForm((prev) => ({ ...prev, [k]: v }));
+
+  const saveMutation = useMutation({
+    mutationFn: () => api.patch('/tenant/header-footer', { header: form }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['header-footer'] });
+      setSaved(true); setSaveError('');
+      setTimeout(() => setSaved(false), 3000);
+    },
+    onError: (e: AxiosError<{ message: string }>) => setSaveError(e.response?.data?.message ?? 'Save failed'),
+  });
+
+  function handleResetAppearance() {
+    if (confirm('Reset header appearance (colors, logo size, buttons) to defaults? Your menu setup stays as-is.')) {
+      setForm((prev) => ({ ...DEFAULT_HEADER, menuOverrides: prev.menuOverrides }));
+    }
+  }
+
+  function pageTitle(slug: string) {
+    return pages?.find((pg) => (pg.isHomePage ? 'home' : pg.slug) === slug)?.title ?? slug;
+  }
+
+  function updateRow(slug: string, patch: Partial<MenuOverride>) {
+    setForm((prev) => ({ ...prev, menuOverrides: prev.menuOverrides.map((o) => (o.pageSlug === slug ? { ...o, ...patch } : o)) }));
+  }
+
+  function moveRow(slug: string, dir: -1 | 1) {
+    setForm((prev) => {
+      const row = prev.menuOverrides.find((o) => o.pageSlug === slug);
+      if (!row) return prev;
+      const siblings = prev.menuOverrides.filter((o) => o.parentSlug === row.parentSlug).sort((a, b) => a.order - b.order);
+      const idx = siblings.findIndex((o) => o.pageSlug === slug);
+      const reordered = moveArrayItem(siblings, idx, dir).map((o, i) => ({ ...o, order: i }));
+      const bySlug = new Map(reordered.map((o) => [o.pageSlug, o]));
+      return { ...prev, menuOverrides: prev.menuOverrides.map((o) => bySlug.get(o.pageSlug) ?? o) };
+    });
+  }
+
+  function nestUnder(slug: string, parentSlug: string | null) {
+    setForm((prev) => {
+      const newOrder = prev.menuOverrides.filter((o) => o.parentSlug === parentSlug).length;
+      return { ...prev, menuOverrides: prev.menuOverrides.map((o) => (o.pageSlug === slug ? { ...o, parentSlug, order: newOrder } : o)) };
+    });
+  }
+
+  const topLevelSlugs = form.menuOverrides.filter((o) => !o.parentSlug).sort((a, b) => a.order - b.order).map((o) => o.pageSlug);
+  const navPages: NavPage[] = (pages ?? []).map((p) => ({ slug: p.slug, title: p.title, isHomePage: p.isHomePage }));
+
+  if (hfLoading || pagesLoading || !loaded) return <div className="flex justify-center py-24"><Spinner size="lg" /></div>;
+
+  return (
+    <div className="flex flex-col h-screen bg-gray-50">
+      <div className="flex-shrink-0 h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4">
+        <div className="flex items-center gap-3 min-w-0">
+          <button onClick={onBack} className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors" title="Back to Pages">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <p className="text-sm font-semibold text-gray-900">Header Builder</p>
+        </div>
+        <div className="flex items-center gap-3 flex-shrink-0">
+          {saveError && <span className="text-xs text-red-600 max-w-[220px] truncate">{saveError}</span>}
+          {saved && (
+            <span className="text-xs text-green-600 font-medium flex items-center gap-1">
+              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+              Saved
+            </span>
+          )}
+          <button onClick={handleResetAppearance} className="text-xs text-gray-400 hover:text-red-500 px-2 transition-colors">Reset appearance</button>
+          <Button size="sm" loading={saveMutation.isPending} onClick={() => saveMutation.mutate()}>Save</Button>
+        </div>
+      </div>
+
+      <div className="flex-1 flex min-h-0 overflow-hidden">
+        <div className="w-96 flex-shrink-0 bg-white border-r border-gray-200 flex flex-col overflow-hidden">
+          <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4">
+            <Section title="Appearance" />
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Logo Height <span className="text-gray-400 font-normal">{form.logoHeightPx}px</span>
+              </label>
+              <input type="range" min={20} max={80} step={2} value={form.logoHeightPx}
+                onChange={(e) => set('logoHeightPx', Number(e.target.value))} className="w-full accent-primary-600" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Background Color</label>
+              <div className="flex items-center gap-2">
+                <input type="color" value={form.backgroundColor} onChange={(e) => set('backgroundColor', e.target.value)}
+                  className="h-9 w-12 rounded-lg border border-gray-200 cursor-pointer p-0.5 flex-shrink-0" />
+                <input className={`${inputCls} font-mono flex-1`} value={form.backgroundColor}
+                  onChange={(e) => { if (/^#[0-9A-Fa-f]{0,6}$/.test(e.target.value)) set('backgroundColor', e.target.value); }} maxLength={7} />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Menu Text Color</label>
+              <div className="flex items-center gap-2">
+                <input type="color" value={form.menuTextColor} onChange={(e) => set('menuTextColor', e.target.value)}
+                  className="h-9 w-12 rounded-lg border border-gray-200 cursor-pointer p-0.5 flex-shrink-0" />
+                <input className={`${inputCls} font-mono flex-1`} value={form.menuTextColor}
+                  onChange={(e) => { if (/^#[0-9A-Fa-f]{0,6}$/.test(e.target.value)) set('menuTextColor', e.target.value); }} maxLength={7} />
+              </div>
+            </div>
+
+            <Section title="Buttons" />
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Sign In Text</label>
+              <input className={inputCls} value={form.signInText} onChange={(e) => set('signInText', e.target.value)} maxLength={30} placeholder="Sign in" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Sign Up Text</label>
+              <input className={inputCls} value={form.signUpText} onChange={(e) => set('signUpText', e.target.value)} maxLength={30} placeholder="Sign up free" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-2">Button Style</label>
+              <div className="grid grid-cols-2 gap-2">
+                {(['solid', 'outline'] as const).map((s) => (
+                  <button key={s} onClick={() => set('buttonStyle', s)}
+                    className={`py-2 text-xs rounded-lg border capitalize font-medium transition-colors ${
+                      form.buttonStyle === s ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                    }`}>
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <Section title="Menu" />
+            <p className="text-xs text-gray-400 -mt-2">Rename, reorder, hide, or nest pages into a dropdown submenu.</p>
+            {topLevelSlugs.map((slug, i) => {
+              const row = form.menuOverrides.find((o) => o.pageSlug === slug)!;
+              const children = form.menuOverrides.filter((o) => o.parentSlug === slug).sort((a, b) => a.order - b.order);
+              const canNest = children.length === 0; // avoid 2-level nesting: a parent can't itself become a child
+              return (
+                <div key={slug} className="border border-gray-200 rounded-lg p-3 space-y-2">
+                  <div className="flex items-center justify-between -mt-0.5 -mr-0.5">
+                    <span className="text-xs font-medium text-gray-400">{pageTitle(slug)}</span>
+                    <ReorderControls index={i} length={topLevelSlugs.length} onMove={(dir) => moveRow(slug, dir)} />
+                  </div>
+                  <input className={inputCls} value={row.label ?? ''} onChange={(e) => updateRow(slug, { label: e.target.value || null })}
+                    placeholder={`${pageTitle(slug)} (default label)`} />
+                  {canNest ? (
+                    <select className={inputCls} value={row.parentSlug ?? ''} onChange={(e) => nestUnder(slug, e.target.value || null)}>
+                      <option value="">— Top level —</option>
+                      {topLevelSlugs.filter((s) => s !== slug).map((s) => (
+                        <option key={s} value={s}>Nest under: {pageTitle(s)}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <p className="text-[11px] text-gray-400">Has nested pages — remove them below to nest this page elsewhere.</p>
+                  )}
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={row.hidden} onChange={(e) => updateRow(slug, { hidden: e.target.checked })}
+                      className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+                    <span className="text-xs text-gray-600">Hide from menu</span>
+                  </label>
+
+                  {children.length > 0 && (
+                    <div className="pl-3 border-l-2 border-gray-100 space-y-3 pt-1">
+                      {children.map((child, ci) => (
+                        <div key={child.pageSlug} className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-medium text-gray-400">↳ {pageTitle(child.pageSlug)}</span>
+                            <ReorderControls index={ci} length={children.length} onMove={(dir) => moveRow(child.pageSlug, dir)} />
+                          </div>
+                          <input className={`${inputCls} text-xs`} value={child.label ?? ''} onChange={(e) => updateRow(child.pageSlug, { label: e.target.value || null })}
+                            placeholder={pageTitle(child.pageSlug)} />
+                          <div className="flex items-center justify-between gap-2">
+                            <button onClick={() => nestUnder(child.pageSlug, null)} className="text-[11px] text-primary-600 hover:text-primary-700 font-medium">
+                              ↑ Move to top level
+                            </button>
+                            <label className="flex items-center gap-1.5 cursor-pointer flex-shrink-0">
+                              <input type="checkbox" checked={child.hidden} onChange={(e) => updateRow(child.pageSlug, { hidden: e.target.checked })}
+                                className="w-3.5 h-3.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+                              <span className="text-[11px] text-gray-600">Hide</span>
+                            </label>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            <div className="pb-6" />
+          </div>
+        </div>
+
+        <div className="flex-1 bg-gray-100 flex flex-col overflow-hidden">
+          <div className="flex-shrink-0 flex items-center justify-between px-6 py-3 bg-white border-b border-gray-200">
+            <p className="text-sm font-semibold text-gray-800">Live Preview</p>
+          </div>
+          <div className="flex-1 overflow-auto">
+            <LandingNavBar
+              logoUrl={tenantInfo?.settings?.logo ?? null}
+              displayName={tenantInfo?.name ?? 'Your School'}
+              linksDisabled
+              pages={navPages}
+              headerConfig={form}
+            />
+            <div className="p-10 text-center text-sm text-gray-400">Page content appears below the header.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Footer Builder
+// ═══════════════════════════════════════════════════════════════════════════
+const DEFAULT_FOOTER: FooterConfig = {
+  backgroundColor: '#ffffff', textColor: '#9ca3af', tagline: null, copyrightText: null, socialLinks: [],
+};
+
+const SOCIAL_PLATFORM_LABELS: Record<SocialPlatform, string> = {
+  facebook: 'Facebook', twitter: 'Twitter / X', instagram: 'Instagram', linkedin: 'LinkedIn', youtube: 'YouTube', tiktok: 'TikTok',
+};
+
+function FooterEditorScreen({ onBack }: { onBack: () => void }) {
+  const qc = useQueryClient();
+  const [form, setForm] = useState<FooterConfig>(DEFAULT_FOOTER);
+  const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const [loaded, setLoaded] = useState(false);
+
+  const { data: hfData, isLoading: hfLoading } = useQuery({
+    queryKey: ['header-footer'],
+    queryFn: async () => {
+      const { data } = await api.get('/tenant/header-footer');
+      return data.data as { header: HeaderConfig; footer: FooterConfig };
+    },
+  });
+
+  const { data: tenantInfo } = useQuery({
+    queryKey: ['my-tenant'],
+    queryFn: async () => {
+      const { data } = await api.get('/tenant');
+      return data.data.tenant as { name: string };
+    },
+  });
+
+  useEffect(() => {
+    if (hfData && !loaded) {
+      setForm({ ...DEFAULT_FOOTER, ...hfData.footer });
+      setLoaded(true);
+    }
+  }, [hfData, loaded]);
+
+  const set = <K extends keyof FooterConfig>(k: K, v: FooterConfig[K]) => setForm((prev) => ({ ...prev, [k]: v }));
+
+  const saveMutation = useMutation({
+    mutationFn: () => api.patch('/tenant/header-footer', { footer: form }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['header-footer'] });
+      setSaved(true); setSaveError('');
+      setTimeout(() => setSaved(false), 3000);
+    },
+    onError: (e: AxiosError<{ message: string }>) => setSaveError(e.response?.data?.message ?? 'Save failed'),
+  });
+
+  function handleReset() {
+    if (confirm('Reset the footer to defaults? This cannot be undone.')) {
+      setForm(DEFAULT_FOOTER);
+    }
+  }
+
+  const socialLinks = form.socialLinks;
+  const usedPlatforms = new Set(socialLinks.map((s) => s.platform));
+  const availablePlatforms = (Object.keys(SOCIAL_PLATFORM_LABELS) as SocialPlatform[]).filter((p) => !usedPlatforms.has(p));
+
+  if (hfLoading || !loaded) return <div className="flex justify-center py-24"><Spinner size="lg" /></div>;
+
+  return (
+    <div className="flex flex-col h-screen bg-gray-50">
+      <div className="flex-shrink-0 h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4">
+        <div className="flex items-center gap-3 min-w-0">
+          <button onClick={onBack} className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors" title="Back to Pages">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <p className="text-sm font-semibold text-gray-900">Footer Builder</p>
+        </div>
+        <div className="flex items-center gap-3 flex-shrink-0">
+          {saveError && <span className="text-xs text-red-600 max-w-[220px] truncate">{saveError}</span>}
+          {saved && (
+            <span className="text-xs text-green-600 font-medium flex items-center gap-1">
+              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+              Saved
+            </span>
+          )}
+          <button onClick={handleReset} className="text-xs text-gray-400 hover:text-red-500 px-2 transition-colors">Reset</button>
+          <Button size="sm" loading={saveMutation.isPending} onClick={() => saveMutation.mutate()}>Save</Button>
+        </div>
+      </div>
+
+      <div className="flex-1 flex min-h-0 overflow-hidden">
+        <div className="w-96 flex-shrink-0 bg-white border-r border-gray-200 flex flex-col overflow-hidden">
+          <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4">
+            <Section title="Appearance" />
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Background Color</label>
+              <div className="flex items-center gap-2">
+                <input type="color" value={form.backgroundColor} onChange={(e) => set('backgroundColor', e.target.value)}
+                  className="h-9 w-12 rounded-lg border border-gray-200 cursor-pointer p-0.5 flex-shrink-0" />
+                <input className={`${inputCls} font-mono flex-1`} value={form.backgroundColor}
+                  onChange={(e) => { if (/^#[0-9A-Fa-f]{0,6}$/.test(e.target.value)) set('backgroundColor', e.target.value); }} maxLength={7} />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Text Color</label>
+              <div className="flex items-center gap-2">
+                <input type="color" value={form.textColor} onChange={(e) => set('textColor', e.target.value)}
+                  className="h-9 w-12 rounded-lg border border-gray-200 cursor-pointer p-0.5 flex-shrink-0" />
+                <input className={`${inputCls} font-mono flex-1`} value={form.textColor}
+                  onChange={(e) => { if (/^#[0-9A-Fa-f]{0,6}$/.test(e.target.value)) set('textColor', e.target.value); }} maxLength={7} />
+              </div>
+            </div>
+
+            <Section title="Text" />
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Tagline (optional)</label>
+              <input className={inputCls} value={form.tagline ?? ''} onChange={(e) => set('tagline', e.target.value || null)}
+                maxLength={200} placeholder="A short line under your name" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Copyright Text (optional)</label>
+              <input className={inputCls} value={form.copyrightText ?? ''} onChange={(e) => set('copyrightText', e.target.value || null)}
+                maxLength={200} placeholder="© {{year}} {{tenantName}}. All rights reserved." />
+              <p className="text-[11px] text-gray-400 mt-1">Use <code>{'{{year}}'}</code> and <code>{'{{tenantName}}'}</code> — they're filled in automatically.</p>
+            </div>
+
+            <Section title="Social Links" />
+            <div className="space-y-2">
+              {socialLinks.map((link, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <select className={`${inputCls} w-32 flex-shrink-0`} value={link.platform}
+                    onChange={(e) => set('socialLinks', socialLinks.map((s, j) => (j === i ? { ...s, platform: e.target.value as SocialPlatform } : s)))}>
+                    {(Object.keys(SOCIAL_PLATFORM_LABELS) as SocialPlatform[])
+                      .filter((p) => p === link.platform || !usedPlatforms.has(p))
+                      .map((p) => <option key={p} value={p}>{SOCIAL_PLATFORM_LABELS[p]}</option>)}
+                  </select>
+                  <input className={`${inputCls} flex-1`} value={link.url}
+                    onChange={(e) => set('socialLinks', socialLinks.map((s, j) => (j === i ? { ...s, url: e.target.value } : s)))}
+                    placeholder="https://..." />
+                  <button onClick={() => set('socialLinks', socialLinks.filter((_, j) => j !== i))} className="p-1 text-gray-300 hover:text-red-500 transition-colors flex-shrink-0" title="Remove">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+              {availablePlatforms.length > 0 && socialLinks.length < 6 && (
+                <button onClick={() => set('socialLinks', [...socialLinks, { platform: availablePlatforms[0], url: '' }])}
+                  className="text-xs text-primary-600 font-medium hover:text-primary-700">+ Add social link</button>
+              )}
+              {socialLinks.length === 0 && <p className="text-xs text-gray-400">No social links yet.</p>}
+            </div>
+            <div className="pb-6" />
+          </div>
+        </div>
+
+        <div className="flex-1 bg-gray-100 flex flex-col overflow-hidden">
+          <div className="flex-shrink-0 flex items-center justify-between px-6 py-3 bg-white border-b border-gray-200">
+            <p className="text-sm font-semibold text-gray-800">Live Preview</p>
+          </div>
+          <div className="flex-1 overflow-auto flex flex-col justify-end">
+            <div className="p-10 text-center text-sm text-gray-400">Page content appears above the footer.</div>
+            <LandingFooter displayName={tenantInfo?.name ?? 'Your School'} linksDisabled footerConfig={form} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // Top-level: switches between the Pages list and the per-page editor
 // ═══════════════════════════════════════════════════════════════════════════
 export default function WebsiteBuilderPage() {
   const [editingPageId, setEditingPageId] = useState<string | null>(null);
+  const [editingChrome, setEditingChrome] = useState<'header' | 'footer' | null>(null);
 
   if (editingPageId) {
     return <PageEditorScreen pageId={editingPageId} onBack={() => setEditingPageId(null)} />;
   }
-  return <PagesListScreen onEditPage={setEditingPageId} />;
+  if (editingChrome === 'header') {
+    return <HeaderEditorScreen onBack={() => setEditingChrome(null)} />;
+  }
+  if (editingChrome === 'footer') {
+    return <FooterEditorScreen onBack={() => setEditingChrome(null)} />;
+  }
+  return <PagesListScreen onEditPage={setEditingPageId} onEditChrome={setEditingChrome} />;
 }

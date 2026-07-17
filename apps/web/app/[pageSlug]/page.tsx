@@ -6,7 +6,7 @@ import axios from 'axios';
 import { applyBrandColor, applySecondaryColor, applyFontFamily } from '@/lib/brandColor';
 import { useTenantSubdomain } from '@/lib/useTenantSubdomain';
 import { resolveSectionCourses } from '@/lib/tenantPageFetch';
-import { PageSectionsRenderer, type PageSection, type PublicCourse, type NavPage } from '@/components/website/LandingPageSections';
+import { PageSectionsRenderer, type PageSection, type PublicCourse, type NavPage, type HeaderConfig, type FooterConfig } from '@/components/website/LandingPageSections';
 
 // Tenant-created pages beyond Home (e.g. /about-us). The root platform
 // domain has no tenant pages at all, so it 404s immediately. Reserved slugs
@@ -25,6 +25,8 @@ export default function TenantCustomPage() {
   const [pageId, setPageId] = useState<string | undefined>(undefined);
   const [courses, setCourses] = useState<PublicCourse[]>([]);
   const [navPages, setNavPages] = useState<NavPage[]>([]);
+  const [headerConfig, setHeaderConfig] = useState<HeaderConfig | null>(null);
+  const [footerConfig, setFooterConfig] = useState<FooterConfig | null>(null);
 
   useEffect(() => {
     if (subdomain === null) return; // not yet resolved
@@ -43,6 +45,8 @@ export default function TenantCustomPage() {
         if (coursesRes.data.data.branding?.secondaryColor) applySecondaryColor(coursesRes.data.data.branding.secondaryColor);
         applyFontFamily(coursesRes.data.data.branding?.fontFamily);
         setNavPages(navRes?.data?.data?.pages ?? []);
+        setHeaderConfig(coursesRes.data.data.branding?.header ?? null);
+        setFooterConfig(coursesRes.data.data.branding?.footer ?? null);
 
         const page = pageRes?.data?.data;
         if (!page?.isPublished) { setNotPublished(true); return; }
@@ -76,6 +80,8 @@ export default function TenantCustomPage() {
       pages={navPages}
       subdomain={subdomain}
       pageId={pageId}
+      headerConfig={headerConfig}
+      footerConfig={footerConfig}
     />
   );
 }
