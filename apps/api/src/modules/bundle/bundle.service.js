@@ -22,7 +22,7 @@ async function listBundles(tenantId, { search, status, page = 1, limit = 20 } = 
   const skip = (Number(page) - 1) * Number(limit);
   const [bundles, total] = await Promise.all([
     CourseBundle.find(filter)
-      .populate('courseIds', 'title price')
+      .populate('courseIds', 'title price thumbnail')
       .sort({ createdAt: -1 }).skip(skip).limit(Number(limit)),
     CourseBundle.countDocuments(filter),
   ]);
@@ -298,11 +298,15 @@ async function _activateBundlePayment(payment) {
 
   const perCoursePrice = (payment.amount / payment.courseIds.length) / 100;
   const enrollmentIds = [];
+  const countedCourseIds = [];
 
   for (const courseId of payment.courseIds) {
     const existing = await Enrollment.findOne({ tenantId: payment.tenantId, courseId, userId: payment.userId });
     if (existing && existing.status === 'active') {
-      enrollmentIds.push(existing._id);
+      // Already owned via a separate purchase — this payment grants nothing
+      // new for this course, so it must NOT be tracked against this payment.
+      // A later refund of this payment must never touch an enrollment (or
+      // enrollmentCount) it didn't actually create.
       continue;
     }
 
@@ -325,13 +329,27 @@ async function _activateBundlePayment(payment) {
       });
       await Course.updateOne({ _id: courseId, tenantId: payment.tenantId }, { $inc: { enrollmentCount: 1 } });
       enrollmentIds.push(enrollment._id);
+      countedCourseIds.push(courseId);
     }
   }
 
-  payment.status        = 'completed';
-  payment.paidAt         = new Date();
-  payment.enrollmentIds  = enrollmentIds;
+  payment.status           = 'completed';
+  payment.paidAt            = new Date();
+  payment.enrollmentIds     = enrollmentIds;
+  payment.countedCourseIds  = countedCourseIds;
   await payment.save();
+
+  // Mirrors payment.service.js's _activatePayment — coupon usage is only
+  // counted once a purchase actually completes, never on initiate/validate,
+  // so abandoned checkouts don't burn a limited-use code. Was previously
+  // dead code (applyBundleCoupon was never called from anywhere).
+  if (payment.couponCode) {
+    const couponSvc = require('../coupon/coupon.service');
+    couponSvc.applyBundleCoupon(
+      payment.tenantId, payment.couponCode, payment.courseIds,
+      (payment.amount + payment.discountAmount) / 100
+    ).catch(() => {});
+  }
 
   const { emitDashboardUpdated } = require('../../services/socket/io');
   emitDashboardUpdated(payment.tenantId, { event: 'new_enrollment' });
@@ -360,12 +378,18 @@ async function refundBundlePayment(tenantId, paymentId, actingUserId, { reason =
   payment.refundReason = reason;
   await payment.save();
 
+  // enrollmentIds only ever contains enrollments THIS payment created or
+  // reactivated (never a pre-existing enrollment from a separate purchase
+  // that happened to overlap with this bundle) — see _activateBundlePayment.
   await Enrollment.updateMany(
     { _id: { $in: payment.enrollmentIds } },
     { status: 'dropped', droppedAt: new Date() }
   );
+  // Fall back to courseIds for payments completed before countedCourseIds
+  // existed (legacy documents where the field is simply absent).
+  const decrementCourseIds = payment.countedCourseIds?.length ? payment.countedCourseIds : payment.courseIds;
   await Course.updateMany(
-    { _id: { $in: payment.courseIds }, tenantId },
+    { _id: { $in: decrementCourseIds }, tenantId },
     { $inc: { enrollmentCount: -1 } }
   );
 

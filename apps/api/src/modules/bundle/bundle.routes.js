@@ -3,6 +3,11 @@ const ctrl = require('./bundle.controller');
 const { authenticate }      = require('../../middlewares/auth.middleware');
 const { requirePermission } = require('../../middlewares/permission.middleware');
 
+// Public marketing-site catalog (no auth) — same published-only data as the
+// authenticated listPublic below, just reachable from the public website's
+// Bundles section (mirrors course.routes.js's own /public pattern).
+router.get('/public', ctrl.listPublic);
+
 router.use(authenticate);
 
 // Student-facing catalog of published bundles for this tenant

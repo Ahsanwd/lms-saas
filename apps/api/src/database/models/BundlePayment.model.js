@@ -10,7 +10,14 @@ const bundlePaymentSchema = new mongoose.Schema(
     userId:   { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
 
     courseIds:     [{ type: mongoose.Schema.Types.ObjectId, ref: 'Course' }],     // snapshot at purchase time
-    enrollmentIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Enrollment' }], // filled in on confirm
+    // Only enrollments this payment actually created or reactivated — NOT
+    // every course in the bundle, since a student may already own some of
+    // them via an unrelated earlier purchase. Refunding this payment must
+    // never touch those. countedCourseIds mirrors the same subset, tracking
+    // which courses' enrollmentCount this payment is responsible for
+    // incrementing (and must symmetrically decrement on refund).
+    enrollmentIds:     [{ type: mongoose.Schema.Types.ObjectId, ref: 'Enrollment' }], // filled in on confirm
+    countedCourseIds:  [{ type: mongoose.Schema.Types.ObjectId, ref: 'Course' }],     // filled in on confirm
 
     amount:         { type: Number, required: true, min: 0 }, // in cents
     currency:       { type: String, default: 'usd' },

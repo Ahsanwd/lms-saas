@@ -3,6 +3,7 @@ const AppError = require('../../utils/AppError');
 
 const MAX_TESTIMONIALS = 6;
 const MAX_TEAM_MEMBERS = 20;
+const MAX_SELECTED_BUNDLES = 30;
 
 // Size/count caps — Mixed-typed section data gets zero Mongoose schema
 // validation, so these are enforced here in the service layer instead.
@@ -72,6 +73,7 @@ function validateSections(sections) {
   let contactFormCount = 0;
   let courseApplicationCount = 0;
   let teamCount = 0;
+  let bundlesSectionCount = 0;
 
   for (const section of sections) {
     if (FIXED_SECTION_TYPES.includes(section.type)) {
@@ -102,6 +104,13 @@ function validateSections(sections) {
         throw new AppError('Only one "team" section is allowed per page', 400);
       if (Array.isArray(section.data) && section.data.length > MAX_TEAM_MEMBERS)
         throw new AppError(`Maximum ${MAX_TEAM_MEMBERS} team members allowed`, 400);
+    } else if (section.type === 'bundlesSection') {
+      bundlesSectionCount += 1;
+      if (bundlesSectionCount > 1)
+        throw new AppError('Only one "bundlesSection" section is allowed per page', 400);
+      const { bundleIds } = section.data || {};
+      if (bundleIds && (!Array.isArray(bundleIds) || bundleIds.length > MAX_SELECTED_BUNDLES))
+        throw new AppError(`A maximum of ${MAX_SELECTED_BUNDLES} selected bundles is allowed`, 400);
     } else {
       throw new AppError(`Unknown section type "${section.type}"`, 400);
     }
