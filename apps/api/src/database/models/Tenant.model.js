@@ -76,6 +76,41 @@ const tenantSchema = new mongoose.Schema(
         payments:      { type: Boolean, default: true },
         forums:        { type: Boolean, default: false },
       },
+
+      // Public website nav bar — defaults reproduce today's hardcoded
+      // LandingNavBar exactly, so tenants who never open the Header Builder
+      // see zero change. menuOverrides join TenantPage by slug rather than
+      // ObjectId ref — a stale entry (page later deleted) is just filtered
+      // out at render time, no cleanup job needed.
+      header: {
+        logoHeightPx:    { type: Number, default: 36, min: 20, max: 80 },
+        backgroundColor: { type: String, default: '#ffffff' },
+        menuTextColor:   { type: String, default: '#4b5563' },
+        signInText:      { type: String, default: 'Sign in', trim: true, maxlength: 30 },
+        signUpText:      { type: String, default: 'Sign up free', trim: true, maxlength: 30 },
+        buttonStyle:     { type: String, enum: ['solid', 'outline'], default: 'solid' },
+        menuOverrides: [{
+          pageSlug:   { type: String, required: true }, // TenantPage.slug ('home' for the home page)
+          label:      { type: String, default: null },  // null = use the page's own title
+          hidden:     { type: Boolean, default: false },
+          order:      { type: Number, default: 0 },
+          parentSlug: { type: String, default: null },  // set = nests this item under another page's dropdown
+        }],
+      },
+
+      // Public website footer — same zero-change-by-default rule as header.
+      footer: {
+        backgroundColor: { type: String, default: '#ffffff' },
+        textColor:       { type: String, default: '#9ca3af' },
+        tagline:         { type: String, default: null, maxlength: 200 },
+        // Extra line above the fixed "Powered by Coursel" attribution.
+        // Supports {{year}} / {{tenantName}} tokens, resolved at render time.
+        copyrightText:   { type: String, default: null, maxlength: 200 },
+        socialLinks: [{
+          platform: { type: String, enum: ['facebook', 'twitter', 'instagram', 'linkedin', 'youtube', 'tiktok'], required: true },
+          url:      { type: String, required: true, maxlength: 500 },
+        }],
+      },
     },
 
     emailSettings: {

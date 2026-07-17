@@ -313,6 +313,97 @@ async function updateFeatureFlags(tenantId, flags) {
   return tenant.settings?.featureFlags ?? {};
 }
 
+// ─── Header / Footer Builder ───────────────────────────────────────────────────
+const HEX_COLOR_RE = /^#[0-9A-Fa-f]{6}$/;
+const MAX_MENU_OVERRIDES = 30;
+const MAX_SOCIAL_LINKS = 6;
+const SOCIAL_PLATFORMS = ['facebook', 'twitter', 'instagram', 'linkedin', 'youtube', 'tiktok'];
+
+const DEFAULT_HEADER = {
+  logoHeightPx: 36, backgroundColor: '#ffffff', menuTextColor: '#4b5563',
+  signInText: 'Sign in', signUpText: 'Sign up free', buttonStyle: 'solid', menuOverrides: [],
+};
+const DEFAULT_FOOTER = {
+  backgroundColor: '#ffffff', textColor: '#9ca3af', tagline: null, copyrightText: null, socialLinks: [],
+};
+
+async function getHeaderFooterSettings(tenantId) {
+  const tenant = await Tenant.findById(tenantId).select('settings.header settings.footer').lean();
+  if (!tenant) throw new AppError('Tenant not found', 404);
+  return {
+    header: { ...DEFAULT_HEADER, ...(tenant.settings?.header || {}) },
+    footer: { ...DEFAULT_FOOTER, ...(tenant.settings?.footer || {}) },
+  };
+}
+
+// tenantRepo.updateById doesn't set runValidators, so — matching this
+// codebase's established style (tenantPage.service.js's validateSections,
+// quiz.service.js's validateQuestionStructure) — validate explicitly rather
+// than relying on Mongoose schema validation to catch a bad enum/color/count.
+function validateHeader(header) {
+  if (header.backgroundColor !== undefined && !HEX_COLOR_RE.test(header.backgroundColor))
+    throw new AppError('Header background color must be a hex color like #ffffff', 400);
+  if (header.menuTextColor !== undefined && !HEX_COLOR_RE.test(header.menuTextColor))
+    throw new AppError('Menu text color must be a hex color like #4b5563', 400);
+  if (header.buttonStyle !== undefined && !['solid', 'outline'].includes(header.buttonStyle))
+    throw new AppError('Invalid button style', 400);
+  if (header.logoHeightPx !== undefined) {
+    const h = Number(header.logoHeightPx);
+    if (!Number.isFinite(h) || h < 20 || h > 80) throw new AppError('Logo height must be between 20 and 80px', 400);
+  }
+  if (header.signInText !== undefined && String(header.signInText).length > 30)
+    throw new AppError('Sign in text is too long (max 30 characters)', 400);
+  if (header.signUpText !== undefined && String(header.signUpText).length > 30)
+    throw new AppError('Sign up text is too long (max 30 characters)', 400);
+  if (header.menuOverrides !== undefined) {
+    if (!Array.isArray(header.menuOverrides)) throw new AppError('menuOverrides must be an array', 400);
+    if (header.menuOverrides.length > MAX_MENU_OVERRIDES)
+      throw new AppError(`A maximum of ${MAX_MENU_OVERRIDES} menu items is allowed`, 400);
+    for (const item of header.menuOverrides) {
+      if (!item.pageSlug || typeof item.pageSlug !== 'string')
+        throw new AppError('Each menu item needs a pageSlug', 400);
+    }
+  }
+}
+
+function validateFooter(footer) {
+  if (footer.backgroundColor !== undefined && !HEX_COLOR_RE.test(footer.backgroundColor))
+    throw new AppError('Footer background color must be a hex color like #ffffff', 400);
+  if (footer.textColor !== undefined && !HEX_COLOR_RE.test(footer.textColor))
+    throw new AppError('Footer text color must be a hex color like #9ca3af', 400);
+  if (footer.tagline !== undefined && footer.tagline !== null && String(footer.tagline).length > 200)
+    throw new AppError('Tagline is too long (max 200 characters)', 400);
+  if (footer.copyrightText !== undefined && footer.copyrightText !== null && String(footer.copyrightText).length > 200)
+    throw new AppError('Copyright text is too long (max 200 characters)', 400);
+  if (footer.socialLinks !== undefined) {
+    if (!Array.isArray(footer.socialLinks)) throw new AppError('socialLinks must be an array', 400);
+    if (footer.socialLinks.length > MAX_SOCIAL_LINKS)
+      throw new AppError(`A maximum of ${MAX_SOCIAL_LINKS} social links is allowed`, 400);
+    for (const link of footer.socialLinks) {
+      if (!SOCIAL_PLATFORMS.includes(link.platform))
+        throw new AppError(`Invalid social platform "${link.platform}"`, 400);
+      if (!link.url || typeof link.url !== 'string' || link.url.length > 500)
+        throw new AppError('Each social link needs a valid URL', 400);
+    }
+  }
+}
+
+async function updateHeaderFooterSettings(tenantId, { header, footer }) {
+  const update = {};
+  if (header !== undefined) {
+    validateHeader(header);
+    update['settings.header'] = { ...DEFAULT_HEADER, ...header };
+  }
+  if (footer !== undefined) {
+    validateFooter(footer);
+    update['settings.footer'] = { ...DEFAULT_FOOTER, ...footer };
+  }
+  if (!Object.keys(update).length) throw new AppError('No valid header/footer fields provided', 400);
+
+  await tenantRepo.updateById(tenantId, { $set: update });
+  return getHeaderFooterSettings(tenantId);
+}
+
 // Website Builder website-content logic (getWebsiteContent/saveWebsiteContent/
 // getPublicWebsiteContent) moved to ../tenantPage/tenantPage.service.js as of
 // the multi-page builder migration (Phase 1a) — storage moved from
@@ -336,6 +427,8 @@ module.exports = {
   saveSafepayGateway,
   disconnectGateway,
   getActiveGateway,
+  getHeaderFooterSettings,
+  updateHeaderFooterSettings,
   markSafepayVerified,
   getFeatureFlags,
   updateFeatureFlags,

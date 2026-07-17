@@ -114,6 +114,20 @@ async function updateFeatureFlags(req, res, next) {
   } catch (err) { next(err); }
 }
 
+async function getHeaderFooter(req, res, next) {
+  try {
+    const data = await tenantService.getHeaderFooterSettings(req.tenant.tenantId);
+    R.success(res, data);
+  } catch (err) { next(err); }
+}
+
+async function updateHeaderFooter(req, res, next) {
+  try {
+    const data = await tenantService.updateHeaderFooterSettings(req.tenant.tenantId, req.body);
+    R.success(res, data, 'Header/footer settings updated');
+  } catch (err) { next(err); }
+}
+
 async function getEmailSettings(req, res, next) {
   try {
     const data = await tenantService.getEmailSettings(req.tenant.tenantId);
@@ -275,6 +289,8 @@ module.exports = {
   removeFavicon,
   getFeatureFlags,
   updateFeatureFlags,
+  getHeaderFooter,
+  updateHeaderFooter,
   getEmailSettings,
   saveEmailSettings,
   getPaymentGateway,

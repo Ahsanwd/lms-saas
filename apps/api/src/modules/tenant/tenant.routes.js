@@ -30,6 +30,10 @@ router.delete('/favicon',  requirePermission('settings:manage'), ctrl.removeFavi
 router.get('/feature-flags',   requireRole('tenant_admin'), ctrl.getFeatureFlags);
 router.patch('/feature-flags', requireRole('tenant_admin'), ctrl.updateFeatureFlags);
 
+// Header/Footer Builder (tenant_admin only)
+router.get('/header-footer',   requireRole('tenant_admin'), ctrl.getHeaderFooter);
+router.patch('/header-footer', requireRole('tenant_admin'), ctrl.updateHeaderFooter);
+
 router.post('/domain', requirePermission('settings:manage'), ctrl.setCustomDomain);
 router.post('/domain/verify', requirePermission('settings:manage'), ctrl.verifyCustomDomain);
 router.delete('/domain', requirePermission('settings:manage'), ctrl.removeCustomDomain);

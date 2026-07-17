@@ -2,6 +2,7 @@ const tenantPageRepo = require('../../database/repositories/tenantPage.repositor
 const AppError = require('../../utils/AppError');
 
 const MAX_TESTIMONIALS = 6;
+const MAX_TEAM_MEMBERS = 20;
 
 // Size/count caps — Mixed-typed section data gets zero Mongoose schema
 // validation, so these are enforced here in the service layer instead.
@@ -70,6 +71,7 @@ function validateSections(sections) {
   let customCount = 0;
   let contactFormCount = 0;
   let courseApplicationCount = 0;
+  let teamCount = 0;
 
   for (const section of sections) {
     if (FIXED_SECTION_TYPES.includes(section.type)) {
@@ -94,6 +96,12 @@ function validateSections(sections) {
       courseApplicationCount += 1;
       if (courseApplicationCount > 1)
         throw new AppError('Only one "courseApplication" section is allowed per page', 400);
+    } else if (section.type === 'team') {
+      teamCount += 1;
+      if (teamCount > 1)
+        throw new AppError('Only one "team" section is allowed per page', 400);
+      if (Array.isArray(section.data) && section.data.length > MAX_TEAM_MEMBERS)
+        throw new AppError(`Maximum ${MAX_TEAM_MEMBERS} team members allowed`, 400);
     } else {
       throw new AppError(`Unknown section type "${section.type}"`, 400);
     }
