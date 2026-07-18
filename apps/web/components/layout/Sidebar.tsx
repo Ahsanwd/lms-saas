@@ -196,7 +196,6 @@ const NAV_ENTRIES: NavEntry[] = [
       { href: '/coupons',          label: 'Coupons',          icon: <CouponIcon />,     roles: ['tenant_admin'] },
       { href: '/groups',           label: 'Groups',           icon: <GroupIcon />,      roles: ['tenant_admin'] },
       { href: '/cohorts',          label: 'Cohorts',          icon: <CohortIcon />,     roles: ['tenant_admin'] },
-      { href: '/membership-plans', label: 'Membership Plans', icon: <MembershipIcon />, roles: ['tenant_admin'] },
       { href: '/membership',       label: 'Membership',       icon: <MembershipIcon />, roles: ['student'] },
       { href: '/my-payments',      label: 'Payment History',  icon: <CreditCardIcon />, roles: ['student'] },
       { href: '/bookmarks',        label: 'Saved Courses',    icon: <BookmarkIcon />,   roles: ['student'] },
@@ -229,6 +228,7 @@ const NAV_ENTRIES: NavEntry[] = [
     key: 'admin', label: 'Admin', icon: <UsersIcon />,
     items: [
       { href: '/users',         label: 'Users',   icon: <UsersIcon />,    roles: ['tenant_admin'] },
+      { href: '/membership-plans', label: 'Membership Plans', icon: <MembershipIcon />, roles: ['tenant_admin'] },
       { href: '/media',         label: 'Media Library', icon: <MediaIcon />, roles: ['tenant_admin', 'instructor'] },
       { href: '/admin/tenants', label: 'Tenants', icon: <BuildingIcon />, roles: ['super_admin'] },
       { href: '/billing',          label: 'Billing',          icon: <CreditCardIcon />, roles: ['tenant_admin'] },
