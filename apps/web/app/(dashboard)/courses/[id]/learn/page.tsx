@@ -928,7 +928,7 @@ function VideoPlayer({ lesson, courseId }: { lesson: Lesson; courseId: string })
   // proactively (well before the 2h expiry) so long-focused viewing doesn't
   // silently break mid-playback.
   const isHosted = vid?.provider === 'local' || vid?.provider === 's3';
-  const { data: videoTokenData, isLoading: videoTokenLoading, isError: videoTokenError } = useQuery<{ signedUrl: string }>({
+  const { data: videoTokenData, isLoading: videoTokenLoading, isError: videoTokenError, error: videoTokenErrorObj } = useQuery<{ signedUrl: string }, import('axios').AxiosError<{ message: string }>>({
     queryKey: ['video-token', lesson._id],
     queryFn: async () => {
       const { data } = await api.get(`/courses/${courseId}/lessons/${lesson._id}/video-token`);
@@ -1050,9 +1050,15 @@ function VideoPlayer({ lesson, courseId }: { lesson: Lesson; courseId: string })
       );
     }
     if (videoTokenError || !videoTokenData?.signedUrl) {
+      const apiMessage = videoTokenErrorObj?.response?.data?.message;
       return (
-        <div className="bg-gray-900 rounded-2xl aspect-video flex items-center justify-center">
-          <p className="text-red-400 text-sm">Could not load video. Please refresh the page.</p>
+        <div className="bg-gray-900 rounded-2xl aspect-video flex flex-col items-center justify-center gap-3 px-6 text-center">
+          <p className="text-red-400 text-sm">{apiMessage || 'Could not load video. Please refresh the page.'}</p>
+          {videoTokenErrorObj?.response?.status === 403 && apiMessage?.toLowerCase().includes('membership') && (
+            <a href="/membership" className="text-xs font-medium text-primary-400 hover:text-primary-300 underline">
+              Go to Membership →
+            </a>
+          )}
         </div>
       );
     }
@@ -1140,7 +1146,7 @@ function AudioPlayer({ lesson, courseId }: { lesson: Lesson; courseId: string })
 
   // Fetch a signed R2 URL for locally-hosted audio (enrollment-gated, 2h window)
   const isHosted = au?.provider === 'local' || au?.provider === 's3';
-  const { data: tokenData, isLoading: tokenLoading, isError: tokenError } = useQuery<{ signedUrl: string }>({
+  const { data: tokenData, isLoading: tokenLoading, isError: tokenError, error: tokenErrorObj } = useQuery<{ signedUrl: string }, import('axios').AxiosError<{ message: string }>>({
     queryKey: ['audio-token', lesson._id],
     queryFn: async () => {
       const { data } = await api.get(`/courses/${courseId}/lessons/${lesson._id}/audio-token`);
@@ -1268,14 +1274,22 @@ function AudioPlayer({ lesson, courseId }: { lesson: Lesson; courseId: string })
         </div>
       </div>
     );
-    if (tokenError || !tokenData?.signedUrl) return (
-      <div className="rounded-2xl overflow-hidden border border-red-100 shadow-sm">
-        <Header />
-        <div className="bg-white px-6 py-6 text-center text-sm text-red-500">
-          Could not load audio. Please refresh the page.
+    if (tokenError || !tokenData?.signedUrl) {
+      const apiMessage = tokenErrorObj?.response?.data?.message;
+      return (
+        <div className="rounded-2xl overflow-hidden border border-red-100 shadow-sm">
+          <Header />
+          <div className="bg-white px-6 py-6 text-center text-sm text-red-500 space-y-2">
+            <p>{apiMessage || 'Could not load audio. Please refresh the page.'}</p>
+            {tokenErrorObj?.response?.status === 403 && apiMessage?.toLowerCase().includes('membership') && (
+              <a href="/membership" className="block text-xs font-medium text-primary-600 hover:text-primary-700 underline">
+                Go to Membership →
+              </a>
+            )}
+          </div>
         </div>
-      </div>
-    );
+      );
+    }
     return (
       <div className="rounded-2xl overflow-hidden border border-purple-100 shadow-sm">
         <Header />
