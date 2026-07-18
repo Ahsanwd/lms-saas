@@ -42,7 +42,7 @@ async function runAnalyticsWeeklyReport() {
           { $sort: { count: -1 } },
           { $limit: 3 },
           { $lookup: { from: 'courses', localField: '_id', foreignField: '_id', as: 'course' } },
-          { $unwind: { path: '$course', preserveNullAndEmpty: true } },
+          { $unwind: { path: '$course', preserveNullAndEmptyArrays: true } },
         ]),
       ]);
 

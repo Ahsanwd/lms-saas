@@ -127,7 +127,7 @@ async function getRevenueReport(tenantId, { months = 12, from, to } = {}) {
       { $sort: { revenue: -1 } },
       { $limit: 10 },
       { $lookup: { from: 'courses', localField: '_id', foreignField: '_id', as: 'course' } },
-      { $unwind: { path: '$course', preserveNullAndEmpty: true } },
+      { $unwind: { path: '$course', preserveNullAndEmptyArrays: true } },
     ]),
     CoursePayment.aggregate([
       { $match: { tenantId: tid, status: 'completed', createdAt: dateFilter } },
@@ -365,7 +365,7 @@ async function getEngagementReport(tenantId, { days = 30, from, to } = {}) {
       { $sort: { activityCount: -1 } },
       { $limit: 5 },
       { $lookup: { from: 'courses', localField: '_id', foreignField: '_id', as: 'course' } },
-      { $unwind: { path: '$course', preserveNullAndEmpty: true } },
+      { $unwind: { path: '$course', preserveNullAndEmptyArrays: true } },
     ]),
     LessonProgress.aggregate([
       { $match: { tenantId: tid, updatedAt: dateFilter } },
