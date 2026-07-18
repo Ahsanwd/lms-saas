@@ -423,13 +423,22 @@ async function submitAttempt(tenantId, quizId, attemptId, answers, user) {
   const questionIds = attempt.servedQuestions;
   const questions = await questionRepo.findManyByIdsForGrading(tenantId, questionIds);
 
-  // Build answers with maxPoints from quiz question config
-  const enrichedAnswers = answers.map(a => {
-    const quizQ = quiz.questions.find(q => q.questionId?._id?.toString() === a.questionId || q.questionId?.toString() === a.questionId);
-    const question = questions.find(q => q._id.toString() === a.questionId);
+  // Build one enriched answer per SERVED question (attempt.servedQuestions),
+  // not per answer the client happened to submit. gradeAttempt only adds a
+  // question's points to maxScore for entries it's given — iterating over
+  // the client's answers array meant a student who omitted an answer for a
+  // question they didn't know simply shrank the denominator instead of
+  // being marked wrong for it, artificially inflating their percentage
+  // (e.g. answer only the 5 you're sure of out of 10 → scored 100%).
+  const answersByQid = new Map((answers || []).map(a => [a.questionId?.toString(), a]));
+  const enrichedAnswers = questionIds.map(qid => {
+    const idStr = (qid._id || qid).toString();
+    const a = answersByQid.get(idStr) || { questionId: idStr };
+    const quizQ = quiz.questions.find(q => q.questionId?._id?.toString() === idStr || q.questionId?.toString() === idStr);
+    const question = questions.find(q => q._id.toString() === idStr);
     const maxPoints = quizQ?.points ?? question?.points ?? 1;
     const negPoints = quizQ?.negativePoints ?? question?.negativePoints ?? 0;
-    return { ...a, maxPoints, negativePoints: negPoints, questionType: question?.type };
+    return { ...a, questionId: idStr, maxPoints, negativePoints: negPoints, questionType: question?.type };
   });
 
   const { gradedAnswers, totalScore, maxScore, hasManual } = gradeAttempt(
