@@ -1159,8 +1159,15 @@ async function markLessonComplete(tenantId, courseId, lessonId, userId, watchedD
   });
 
   if (completedAt) {
+    // Only issue a certificate the first time — a student who drops and
+    // re-enrolls (enroll()'s re-enrollment branch resets status/completedAt
+    // but leaves CourseProgress/certificateIssued untouched) can hit this
+    // 100%-completion branch again on the very next lesson they mark
+    // complete. Without this guard, re-issuing regenerates certificateId,
+    // silently orphaning the original certificate's public verification
+    // link and re-sending the "certificate ready" notification.
     let certUpdate = {};
-    if (course.certificateEnabled) {
+    if (course.certificateEnabled && !enrollment.certificateIssued) {
       const certTemplateSvc = require('../certificateTemplate/certTemplate.service');
       const tmpl = await certTemplateSvc.getTemplate(tenantId, courseId).catch(() => null);
       const expiresAt = tmpl?.expiryDays
@@ -1180,7 +1187,7 @@ async function markLessonComplete(tenantId, courseId, lessonId, userId, watchedD
     // Notify student of completion and certificate (fire-and-forget)
     const notifySvc = require('../notification/notification.service');
     notifySvc.notifyCourseCompleted(tenantId, userId, course.title, courseId).catch(() => {});
-    if (course.certificateEnabled)
+    if (course.certificateEnabled && !enrollment.certificateIssued)
       notifySvc.notifyCertificateIssued(tenantId, userId, course.title, courseId).catch(() => {});
   }
 
