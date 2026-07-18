@@ -135,10 +135,13 @@ async function joinViaLink(tenantId, token, user) {
     results.push({ courseId, status: 'enrolled' });
   }
 
-  // Count this as one use regardless of how many courses were in the bundle
-  await linkRepo.incrementUses(link._id);
-
   const enrolled = results.filter(r => r.status === 'enrolled').map(r => r.courseId);
+
+  // Only count this as a "use" (of maxUses/"spots remaining") if it actually
+  // resulted in a new enrollment — otherwise a repeat visit from someone
+  // already enrolled would silently burn through the cap for no reason.
+  if (enrolled.length > 0) await linkRepo.incrementUses(link._id);
+
   const firstCourseId = link.courseIds[0]?._id || link.courseIds[0];
 
   return { results, enrolled, redirectCourseId: firstCourseId };
