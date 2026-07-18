@@ -1,6 +1,6 @@
 const router = require('express').Router();
-const { authenticate }       = require('../../middlewares/auth.middleware');
-const { requirePermission }  = require('../../middlewares/permission.middleware');
+const { authenticate }  = require('../../middlewares/auth.middleware');
+const { requireRole }   = require('../../middlewares/permission.middleware');
 const ctrl = require('./refundRequest.controller');
 
 router.use(authenticate);
@@ -9,9 +9,11 @@ router.use(authenticate);
 router.post('/',     ctrl.request);
 router.get('/my',    ctrl.myRequests);
 
-// Admin
-router.get('/',                          requirePermission('course:manage'), ctrl.list);
-router.post('/:requestId/approve',       requirePermission('course:manage'), ctrl.approve);
-router.post('/:requestId/reject',        requirePermission('course:manage'), ctrl.reject);
+// Admin — financial action (triggers a real refund + exposes tenant-wide
+// payment data), so this is tenant_admin-only, not course:manage (which
+// instructors also hold for legitimate course-editing purposes).
+router.get('/',                          requireRole('tenant_admin'), ctrl.list);
+router.post('/:requestId/approve',       requireRole('tenant_admin'), ctrl.approve);
+router.post('/:requestId/reject',        requireRole('tenant_admin'), ctrl.reject);
 
 module.exports = router;
