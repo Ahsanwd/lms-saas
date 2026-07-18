@@ -6,7 +6,7 @@ class MediaRepository {
     const query = { tenantId, deletedAt: null, ...filter };
     return Promise.all([
       Media.find(query)
-        .populate('createdBy', 'name avatar')
+        .populate('createdBy', 'firstName lastName avatar')
         .sort(sort)
         .skip(skip)
         .limit(Number(limit)),

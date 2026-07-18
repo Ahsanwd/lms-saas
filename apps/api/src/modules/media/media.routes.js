@@ -4,6 +4,7 @@ const { authenticate }      = require('../../middlewares/auth.middleware');
 const { requirePermission } = require('../../middlewares/permission.middleware');
 const { upload }            = require('../../services/storage/storage.service');
 const { trackMediaAsset }   = require('../../middlewares/mediaTracking.middleware');
+const { guardStorageLimit, trackUpload } = require('../../middlewares/limitGuard.middleware');
 const AppError = require('../../utils/AppError');
 
 router.use(authenticate);
@@ -22,7 +23,10 @@ function uploadToLibrary(req, res, next) {
 }
 
 router.get('/',      requirePermission('media:read'),   ctrl.listMedia);
-router.post('/upload', requirePermission('media:manage'), uploadToLibrary,
+router.post('/upload', requirePermission('media:manage'),
+  guardStorageLimit(),
+  uploadToLibrary,
+  trackUpload(),
   trackMediaAsset(req => req.query.category, () => ({ contextType: 'media-library', contextId: null })),
   ctrl.uploadMedia);
 router.delete('/:id', requirePermission('media:delete'), ctrl.deleteMedia);
