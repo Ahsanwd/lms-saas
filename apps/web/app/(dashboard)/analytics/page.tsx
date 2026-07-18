@@ -112,7 +112,13 @@ function DateRangePicker({ range, onChange }: {
     onChange(presetRange(key));
   }
   function applyCustom() {
-    if (customFrom && customTo) onChange({ from: new Date(customFrom), to: new Date(customTo) });
+    if (customFrom && customTo) {
+      // Plain "YYYY-MM-DD" input parses as UTC midnight — bump "to" to the
+      // end of that day so the selected end date's own data isn't excluded.
+      const to = new Date(customTo);
+      to.setHours(23, 59, 59, 999);
+      onChange({ from: new Date(customFrom), to });
+    }
   }
 
   return (
@@ -388,7 +394,7 @@ function RevenueTab() {
                     <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#9ca3af' }} />
                     <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} tickFormatter={(v) => `$${v}`} width={48} />
                     <RechartsTip
-                      formatter={(v: number | undefined) => [`$${Number(v ?? 0).toFixed(2)}`, 'Revenue']}
+                      formatter={(v) => [`$${Number(v ?? 0).toFixed(2)}`, 'Revenue']}
                       contentStyle={{ fontSize: 12, borderRadius: 8 }}
                     />
                     <Bar dataKey="revenue" fill="#3B82F6" radius={[3, 3, 0, 0]} />
