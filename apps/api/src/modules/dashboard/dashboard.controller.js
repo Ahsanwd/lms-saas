@@ -78,7 +78,7 @@ async function getStudentActivity(req, res, next) {
     const { courseId, studentId } = req.params;
     const { page, limit } = req.query;
     const data = await dashboardService.getStudentActivityForCourse(
-      req.tenant.tenantId, courseId, studentId, { page, limit }
+      req.tenant.tenantId, courseId, studentId, req.user, { page, limit }
     );
     R.success(res, data);
   } catch (err) { next(err); }

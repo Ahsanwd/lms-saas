@@ -10,13 +10,13 @@ const QuizAttempt = require('../../database/models/QuizAttempt.model');
 const Tenant = require('../../database/models/Tenant.model');
 const Invoice = require('../../database/models/Invoice.model');
 const Subscription = require('../../database/models/Subscription.model');
+const AppError = require('../../utils/AppError');
 
 const toId = (id) => mongoose.Types.ObjectId.createFromHexString(id.toString());
 
 // ─── Super Admin Dashboard ────────────────────────────────────────────────────
 async function getSuperAdminDashboard() {
   const now = new Date();
-  const thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000);
   const sevenDaysAhead = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
   const [
@@ -152,7 +152,6 @@ async function getTenantAdminDashboard(tenantId) {
     newUsersThisMonth,
     quizStats,
     subscription,
-    storageInfo,
     completionRate,
   ] = await Promise.all([
     // Users by role
@@ -203,9 +202,6 @@ async function getTenantAdminDashboard(tenantId) {
 
     // Current subscription
     Subscription.findOne({ tenantId: tid }).populate('planId', 'name slug limits price'),
-
-    // Tenant storage
-    Tenant.findById(tenantId).select('storageUsedBytes plan'),
 
     // Completion rate
     Enrollment.aggregate([
@@ -290,9 +286,13 @@ async function getInstructorDashboard(tenantId, instructorId) {
       { $group: { _id: null, avg: { $avg: '$percentage' } } },
     ]),
 
-    // Pending manual quiz grades
-    QuizAttempt.find({ tenantId: tid, status: 'pending_manual' })
-      .populate({ path: 'quizId', match: { instructorId: iid }, select: 'title courseId' })
+    // Pending manual quiz grades — scoped to this instructor's own courses at
+    // the query level. Previously only filtered via the quizId populate's
+    // match (applied after the .limit(10)), so another instructor's larger
+    // pending queue could push this instructor's own pending attempts past
+    // the limit entirely, silently showing 0 pending grades.
+    QuizAttempt.find({ tenantId: tid, status: 'pending_manual', courseId: { $in: myCourseIds } })
+      .populate('quizId', 'title courseId')
       .populate('userId', 'firstName lastName email')
       .sort({ submittedAt: -1 })
       .limit(10),
@@ -513,11 +513,20 @@ async function getOnboardingChecklist(tenantId) {
 }
 
 // ─── Student Activity for admin/instructor per course ─────────────────────────
-async function getStudentActivityForCourse(tenantId, courseId, studentId, { page = 1, limit = 20 } = {}) {
+async function getStudentActivityForCourse(tenantId, courseId, studentId, actingUser, { page = 1, limit = 20 } = {}) {
   const tid = toId(tenantId);
   const cid = toId(courseId);
   const uid = toId(studentId);
   const skip = (page - 1) * limit;
+
+  // An instructor may only view activity for students in their OWN courses —
+  // the route only checks role:'instructor', not course ownership, so this
+  // was previously reachable for any course/student in the tenant.
+  if (actingUser?.role === 'instructor') {
+    const course = await Course.findOne({ _id: cid, tenantId: tid, deletedAt: null }).select('instructorId').lean();
+    if (!course || course.instructorId?.toString() !== actingUser.sub)
+      throw new AppError('Forbidden', 403);
+  }
 
   const [lessonActivity, total] = await Promise.all([
     LessonProgress.find({ tenantId: tid, courseId: cid, userId: uid })
