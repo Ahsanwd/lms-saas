@@ -24,6 +24,13 @@ const enrollmentSchema = new mongoose.Schema(
     discountAmount: { type: Number, default: 0 },
     couponCode:     { type: String, default: null },
 
+    // How access was granted. 'membership' enrollments are re-checked against
+    // live membership status at video/audio playback time — cancelling the
+    // membership revokes further playback even though this record stays
+    // 'active' (progress/certificates are preserved, only streaming is gated).
+    enrolledVia:      { type: String, enum: ['direct', 'membership'], default: 'direct' },
+    membershipPlanId: { type: mongoose.Schema.Types.ObjectId, ref: 'MembershipPlan', default: null },
+
     // Trial / Audit mode
     isTrial:      { type: Boolean, default: false },
     trialEndsAt:  { type: Date,    default: null },

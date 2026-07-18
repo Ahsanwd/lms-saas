@@ -869,10 +869,12 @@ async function enroll(tenantId, courseId, user, { couponCode, accessCode } = {})
   }
 
   // Paid courses — check membership access before blocking for payment
+  let viaMembership    = false;
+  let membershipPlanId = null;
   if (!course.isFree && (course.price || 0) > 0) {
     const membershipSvc = require('../membership/membership.service');
-    const { hasAccess } = await membershipSvc.checkCourseAccess(tenantId, user.sub, courseId);
-    if (!hasAccess) {
+    const access = await membershipSvc.checkCourseAccess(tenantId, user.sub, courseId);
+    if (!access.hasAccess) {
       throw new AppError(
         'This course requires payment. Please use the Buy Now button.',
         400,
@@ -880,6 +882,8 @@ async function enroll(tenantId, courseId, user, { couponCode, accessCode } = {})
       );
     }
     // Member — fall through to free enrollment below
+    viaMembership    = true;
+    membershipPlanId = access.planId;
   }
 
   const existing = await enrollmentRepo.findByUserAndCourse(tenantId, user.sub, courseId);
@@ -892,6 +896,8 @@ async function enroll(tenantId, courseId, user, { couponCode, accessCode } = {})
       droppedAt: null,
       completedAt: null,
       expiresAt: calcExpiresAt(course.accessDurationDays),
+      enrolledVia: viaMembership ? 'membership' : 'direct',
+      membershipPlanId: viaMembership ? membershipPlanId : null,
     });
   }
 
@@ -905,7 +911,11 @@ async function enroll(tenantId, courseId, user, { couponCode, accessCode } = {})
   let discountAmount = 0;
   let appliedCode    = null;
 
-  if (couponCode && !course.isFree && course.price > 0) {
+  if (viaMembership) {
+    // Covered by the subscription, not a per-course payment — a coupon makes
+    // no sense stacked on top of membership access, so skip that branch entirely.
+    pricePaid = 0;
+  } else if (couponCode && !course.isFree && course.price > 0) {
     try {
       const couponService = require('../coupon/coupon.service');
       const discount = await couponService.applyCoupon(tenantId, couponCode, courseId, course.price);
@@ -925,6 +935,8 @@ async function enroll(tenantId, courseId, user, { couponCode, accessCode } = {})
     discountAmount,
     couponCode: appliedCode,
     expiresAt: calcExpiresAt(course.accessDurationDays), // Feature 1
+    enrolledVia: viaMembership ? 'membership' : 'direct',
+    membershipPlanId: viaMembership ? membershipPlanId : null,
   });
 
   await courseRepo.incrementCounter(tenantId, courseId, { enrollmentCount: 1 });

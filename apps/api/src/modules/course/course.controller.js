@@ -543,6 +543,17 @@ async function cfStreamStatus(req, res, next) {
   } catch (err) { next(err); }
 }
 
+// Membership-covered enrollments stay Enrollment.status: 'active' forever —
+// only re-checking live membership status at playback time actually revokes
+// access once the subscription lapses, without touching progress/certificates
+// on the enrollment record itself.
+async function assertStillHasPlaybackAccess(tenantId, courseId, userId, enrollment) {
+  if (enrollment.enrolledVia !== 'membership') return true;
+  const membershipSvc = require('../membership/membership.service');
+  const { hasAccess } = await membershipSvc.checkCourseAccess(tenantId, userId, courseId);
+  return hasAccess;
+}
+
 async function cfStreamToken(req, res, next) {
   try {
     const { tenantId } = req.tenant;
@@ -561,6 +572,8 @@ async function cfStreamToken(req, res, next) {
         tenantId, courseId: lesson.courseId, userId: req.user.sub, status: 'active',
       }).lean();
       if (!enrolled) return R.error(res, 'Not enrolled in this course', 403);
+      if (!(await assertStillHasPlaybackAccess(tenantId, lesson.courseId, req.user.sub, enrolled)))
+        return R.error(res, 'Your membership has expired or been cancelled. Resubscribe to keep watching this course.', 403);
     }
 
     const config = require('../../config');
@@ -600,6 +613,8 @@ async function audioToken(req, res, next) {
         tenantId, courseId, userId: req.user.sub, status: 'active',
       }).lean();
       if (!enrolled) return R.error(res, 'Not enrolled in this course', 403);
+      if (!(await assertStillHasPlaybackAccess(tenantId, courseId, req.user.sub, enrolled)))
+        return R.error(res, 'Your membership has expired or been cancelled. Resubscribe to keep listening to this course.', 403);
     }
 
     const { generatePresignedGetUrl } = require('../../services/storage/storage.service');
@@ -632,6 +647,8 @@ async function videoToken(req, res, next) {
         tenantId, courseId, userId: req.user.sub, status: 'active',
       }).lean();
       if (!enrolled) return R.error(res, 'Not enrolled in this course', 403);
+      if (!(await assertStillHasPlaybackAccess(tenantId, courseId, req.user.sub, enrolled)))
+        return R.error(res, 'Your membership has expired or been cancelled. Resubscribe to keep watching this course.', 403);
     }
 
     const { generatePresignedGetUrl } = require('../../services/storage/storage.service');

@@ -204,7 +204,6 @@ async function initiateSubscription(tenantId, userId, { planId, billingCycle = '
 
 // Confirm — verifies payment and activates the subscription
 async function confirmSubscription(tenantId, subscriptionId, userId) {
-  const sub = await subRepo.findById ? null : null; // use raw model
   const MembershipSubscription = require('../../database/models/MembershipSubscription.model');
   const record = await MembershipSubscription.findOne({ _id: subscriptionId, tenantId, userId });
   if (!record) throw new AppError('Subscription not found', 404);
@@ -284,10 +283,16 @@ async function checkCourseAccess(tenantId, userId, courseId) {
   const plan = sub.planId;
   if (!plan) return { hasAccess: false };
 
-  if (plan.courseAccess === 'all') return { hasAccess: true, planName: plan.name, onGracePeriod: sub.status === 'past_due' };
+  if (plan.courseAccess === 'all')
+    return { hasAccess: true, planId: plan._id, planName: plan.name, onGracePeriod: sub.status === 'past_due' };
 
   const covered = (plan.courses || []).some(c => c._id.toString() === courseId.toString());
-  return { hasAccess: covered, planName: covered ? plan.name : null, onGracePeriod: sub.status === 'past_due' };
+  return {
+    hasAccess: covered,
+    planId: covered ? plan._id : null,
+    planName: covered ? plan.name : null,
+    onGracePeriod: sub.status === 'past_due',
+  };
 }
 
 // Admin: list all subscriptions for a tenant

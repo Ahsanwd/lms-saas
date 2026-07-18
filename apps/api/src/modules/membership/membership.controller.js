@@ -4,9 +4,15 @@ const R   = require('../../utils/response');
 // ─── Plan management (Tenant Admin) ───────────────────────────────────────────
 async function listPlans(req, res, next) {
   try {
-    const includeInactive = req.query.all === 'true';
+    const isAdmin = req.user.role === 'tenant_admin';
+    // Only tenant admins may see inactive/draft plans or per-plan subscriber
+    // counts — students/instructors hitting this same shared endpoint (they
+    // need it to browse active plans) get the public-safe shape regardless
+    // of what query params they send.
+    const includeInactive = isAdmin && req.query.all === 'true';
     const plans = await svc.listPlans(req.tenant.tenantId, { includeInactive });
-    R.success(res, { plans });
+    const safePlans = isAdmin ? plans : plans.map(({ subscribers, ...rest }) => rest);
+    R.success(res, { plans: safePlans });
   } catch (err) { next(err); }
 }
 
