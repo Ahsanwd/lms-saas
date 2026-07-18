@@ -20,38 +20,21 @@ async function handlePaymentSucceeded(intent) {
     const now       = new Date(invoice.periodStart);
     const periodEnd = new Date(invoice.periodEnd);
 
-    if (sub) {
-      await subscriptionRepo.updateById(sub._id, {
-        previousPlanId:     sub.planId,
-        planId:             invoice.planId,
-        billingCycle:       invoice.billingCycle,
-        currentPeriodStart: now,
-        currentPeriodEnd:   periodEnd,
-        status:             'active',
-        isOnTrial:          false,
-        planChangedAt:      now,
-      });
-    } else {
-      await subscriptionRepo.create({
-        tenantId:           invoice.tenantId,
-        planId:             invoice.planId,
-        billingCycle:       invoice.billingCycle,
-        currentPeriodStart: now,
-        currentPeriodEnd:   periodEnd,
-        isOnTrial:          false,
-        status:             'active',
-      });
-    }
-
-    await tenantRepo.updateById(invoice.tenantId, {
-      plan:          invoice.planId,
-      planExpiresAt: periodEnd,
-      isOnTrial:     false,
-      status:        'active',
+    // Shared with confirmSubscriptionPayment() so both the webhook and the
+    // synchronous confirm call activate a subscription identically — this
+    // used to be duplicated inline here and had drifted (missing the
+    // gracePeriodEndsAt reset and coupon usage tracking entirely).
+    const billingSvc = require('../billing/billing.service');
+    const coupon = invoice.couponId ? { _id: invoice.couponId } : null;
+    await billingSvc._activateSubscription({
+      sub, tenantId: invoice.tenantId,
+      planId: invoice.planId,
+      cycle:  invoice.billingCycle,
+      now, periodEnd,
+      coupon,
+      invoice,
     });
 
-    await invoiceRepo.updateById(invoiceId, { status: 'paid', paidAt: new Date() });
-    emitBillingUpdated(invoice.tenantId, { event: 'subscription_activated' });
     logger.info(`[stripe.webhook] Subscription activated for tenant ${invoice.tenantId} via PI ${intent.id}`);
     return;
   }
@@ -97,9 +80,11 @@ async function handlePaymentFailed(intent) {
 <p>Please <a href="${APP_URL}/billing">update your payment method</a> to avoid service interruption.</p>`,
           });
         }
+        emitBillingUpdated(sub.tenantId, { event: 'payment_failed' });
+        logger.info(`[stripe.webhook] Subscription payment failed, grace period set: PI ${intent.id}`);
+      } else {
+        logger.warn(`[stripe.webhook] payment_intent.payment_failed for subscription_upgrade but no matching Subscription found for customer ${intent.customer}`);
       }
-      emitBillingUpdated(sub.tenantId, { event: 'payment_failed' });
-      logger.info(`[stripe.webhook] Subscription payment failed, grace period set: PI ${intent.id}`);
     } catch (err) {
       logger.error(`[stripe.webhook] handlePaymentFailed (subscription) error: ${err.message}`);
     }

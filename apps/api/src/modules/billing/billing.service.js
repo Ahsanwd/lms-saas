@@ -93,6 +93,8 @@ async function upgradePlan(tenantId, { planId, billingCycle, couponCode }) {
     if (coupon.maxUses > 0 && coupon.usedCount >= coupon.maxUses) throw new AppError('Coupon usage limit reached', 400);
     if (coupon.onePerTenant && coupon.usedByTenants?.some(t => t.toString() === tenantId.toString()))
       throw new AppError('You have already used this coupon', 400);
+    if (coupon.applicablePlans?.length > 0 && !coupon.applicablePlans.some(p => p.toString() === planId))
+      throw new AppError('Coupon is not valid for this plan', 400);
     discountAmount = coupon.discountType === 'percentage'
       ? Math.round((subtotal * coupon.discountValue) / 100)
       : Math.min(coupon.discountValue, subtotal);
@@ -198,12 +200,18 @@ async function confirmSubscriptionPayment(tenantId, paymentIntentId) {
   const now = new Date(invoice.periodStart);
   const periodEnd = new Date(invoice.periodEnd);
 
+  // The invoice remembers which coupon (if any) was applied at checkout —
+  // pass it through so usage tracking (maxUses/onePerTenant) actually counts
+  // this redemption. Previously hardcoded to null, so coupon limits were
+  // silently bypassed for every paid (non-free) Stripe subscription upgrade.
+  const coupon = invoice.couponId ? { _id: invoice.couponId } : null;
+
   await _activateSubscription({
     sub, tenantId,
     planId: invoice.planId.toString(),
     cycle:  invoice.billingCycle,
     now, periodEnd,
-    coupon: null,
+    coupon,
     invoice,
   });
 
@@ -418,4 +426,9 @@ module.exports = {
   createPortalSession, downloadInvoice,
   listPaymentMethods, deletePaymentMethod,
   getBillingInfo, createLsCheckout, createLsTopupCheckout,
+  // Exported for the Stripe webhook, so the "payment_intent.succeeded" fires-
+  // first race path shares the exact same activation logic (previously
+  // duplicated inline in stripe.webhook.js and had drifted — missing the
+  // gracePeriodEndsAt reset and coupon usage tracking entirely).
+  _activateSubscription,
 };
