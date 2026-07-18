@@ -27,20 +27,22 @@ import {
   type SocialPlatform,
   type BundlesSectionData,
   type PublicBundle,
+  type MembershipPlansSectionData,
+  type PublicMembershipPlan,
 } from '@/components/website/LandingPageSections';
 
 // Fixed types: 0-or-1 per page. 'custom' is the one repeatable type — any
 // number of Custom Code sections are allowed per page.
-type FixedSectionType = 'hero' | 'about' | 'coursesSection' | 'testimonials' | 'cta' | 'contact' | 'contactForm' | 'courseApplication' | 'team' | 'bundlesSection';
+type FixedSectionType = 'hero' | 'about' | 'coursesSection' | 'testimonials' | 'cta' | 'contact' | 'contactForm' | 'courseApplication' | 'team' | 'bundlesSection' | 'membershipPlansSection';
 type SectionType = FixedSectionType | 'custom';
 type InstituteType = 'school' | 'academy' | 'college' | 'university';
 
-const SECTION_TYPE_ORDER: FixedSectionType[] = ['hero', 'about', 'coursesSection', 'bundlesSection', 'team', 'testimonials', 'cta', 'contact', 'contactForm', 'courseApplication'];
+const SECTION_TYPE_ORDER: FixedSectionType[] = ['hero', 'about', 'coursesSection', 'bundlesSection', 'membershipPlansSection', 'team', 'testimonials', 'cta', 'contact', 'contactForm', 'courseApplication'];
 const SECTION_LABELS: Record<SectionType, string> = {
   hero: 'Hero', about: 'About', coursesSection: 'Courses Section',
   testimonials: 'Testimonials', cta: 'Call To Action', contact: 'Contact', custom: 'Custom Code',
   contactForm: 'Contact Form', courseApplication: 'Course Application', team: 'Team / Instructors',
-  bundlesSection: 'Bundles Section',
+  bundlesSection: 'Bundles Section', membershipPlansSection: 'Membership Plans Section',
 };
 
 // One icon per section type, so the outline is scannable at a glance instead
@@ -58,6 +60,7 @@ const SECTION_ICON_PATHS: Record<SectionType, string> = {
   courseApplication: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-5 9l2 2 4-4',
   custom: 'M10 20l4-16M6 8l-4 4 4 4M18 8l4 4-4 4',
   bundlesSection: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4',
+  membershipPlansSection: 'M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z',
 };
 
 function SectionIcon({ type, className = 'w-4 h-4' }: { type: SectionType; className?: string }) {
@@ -80,6 +83,7 @@ const DEFAULT_SECTION_DATA: Record<SectionType, unknown> = {
   contactForm: { heading: 'Get in touch', subheading: '', fields: { name: true, phone: false, subject: true }, recipientEmail: null } as ContactFormData,
   courseApplication: { heading: 'Apply Now', subheading: '' } as CourseApplicationData,
   bundlesSection: { heading: '', subheading: '', displayMode: 'all', bundleIds: [], layout: 'grid' } as BundlesSectionData,
+  membershipPlansSection: { heading: '', subheading: '' } as MembershipPlansSectionData,
 };
 
 const INSTITUTE_LABELS: Record<InstituteType, string> = {
@@ -434,6 +438,16 @@ function PageEditorScreen({ pageId, onBack }: { pageId: string; onBack: () => vo
     staleTime: 60_000,
   });
   const allBundles = bundlesData ?? [];
+
+  const { data: plansData } = useQuery({
+    queryKey: ['membership-plans-website-builder'],
+    queryFn: async () => {
+      const { data } = await api.get('/membership/plans');
+      return (data.data?.plans ?? []) as PublicMembershipPlan[];
+    },
+    staleTime: 60_000,
+  });
+  const allPlans = plansData ?? [];
 
   useEffect(() => {
     if (pageData && !loaded) {
@@ -891,6 +905,28 @@ function PageEditorScreen({ pageId, onBack }: { pageId: string; onBack: () => vo
                     );
                   })()}
 
+                  {section.type === 'membershipPlansSection' && (() => {
+                    const plansSectionData = section.data as MembershipPlansSectionData;
+                    return (
+                    <>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Heading</label>
+                        <input className={inputCls} value={plansSectionData.heading ?? ''} onChange={(e) => setSectionFieldAt<MembershipPlansSectionData>(idx, 'heading', e.target.value)} placeholder="Membership Plans" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Subheading</label>
+                        <input className={inputCls} value={plansSectionData.subheading ?? ''} onChange={(e) => setSectionFieldAt<MembershipPlansSectionData>(idx, 'subheading', e.target.value)} placeholder="Optional subheading" />
+                      </div>
+                      <p className="text-xs text-gray-400">
+                        Shows every active plan from Monetization → Membership Plans, with its price, features, and which courses it includes. To hide a plan from this section, deactivate it there.
+                      </p>
+                      {allPlans.length === 0 && (
+                        <p className="text-xs text-amber-600">You don't have any active membership plans yet — create one under Membership Plans first.</p>
+                      )}
+                    </>
+                    );
+                  })()}
+
                   {section.type === 'testimonials' && (() => {
                     const testimonialsData = section.data as Testimonial[];
                     return (
@@ -1162,6 +1198,7 @@ function PageEditorScreen({ pageId, onBack }: { pageId: string; onBack: () => vo
               logoUrl={null}
               linksDisabled
               bundles={allBundles}
+              membershipPlans={allPlans}
             />
           </div>
         </div>

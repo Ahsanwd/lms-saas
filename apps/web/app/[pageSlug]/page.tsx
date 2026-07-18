@@ -6,7 +6,7 @@ import axios from 'axios';
 import { applyBrandColor, applySecondaryColor, applyFontFamily } from '@/lib/brandColor';
 import { useTenantSubdomain } from '@/lib/useTenantSubdomain';
 import { resolveSectionCourses } from '@/lib/tenantPageFetch';
-import { PageSectionsRenderer, type PageSection, type PublicCourse, type NavPage, type HeaderConfig, type FooterConfig, type PublicBundle } from '@/components/website/LandingPageSections';
+import { PageSectionsRenderer, type PageSection, type PublicCourse, type NavPage, type HeaderConfig, type FooterConfig, type PublicBundle, type PublicMembershipPlan } from '@/components/website/LandingPageSections';
 
 // Tenant-created pages beyond Home (e.g. /about-us). The root platform
 // domain has no tenant pages at all, so it 404s immediately. Reserved slugs
@@ -28,6 +28,7 @@ export default function TenantCustomPage() {
   const [headerConfig, setHeaderConfig] = useState<HeaderConfig | null>(null);
   const [footerConfig, setFooterConfig] = useState<FooterConfig | null>(null);
   const [bundles, setBundles] = useState<PublicBundle[]>([]);
+  const [membershipPlans, setMembershipPlans] = useState<PublicMembershipPlan[]>([]);
 
   useEffect(() => {
     if (subdomain === null) return; // not yet resolved
@@ -39,8 +40,9 @@ export default function TenantCustomPage() {
       axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/tenant/pages/public/${pageSlug}`, { headers }).catch(() => null),
       axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/tenant/pages/public`, { headers }).catch(() => null),
       axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/bundles/public`, { headers }).catch(() => null),
+      axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/membership/plans/public`, { headers }).catch(() => null),
     ])
-      .then(async ([coursesRes, pageRes, navRes, bundlesRes]) => {
+      .then(async ([coursesRes, pageRes, navRes, bundlesRes, plansRes]) => {
         setTenantName(coursesRes.data.data.tenantName ?? '');
         setLogoUrl(coursesRes.data.data.branding?.logoUrl ?? null);
         if (coursesRes.data.data.branding?.primaryColor) applyBrandColor(coursesRes.data.data.branding.primaryColor);
@@ -50,6 +52,7 @@ export default function TenantCustomPage() {
         setHeaderConfig(coursesRes.data.data.branding?.header ?? null);
         setFooterConfig(coursesRes.data.data.branding?.footer ?? null);
         setBundles(bundlesRes?.data?.data?.bundles ?? []);
+        setMembershipPlans(plansRes?.data?.data?.plans ?? []);
 
         const page = pageRes?.data?.data;
         if (!page?.isPublished) { setNotPublished(true); return; }
@@ -86,6 +89,7 @@ export default function TenantCustomPage() {
       headerConfig={headerConfig}
       footerConfig={footerConfig}
       bundles={bundles}
+      membershipPlans={membershipPlans}
     />
   );
 }

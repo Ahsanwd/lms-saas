@@ -14,6 +14,7 @@ import {
   type HeaderConfig,
   type FooterConfig,
   type PublicBundle,
+  type PublicMembershipPlan,
 } from '@/components/website/LandingPageSections';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -136,6 +137,7 @@ function TenantLandingPage({ subdomain }: { subdomain: string }) {
   const [headerConfig, setHeaderConfig] = useState<HeaderConfig | null>(null);
   const [footerConfig, setFooterConfig] = useState<FooterConfig | null>(null);
   const [bundles, setBundles] = useState<PublicBundle[]>([]);
+  const [membershipPlans, setMembershipPlans] = useState<PublicMembershipPlan[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -145,8 +147,9 @@ function TenantLandingPage({ subdomain }: { subdomain: string }) {
       axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/tenant/pages/public/home`, { headers }).catch(() => null),
       axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/tenant/pages/public`, { headers }).catch(() => null),
       axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/bundles/public`, { headers }).catch(() => null),
+      axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/membership/plans/public`, { headers }).catch(() => null),
     ])
-      .then(async ([coursesRes, pageRes, navRes, bundlesRes]) => {
+      .then(async ([coursesRes, pageRes, navRes, bundlesRes, plansRes]) => {
         let finalCourses = coursesRes.data.data.courses ?? [];
         setTenantName(coursesRes.data.data.tenantName ?? '');
         setLogoUrl(coursesRes.data.data.branding?.logoUrl ?? null);
@@ -157,6 +160,7 @@ function TenantLandingPage({ subdomain }: { subdomain: string }) {
         setHeaderConfig(coursesRes.data.data.branding?.header ?? null);
         setFooterConfig(coursesRes.data.data.branding?.footer ?? null);
         setBundles(bundlesRes?.data?.data?.bundles ?? []);
+        setMembershipPlans(plansRes?.data?.data?.plans ?? []);
 
         const page = pageRes?.data?.data;
         if (page?.isPublished) {
@@ -198,6 +202,7 @@ function TenantLandingPage({ subdomain }: { subdomain: string }) {
         headerConfig={headerConfig}
         footerConfig={footerConfig}
         bundles={bundles}
+        membershipPlans={membershipPlans}
       />
     );
   }

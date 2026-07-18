@@ -40,6 +40,23 @@ export interface BundlesSectionData {
   layout: 'grid' | 'slider';
 }
 
+export interface PublicMembershipPlan {
+  _id: string;
+  name: string;
+  description: string;
+  monthlyPrice: number;
+  yearlyPrice: number;
+  courseAccess: 'all' | 'selected';
+  courses: { _id: string; title: string; thumbnail: string | null }[];
+  features: string[];
+  trialDays: number;
+}
+
+export interface MembershipPlansSectionData {
+  heading: string | null;
+  subheading: string | null;
+}
+
 export interface Testimonial {
   name: string;
   role: string;
@@ -793,6 +810,140 @@ export function BundlesGrid({
   );
 }
 
+// ─── Membership Plans ─────────────────────────────────────────────────────────
+
+export function MembershipPlanCard({ plan, yearly, linksDisabled }: { plan: PublicMembershipPlan; yearly: boolean; linksDisabled?: boolean }) {
+  const price = yearly ? plan.yearlyPrice : plan.monthlyPrice;
+  const isFree = price === 0;
+
+  return (
+    <div className="flex flex-col rounded-2xl border border-gray-200 bg-white overflow-hidden shadow-sm hover:shadow-md hover:border-primary-200 transition-all p-6">
+      <h3 className="font-semibold text-gray-900 text-lg">{plan.name}</h3>
+      {plan.description && <p className="text-sm text-gray-500 mt-1">{plan.description}</p>}
+
+      <div className="mt-4 flex items-baseline gap-1">
+        <span className="text-3xl font-bold text-gray-900">{isFree ? 'Free' : `$${price.toFixed(0)}`}</span>
+        {!isFree && <span className="text-sm text-gray-400">/{yearly ? 'year' : 'month'}</span>}
+      </div>
+      {plan.trialDays > 0 && (
+        <span className="mt-2 inline-flex w-fit items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-secondary-50 text-secondary-700">
+          {plan.trialDays}-day free trial
+        </span>
+      )}
+
+      {plan.features.length > 0 && (
+        <ul className="mt-4 space-y-2">
+          {plan.features.map((f, i) => (
+            <li key={i} className="text-sm text-gray-600 flex items-start gap-2">
+              <svg className="w-4 h-4 text-primary-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
+              {f}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="mt-4 pt-4 border-t border-gray-100">
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Courses included</p>
+        {plan.courseAccess === 'all' ? (
+          <p className="text-sm text-gray-700 flex items-center gap-1.5">
+            <svg className="w-3.5 h-3.5 text-primary-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+            </svg>
+            All courses included
+          </p>
+        ) : plan.courses.length > 0 ? (
+          <ul className="space-y-0.5">
+            {plan.courses.slice(0, 4).map((c) => (
+              <li key={c._id} className="text-sm text-gray-600 flex items-center gap-1.5 truncate">
+                <svg className="w-3 h-3 text-primary-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+                <span className="truncate">{c.title}</span>
+              </li>
+            ))}
+            {plan.courses.length > 4 && <li className="text-xs text-gray-400">+{plan.courses.length - 4} more</li>}
+          </ul>
+        ) : (
+          <p className="text-sm text-gray-400 italic">No courses assigned yet</p>
+        )}
+      </div>
+
+      <MaybeLink
+        href="/login?redirect=/membership"
+        disabled={linksDisabled}
+        className="mt-6 block text-center text-sm font-semibold bg-primary-600 text-white py-2.5 rounded-xl hover:bg-primary-700 transition-colors cursor-pointer"
+      >
+        Get Started
+      </MaybeLink>
+    </div>
+  );
+}
+
+export function MembershipPlansSection({
+  plans, loading, membershipPlansSection, linksDisabled,
+}: {
+  plans: PublicMembershipPlan[]; loading: boolean; membershipPlansSection: MembershipPlansSectionData; linksDisabled?: boolean;
+}) {
+  const [yearly, setYearly] = useState(false);
+  const hasYearlyDiscount = plans.some((p) => p.yearlyPrice > 0 && p.yearlyPrice < p.monthlyPrice * 12);
+
+  return (
+    <section id="membership-plans" className="py-14 px-6 bg-white scroll-mt-16">
+      <div className="max-w-6xl mx-auto">
+        <div className="text-center mb-8">
+          <h2 className="text-2xl font-bold text-gray-900">
+            {membershipPlansSection.heading || (loading ? 'Loading plans…' : plans.length > 0 ? 'Membership Plans' : 'No plans yet')}
+          </h2>
+          {membershipPlansSection.subheading && <p className="text-gray-500 mt-2 max-w-lg mx-auto">{membershipPlansSection.subheading}</p>}
+
+          {!loading && plans.length > 0 && (
+            <div className="inline-flex items-center gap-3 mt-6 bg-gray-100 rounded-full p-1">
+              <button type="button" onClick={() => setYearly(false)}
+                className={`px-4 py-1.5 text-sm font-medium rounded-full transition-colors ${!yearly ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}>
+                Monthly
+              </button>
+              <button type="button" onClick={() => setYearly(true)}
+                className={`px-4 py-1.5 text-sm font-medium rounded-full transition-colors flex items-center gap-1.5 ${yearly ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}>
+                Yearly
+                {hasYearlyDiscount && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-secondary-100 text-secondary-700">Save</span>}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {loading ? (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="rounded-2xl border border-gray-100 p-6 animate-pulse space-y-3">
+                <div className="h-4 bg-gray-100 rounded w-1/2" />
+                <div className="h-8 bg-gray-100 rounded w-1/3" />
+                <div className="h-3 bg-gray-100 rounded w-full" />
+                <div className="h-3 bg-gray-100 rounded w-2/3" />
+              </div>
+            ))}
+          </div>
+        ) : plans.length === 0 ? (
+          <div className="text-center py-20 text-gray-400">
+            <svg className="w-16 h-16 mx-auto mb-4 text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+            </svg>
+            <p className="text-lg font-medium">No membership plans published yet</p>
+            <p className="text-sm mt-1">Check back soon!</p>
+          </div>
+        ) : (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {plans.map((plan) => (
+              <MembershipPlanCard key={plan._id} plan={plan} yearly={yearly} linksDisabled={linksDisabled} />
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 // ─── Testimonials ─────────────────────────────────────────────────────────────
 
 export function TestimonialsSection({ testimonials }: { testimonials: Testimonial[] }) {
@@ -1186,7 +1337,7 @@ export function LandingFooter({ displayName, linksDisabled, footerConfig }: { di
 
 export interface PageSection {
   _id?: string; // Mongoose-assigned; absent for a section not yet saved
-  type: 'hero' | 'about' | 'coursesSection' | 'testimonials' | 'cta' | 'contact' | 'custom' | 'contactForm' | 'courseApplication' | 'team' | 'bundlesSection';
+  type: 'hero' | 'about' | 'coursesSection' | 'testimonials' | 'cta' | 'contact' | 'custom' | 'contactForm' | 'courseApplication' | 'team' | 'bundlesSection' | 'membershipPlansSection';
   order: number;
   data: unknown;
 }
@@ -1201,7 +1352,7 @@ export interface CustomCodeData {
 
 export function PageSectionsRenderer({
   sections, courses, coursesLoading, displayName, logoUrl, linksDisabled, pages, subdomain, pageId, headerConfig, footerConfig,
-  bundles = [], bundlesLoading = false,
+  bundles = [], bundlesLoading = false, membershipPlans = [], membershipPlansLoading = false,
 }: {
   sections: PageSection[];
   courses: PublicCourse[];
@@ -1216,6 +1367,8 @@ export function PageSectionsRenderer({
   footerConfig?: FooterConfig | null;
   bundles?: PublicBundle[];
   bundlesLoading?: boolean;
+  membershipPlans?: PublicMembershipPlan[];
+  membershipPlansLoading?: boolean;
 }) {
   const hasAbout = sections.some((s) => {
     if (s.type !== 'about') return false;
@@ -1282,6 +1435,16 @@ export function PageSectionsRenderer({
                 bundles={bundles}
                 loading={bundlesLoading}
                 bundlesSection={section.data as BundlesSectionData}
+                linksDisabled={linksDisabled}
+              />
+            );
+          case 'membershipPlansSection':
+            return (
+              <MembershipPlansSection
+                key={i}
+                plans={membershipPlans}
+                loading={membershipPlansLoading}
+                membershipPlansSection={section.data as MembershipPlansSectionData}
                 linksDisabled={linksDisabled}
               />
             );
