@@ -10,6 +10,13 @@ async function listPlans(req, res, next) {
   } catch (err) { next(err); }
 }
 
+async function listPublicPlans(req, res, next) {
+  try {
+    const plans = await svc.listPublicPlans(req.tenant.tenantId);
+    R.success(res, { plans });
+  } catch (err) { next(err); }
+}
+
 async function createPlan(req, res, next) {
   try {
     const plan = await svc.createPlan(req.tenant.tenantId, req.body);
@@ -88,4 +95,4 @@ async function failedRenewals(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { listPlans, createPlan, updatePlan, togglePlan, deletePlan, getMySubscription, initiate, confirm, cancel, checkAccess, listSubscriptions, failedRenewals };
+module.exports = { listPlans, listPublicPlans, createPlan, updatePlan, togglePlan, deletePlan, getMySubscription, initiate, confirm, cancel, checkAccess, listSubscriptions, failedRenewals };

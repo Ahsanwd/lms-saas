@@ -3,6 +3,10 @@ const ctrl   = require('./membership.controller');
 const { authenticate }      = require('../../middlewares/auth.middleware');
 const { requireRole, requirePermission } = require('../../middlewares/permission.middleware');
 
+// Public marketing-site listing (no auth) — mirrors course.routes.js's own
+// /public pattern. Active plans only, no admin-only subscriber counts.
+router.get('/plans/public', ctrl.listPublicPlans);
+
 router.use(authenticate);
 
 // ── Plan management — Tenant Admin only ───────────────────────────────────────

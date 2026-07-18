@@ -83,6 +83,12 @@ async function listPlans(tenantId, { includeInactive = false } = {}) {
   return withCounts;
 }
 
+// Public marketing-site listing — active plans only, no admin-only
+// subscriber counts (unlike listPlans above).
+async function listPublicPlans(tenantId) {
+  return planRepo.findAll(tenantId, { includeInactive: false });
+}
+
 async function createPlan(tenantId, data) {
   const { name, description, monthlyPrice, yearlyPrice, courseAccess, courses, features, trialDays, sortOrder } = data;
   if (!name) throw new AppError('Plan name is required', 400);
@@ -425,7 +431,7 @@ async function getSubscriptionsExpiringSoon() {
 }
 
 module.exports = {
-  listPlans, createPlan, updatePlan, togglePlan, deletePlan,
+  listPlans, listPublicPlans, createPlan, updatePlan, togglePlan, deletePlan,
   getMySubscription, initiateSubscription, confirmSubscription,
   confirmSubscriptionByIntentId, cancelSubscription, checkCourseAccess,
   listSubscriptions, getFailedRenewals,

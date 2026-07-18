@@ -74,6 +74,7 @@ function validateSections(sections) {
   let courseApplicationCount = 0;
   let teamCount = 0;
   let bundlesSectionCount = 0;
+  let membershipPlansSectionCount = 0;
 
   for (const section of sections) {
     if (FIXED_SECTION_TYPES.includes(section.type)) {
@@ -111,6 +112,10 @@ function validateSections(sections) {
       const { bundleIds } = section.data || {};
       if (bundleIds && (!Array.isArray(bundleIds) || bundleIds.length > MAX_SELECTED_BUNDLES))
         throw new AppError(`A maximum of ${MAX_SELECTED_BUNDLES} selected bundles is allowed`, 400);
+    } else if (section.type === 'membershipPlansSection') {
+      membershipPlansSectionCount += 1;
+      if (membershipPlansSectionCount > 1)
+        throw new AppError('Only one "membershipPlansSection" section is allowed per page', 400);
     } else {
       throw new AppError(`Unknown section type "${section.type}"`, 400);
     }
