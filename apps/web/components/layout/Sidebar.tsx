@@ -14,7 +14,7 @@ interface NavLeaf {
   label: string;
   icon: React.ReactNode;
   roles: Role[];
-  badge?: 'notif-count' | 'chat-count' | 'contact-count';
+  badge?: 'notif-count' | 'chat-count' | 'contact-count' | 'course-application-count';
 }
 
 interface NavGroup {
@@ -211,7 +211,7 @@ const NAV_ENTRIES: NavEntry[] = [
       { href: '/announcements', label: 'Announcements',  icon: <MegaphoneIcon />, roles: ['tenant_admin', 'instructor', 'student'] },
       { href: '/notifications', label: 'Notifications', icon: <BellIcon />,      roles: ['tenant_admin', 'instructor', 'student'], badge: 'notif-count' },
       { href: '/contact-submissions', label: 'Contact Submissions', icon: <MailIcon />, roles: ['tenant_admin'], badge: 'contact-count' },
-      { href: '/course-applications', label: 'Course Applications', icon: <ClipboardCheckIcon />, roles: ['tenant_admin'] },
+      { href: '/course-applications', label: 'Course Applications', icon: <ClipboardCheckIcon />, roles: ['tenant_admin'], badge: 'course-application-count' },
     ],
   },
 
@@ -324,10 +324,23 @@ export function Sidebar({ role, tenantName, logoUrl, isOpen = false, onClose, ef
   });
   const contactUnreadCount = contactCountData?.count ?? 0;
 
+  const { data: courseAppCountData } = useQuery({
+    queryKey: ['course-applications-pending'],
+    queryFn: async () => {
+      const { data } = await api.get('/course-applications/pending-count');
+      return data.data as { count: number };
+    },
+    enabled: navRole === 'tenant_admin',
+    refetchInterval: 30_000,
+    staleTime: 10_000,
+  });
+  const courseAppPendingCount = courseAppCountData?.count ?? 0;
+
   const getBadgeCount = (item: NavLeaf) =>
     item.badge === 'notif-count' ? unreadCount
       : item.badge === 'chat-count' ? chatUnreadCount
       : item.badge === 'contact-count' ? contactUnreadCount
+      : item.badge === 'course-application-count' ? courseAppPendingCount
       : 0;
 
   const renderLeaf = (item: NavLeaf, nested = false) => {
