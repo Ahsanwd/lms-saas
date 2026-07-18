@@ -227,7 +227,7 @@ const NAV_ENTRIES: NavEntry[] = [
   {
     key: 'admin', label: 'Admin', icon: <UsersIcon />,
     items: [
-      { href: '/users',         label: 'Users',   icon: <UsersIcon />,    roles: ['tenant_admin'] },
+      { href: '/users',         label: 'Users',   icon: <UsersIcon />,    roles: ['tenant_admin', 'instructor'] },
       { href: '/membership-plans', label: 'Membership Plans', icon: <MembershipIcon />, roles: ['tenant_admin'] },
       { href: '/media',         label: 'Media Library', icon: <MediaIcon />, roles: ['tenant_admin', 'instructor'] },
       { href: '/admin/tenants', label: 'Tenants', icon: <BuildingIcon />, roles: ['super_admin'] },

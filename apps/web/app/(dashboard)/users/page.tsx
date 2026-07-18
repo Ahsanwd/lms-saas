@@ -7,6 +7,7 @@ import { Button, Badge, Spinner, Card, Alert } from '@/components/ui';
 import { AxiosError } from 'axios';
 import { cn } from '@/lib/utils';
 import type { Role } from '@/types';
+import { useAuthStore } from '@/stores/auth.store';
 
 interface TenantUser {
   _id: string;
@@ -778,6 +779,58 @@ function AddUserModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+// ── Edit Name Modal ───────────────────────────────────────────────────────────
+function EditNameModal({ user, onClose }: { user: TenantUser; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [firstName, setFirstName] = useState(user.firstName);
+  const [lastName, setLastName]   = useState(user.lastName);
+  const [error, setError] = useState('');
+
+  const mutation = useMutation({
+    mutationFn: () => api.patch(`/users/${user._id}/name`, { firstName, lastName }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['users'] }); onClose(); },
+    onError: (err: AxiosError<{ message: string }>) => {
+      setError(err.response?.data?.message ?? 'Failed to update name');
+    },
+  });
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-1">Edit Name</h2>
+        <p className="text-sm text-gray-500 mb-4">{user.email}</p>
+        {error && <Alert variant="error" className="mb-3">{error}</Alert>}
+        <div className="grid grid-cols-2 gap-3 mb-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+            <input
+              autoFocus type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+            <input
+              type="text" value={lastName} onChange={(e) => setLastName(e.target.value)}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+        </div>
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button
+            loading={mutation.isPending}
+            disabled={!firstName.trim() || !lastName.trim()}
+            onClick={() => mutation.mutate()}
+          >
+            Save
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Role Change Modal ─────────────────────────────────────────────────────────
 function RoleModal({ user, onClose }: { user: TenantUser; onClose: () => void }) {
   const qc = useQueryClient();
@@ -819,6 +872,8 @@ function RoleModal({ user, onClose }: { user: TenantUser; onClose: () => void })
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function UsersPage() {
   const qc = useQueryClient();
+  const { user: me } = useAuthStore();
+  const isAdmin = me?.role === 'tenant_admin';
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -826,6 +881,7 @@ export default function UsersPage() {
   const [addUserOpen, setAddUserOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [roleModal, setRoleModal] = useState<TenantUser | null>(null);
+  const [nameModal, setNameModal] = useState<TenantUser | null>(null);
   const [actionError, setActionError] = useState('');
   const [exporting, setExporting] = useState(false);
 
@@ -910,52 +966,54 @@ export default function UsersPage() {
           <h1 className="text-xl font-semibold text-gray-900">Users</h1>
           <p className="text-sm text-gray-500 mt-0.5">{data?.pagination?.total ?? 0} total</p>
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          {/* Export */}
-          <button
-            onClick={handleExport}
-            disabled={exporting}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-          >
-            {exporting ? (
-              <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 12a8 8 0 018-8v8H4z" />
-              </svg>
-            ) : (
+        {isAdmin && (
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {/* Export */}
+            <button
+              onClick={handleExport}
+              disabled={exporting}
+              className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+            >
+              {exporting ? (
+                <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 12a8 8 0 018-8v8H4z" />
+                </svg>
+              ) : (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+              )}
+              Export CSV
+            </button>
+
+            {/* Import */}
+            <button
+              onClick={() => setImportOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
               </svg>
-            )}
-            Export CSV
-          </button>
+              Import CSV
+            </button>
 
-          {/* Import */}
-          <button
-            onClick={() => setImportOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-            </svg>
-            Import CSV
-          </button>
+            {/* Add User (direct create) */}
+            <Button variant="outline" onClick={() => setAddUserOpen(true)}>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Add User
+            </Button>
 
-          {/* Add User (direct create) */}
-          <Button variant="outline" onClick={() => setAddUserOpen(true)}>
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Add User
-          </Button>
-
-          {/* Invite */}
-          <Button onClick={() => setInviteOpen(true)}>
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Invite User
-          </Button>
-        </div>
+            {/* Invite */}
+            <Button onClick={() => setInviteOpen(true)}>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Invite User
+            </Button>
+          </div>
+        )}
       </div>
 
       {actionError && <Alert variant="error">{actionError}</Alert>}
@@ -974,16 +1032,18 @@ export default function UsersPage() {
           onChange={(e) => setSearch(e.target.value)}
           className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
         />
-        <select
-          value={roleFilter}
-          onChange={(e) => setRoleFilter(e.target.value)}
-          className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
-        >
-          <option value="">All Roles</option>
-          <option value="tenant_admin">Admin</option>
-          <option value="instructor">Instructor</option>
-          <option value="student">Student</option>
-        </select>
+        {isAdmin && (
+          <select
+            value={roleFilter}
+            onChange={(e) => setRoleFilter(e.target.value)}
+            className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+          >
+            <option value="">All Roles</option>
+            <option value="tenant_admin">Admin</option>
+            <option value="instructor">Instructor</option>
+            <option value="student">Student</option>
+          </select>
+        )}
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
@@ -1009,11 +1069,15 @@ export default function UsersPage() {
               </svg>
             </div>
             <p className="text-gray-900 font-medium">No users found</p>
-            <p className="text-gray-500 text-sm mt-1">Invite someone or import a CSV to get started.</p>
-            <div className="flex gap-2 mt-4">
-              <Button variant="outline" onClick={() => setImportOpen(true)}>Import CSV</Button>
-              <Button onClick={() => setInviteOpen(true)}>Invite User</Button>
-            </div>
+            {isAdmin && (
+              <>
+                <p className="text-gray-500 text-sm mt-1">Invite someone or import a CSV to get started.</p>
+                <div className="flex gap-2 mt-4">
+                  <Button variant="outline" onClick={() => setImportOpen(true)}>Import CSV</Button>
+                  <Button onClick={() => setInviteOpen(true)}>Invite User</Button>
+                </div>
+              </>
+            )}
           </div>
         </Card>
       ) : (
@@ -1065,25 +1129,32 @@ export default function UsersPage() {
                   </td>
                   <td className="px-4 py-4">
                     <div className="flex items-center gap-1 justify-end">
-                      <Button size="sm" variant="ghost" onClick={() => setRoleModal(u)}>Role</Button>
-                      {u.status === 'suspended' ? (
-                        <Button size="sm" variant="ghost" loading={unsuspendMutation.isPending}
-                          onClick={() => unsuspendMutation.mutate(u._id)}>
-                          Unsuspend
-                        </Button>
-                      ) : (
-                        <Button size="sm" variant="ghost" loading={suspendMutation.isPending}
-                          onClick={() => suspendMutation.mutate(u._id)}>
-                          <span className="text-amber-600">Suspend</span>
-                        </Button>
+                      {(isAdmin || u.role === 'student') && (
+                        <Button size="sm" variant="ghost" onClick={() => setNameModal(u)}>Edit Name</Button>
                       )}
-                      <Button size="sm" variant="danger"
-                        onClick={() => {
-                          if (confirm(`Delete ${u.firstName} ${u.lastName}? This cannot be undone.`))
-                            deleteMutation.mutate(u._id);
-                        }}>
-                        Delete
-                      </Button>
+                      {isAdmin && (
+                        <>
+                          <Button size="sm" variant="ghost" onClick={() => setRoleModal(u)}>Role</Button>
+                          {u.status === 'suspended' ? (
+                            <Button size="sm" variant="ghost" loading={unsuspendMutation.isPending}
+                              onClick={() => unsuspendMutation.mutate(u._id)}>
+                              Unsuspend
+                            </Button>
+                          ) : (
+                            <Button size="sm" variant="ghost" loading={suspendMutation.isPending}
+                              onClick={() => suspendMutation.mutate(u._id)}>
+                              <span className="text-amber-600">Suspend</span>
+                            </Button>
+                          )}
+                          <Button size="sm" variant="danger"
+                            onClick={() => {
+                              if (confirm(`Delete ${u.firstName} ${u.lastName}? This cannot be undone.`))
+                                deleteMutation.mutate(u._id);
+                            }}>
+                            Delete
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -1097,6 +1168,7 @@ export default function UsersPage() {
       {addUserOpen && <AddUserModal onClose={() => setAddUserOpen(false)} />}
       {importOpen  && <ImportModal onClose={() => setImportOpen(false)} />}
       {roleModal   && <RoleModal user={roleModal} onClose={() => setRoleModal(null)} />}
+      {nameModal   && <EditNameModal user={nameModal} onClose={() => setNameModal(null)} />}
     </div>
   );
 }
