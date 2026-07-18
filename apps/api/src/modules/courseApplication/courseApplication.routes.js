@@ -20,6 +20,7 @@ router.post('/submit', courseApplicationLimiter, ctrl.submit);
 router.use(authenticate);
 
 router.get('/', requireRole('tenant_admin'), ctrl.list);
+router.get('/pending-count', requireRole('tenant_admin'), ctrl.pendingCount);
 router.patch('/:id/approve', requireRole('tenant_admin'), ctrl.approve);
 router.patch('/:id/reject', requireRole('tenant_admin'), ctrl.reject);
 

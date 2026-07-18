@@ -32,15 +32,36 @@ async function submit(tenantId, pageId, data, meta) {
   const course = await courseRepo.findById(tenantId, courseId);
   if (!course || course.status !== 'published') throw new AppError('Course not found', 404);
 
-  return courseApplicationRepo.create({
+  const application = await courseApplicationRepo.create({
     tenantId, pageId: pageId || null, courseId,
     name: name.trim(), email, phone: phone || null, gender: gender || null,
     ip: meta?.ip || null,
   });
+
+  // In-app notification to every tenant admin — same pattern as contact
+  // form submissions, so a new application is actually visible somewhere
+  // besides the list page itself.
+  const User = require('../../database/models/User.model');
+  const admins = await User.find({ tenantId, role: 'tenant_admin', deletedAt: null }).select('_id').lean();
+  if (admins.length > 0) {
+    const notifySvc = require('../notification/notification.service');
+    notifySvc.createBulk(tenantId, admins.map((a) => a._id), {
+      type: 'course_application',
+      title: 'New course application',
+      message: `${name.trim()} applied for "${course.title}"`,
+      link: '/course-applications',
+    }).catch(() => {});
+  }
+
+  return application;
 }
 
 function listApplications(tenantId, query) {
   return courseApplicationRepo.findAll(tenantId, query);
+}
+
+function getPendingCount(tenantId) {
+  return courseApplicationRepo.countPending(tenantId);
 }
 
 async function approveApplication(tenantId, applicationId, actingUser) {
@@ -86,4 +107,4 @@ async function rejectApplication(tenantId, applicationId, actingUser, { reviewNo
   });
 }
 
-module.exports = { submit, listApplications, approveApplication, rejectApplication };
+module.exports = { submit, listApplications, getPendingCount, approveApplication, rejectApplication };

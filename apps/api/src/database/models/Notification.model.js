@@ -32,6 +32,7 @@ const notificationSchema = new mongoose.Schema(
         'discussion_reply',     // someone replied to your discussion post
         'group_announcement',   // announcement posted in a group you're a member of
         'contact_submission',   // someone submitted the public Contact Form (tenant admin only)
+        'course_application',   // someone submitted the public Course Application form (tenant admin only)
       ],
       required: true,
     },

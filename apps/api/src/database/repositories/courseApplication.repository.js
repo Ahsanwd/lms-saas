@@ -27,6 +27,10 @@ class CourseApplicationRepository {
   updateById(tenantId, id, update) {
     return CourseApplication.findOneAndUpdate({ _id: id, tenantId }, update, { new: true });
   }
+
+  countPending(tenantId) {
+    return CourseApplication.countDocuments({ tenantId, status: 'pending', deletedAt: null });
+  }
 }
 
 module.exports = new CourseApplicationRepository();

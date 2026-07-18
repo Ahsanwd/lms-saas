@@ -24,6 +24,13 @@ async function list(req, res, next) {
   } catch (err) { next(err); }
 }
 
+async function pendingCount(req, res, next) {
+  try {
+    const count = await courseApplicationService.getPendingCount(req.tenant.tenantId);
+    R.success(res, { count });
+  } catch (err) { next(err); }
+}
+
 async function approve(req, res, next) {
   try {
     const application = await courseApplicationService.approveApplication(
@@ -42,4 +49,4 @@ async function reject(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { submit, list, approve, reject };
+module.exports = { submit, list, pendingCount, approve, reject };
