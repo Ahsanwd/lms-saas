@@ -328,6 +328,15 @@ async function getMySubmission(tenantId, assignmentId, user) {
   const assignment = await assignmentRepo.findById(tenantId, assignmentId);
   if (!assignment) throw new AppError('Assignment not found', 404);
 
+  // Same gate as getAssignment() — without it, a student could pull a draft
+  // assignment's title/instructions/rubric, or one for a course they aren't
+  // enrolled in, just by knowing/guessing its id.
+  if (user.role === 'student') {
+    if (assignment.status !== 'published') throw new AppError('Assignment not found', 404);
+    const enrollment = await enrollmentRepo.findByUserAndCourse(tenantId, user.sub, assignment.courseId._id ?? assignment.courseId);
+    if (!enrollment) throw new AppError('You are not enrolled in this course', 403);
+  }
+
   const submission = await submissionRepo.findByStudent(tenantId, assignmentId, user.sub);
   return { assignment, submission: submission || null };
 }
