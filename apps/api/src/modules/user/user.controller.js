@@ -34,12 +34,19 @@ const avatarUpload = multer({
   },
 });
 
+// Instructors only have user:read/user:update to manage their students' name
+// typos — never to browse the full staff roster. Force the role filter to
+// 'student' for them regardless of what the query string asks for.
+function scopedRoleFilter(req, requestedRole) {
+  return req.user.role === 'instructor' ? 'student' : requestedRole;
+}
+
 async function list(req, res, next) {
   try {
     if (!req.tenant) return R.error(res, 'Tenant context missing', 400);
-    const { role, status, search, page, limit } = req.query;
+    const { status, search, page, limit } = req.query;
     const result = await userService.listUsers(req.tenant.tenantId, {
-      role, status, search, page, limit,
+      role: scopedRoleFilter(req, req.query.role), status, search, page, limit,
     });
     R.success(res, result);
   } catch (err) { next(err); }
@@ -48,6 +55,8 @@ async function list(req, res, next) {
 async function getById(req, res, next) {
   try {
     const user = await userService.getUserById(req.tenant.tenantId, req.params.id);
+    if (req.user.role === 'instructor' && user.role !== 'student')
+      return R.error(res, 'Forbidden', 403);
     R.success(res, { user });
   } catch (err) { next(err); }
 }
@@ -150,6 +159,17 @@ async function acceptInvite(req, res, next) {
   } catch (err) { next(err); }
 }
 
+async function updateName(req, res, next) {
+  try {
+    const { firstName, lastName } = req.body;
+    validateUpdateProfile({ firstName, lastName });
+    const user = await userService.updateUserName(
+      req.tenant.tenantId, req.params.id, { firstName, lastName }, req.user
+    );
+    R.success(res, { user }, 'Name updated');
+  } catch (err) { next(err); }
+}
+
 async function updateRole(req, res, next) {
   try {
     const { role } = req.body;
@@ -211,8 +231,10 @@ async function bulkImport(req, res, next) {
 
 async function exportCsv(req, res, next) {
   try {
-    const { role, status, search } = req.query;
-    const csv = await userService.exportUsers(req.tenant.tenantId, { role, status, search });
+    const { status, search } = req.query;
+    const csv = await userService.exportUsers(req.tenant.tenantId, {
+      role: scopedRoleFilter(req, req.query.role), status, search,
+    });
     const date = new Date().toISOString().split('T')[0];
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="users-${date}.csv"`);
@@ -225,7 +247,7 @@ module.exports = {
   updateMe, changePassword, mySessions, revokeMySession,
   avatarUpload, uploadAvatar, deleteAvatar,
   invite, acceptInvite, createUser,
-  updateRole, suspend, unsuspend, deleteUser,
+  updateName, updateRole, suspend, unsuspend, deleteUser,
   getUserSessions, revokeUserSession,
   csvUpload, bulkImport, previewImport, exportCsv,
 };

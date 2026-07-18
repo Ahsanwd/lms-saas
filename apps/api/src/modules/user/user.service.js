@@ -144,6 +144,23 @@ async function changePassword(tenantId, userId, { currentPassword, newPassword }
   await sessionRepo.revokeAllByUser(tenantId, userId);
 }
 
+// ─── Update Another User's Name (admin/instructor action) ────────────────────
+async function updateUserName(tenantId, targetUserId, { firstName, lastName }, actingUser) {
+  if (!firstName?.trim() || !lastName?.trim())
+    throw new AppError('First and last name are required', 400);
+
+  const user = await userRepo.findById(tenantId, targetUserId);
+  if (!user) throw new AppError('User not found', 404);
+  if (user.role === 'super_admin') throw new AppError('Cannot edit super admin', 403);
+
+  // Instructors only have this permission to fix up their own students' names —
+  // not to rename fellow instructors or tenant admins.
+  if (actingUser.role === 'instructor' && user.role !== 'student')
+    throw new AppError('Instructors can only edit student profiles', 403);
+
+  return userRepo.updateById(targetUserId, { firstName: firstName.trim(), lastName: lastName.trim() });
+}
+
 // ─── Update Role ──────────────────────────────────────────────────────────────
 async function updateRole(tenantId, targetUserId, { role }, actingUser) {
   if (targetUserId.toString() === actingUser.sub)
@@ -490,7 +507,7 @@ module.exports = {
   updateProfile,
   uploadAvatar, deleteAvatar,
   changePassword,
-  updateRole, suspendUser, unsuspendUser, deleteUser,
+  updateUserName, updateRole, suspendUser, unsuspendUser, deleteUser,
   inviteUser, acceptInvite, createUser,
   getUserSessions, revokeUserSession,
   previewBulkImport, bulkImportUsers, exportUsers,

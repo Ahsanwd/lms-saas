@@ -32,6 +32,7 @@ router.get('/export', requirePermission('user:read'), ctrl.exportCsv);
 // ── Admin — User Management ───────────────────────────────────────────────────
 router.get('/', requirePermission('user:read'), ctrl.list);
 router.get('/:id', requirePermission('user:read'), ctrl.getById);
+router.patch('/:id/name', requirePermission('user:update'), ctrl.updateName);
 router.patch('/:id/role', requirePermission('user:manage'), ctrl.updateRole);
 router.patch('/:id/suspend', requirePermission('user:manage'), ctrl.suspend);
 router.patch('/:id/unsuspend', requirePermission('user:manage'), ctrl.unsuspend);

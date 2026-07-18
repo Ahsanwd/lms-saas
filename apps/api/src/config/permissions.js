@@ -29,7 +29,7 @@ const PERMISSIONS = {
     'category:read',
     'announcement:create', 'announcement:read', 'announcement:update', 'announcement:delete',
     'analytics:read',
-    'user:read',
+    'user:read', 'user:update', // name edits only — user.service restricts instructors to student profiles
     'media:read',
   ],
 
