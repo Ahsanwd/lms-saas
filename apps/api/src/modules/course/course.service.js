@@ -44,6 +44,47 @@ function cleanupCloudflareVideo(tenantId, video) {
   }
 }
 
+// Removes a Bunny.net Stream video (fire-and-forget) when a lesson's video is
+// replaced or the lesson is deleted. Bunny is BYOK per-tenant (Tenant.bunnyStream),
+// unlike Cloudflare's shared platform-level account — same rationale as
+// cleanupCloudflareVideo above: deleteFile()/getFileSizeBytes() silently no-op
+// for a Bunny video GUID (it isn't a real file path), so without this the
+// actual video on the tenant's own Bunny account was never deleted.
+function cleanupBunnyVideo(tenantId, video) {
+  if (!video?.url) return;
+  (async () => {
+    try {
+      const Tenant = require('../../database/models/Tenant.model');
+      const tenant = await Tenant.findById(tenantId).select('+bunnyStream.apiKeyEnc bunnyStream').lean();
+      const b = tenant?.bunnyStream;
+      if (!b?.enabled || !b.libraryId || !b.apiKeyEnc) return;
+      const bunnySvc = require('../../services/bunnyStream/bunnyStream.service');
+      const apiKey = bunnySvc.decrypt(b.apiKeyEnc);
+      await bunnySvc.deleteVideo(b.libraryId, apiKey, video.url);
+    } catch { /* non-fatal */ }
+  })();
+}
+
+// Shared dispatch for "a lesson's video is about to be replaced" — used by
+// every video-set path (direct upload, Cloudflare Stream confirm, Bunny
+// confirm) so replacing a video via ANY of them reclaims whatever the
+// previous video actually was, not just the one matching that same path.
+function cleanupPreviousLessonVideo(tenantId, video) {
+  if (!video?.url) return;
+  if (video.provider === 'cloudflare') {
+    cleanupCloudflareVideo(tenantId, video);
+  } else if (video.provider === 'bunny') {
+    cleanupBunnyVideo(tenantId, video);
+  } else {
+    const oldSize = getFileSizeBytes(video.url);
+    deleteFile(video.url);
+    if (oldSize > 0) setImmediate(() => {
+      const lgSvc = require('../../services/limitGuard/limitGuard.service');
+      lgSvc.decrementStorageUsed(tenantId, oldSize).catch(() => {});
+    });
+  }
+}
+
 async function recalcCourseCounters(tenantId, courseId) {
   const lessons = await lessonRepo.findByCourse(tenantId, courseId);
   const published = lessons.filter(l => l.isPublished && !l.deletedAt);
@@ -534,18 +575,7 @@ async function uploadLessonVideo(tenantId, courseId, lessonId, file, user) {
 
   const lesson = await lessonRepo.findById(tenantId, lessonId);
   if (!lesson || lesson.courseId.toString() !== courseId) throw new AppError('Lesson not found', 404);
-  if (lesson.video?.url) {
-    if (lesson.video.provider === 'cloudflare') {
-      cleanupCloudflareVideo(tenantId, lesson.video);
-    } else {
-      const oldSize = getFileSizeBytes(lesson.video.url);
-      deleteFile(lesson.video.url);
-      if (oldSize > 0) setImmediate(() => {
-        const lgSvc = require('../../services/limitGuard/limitGuard.service');
-        lgSvc.decrementStorageUsed(tenantId, oldSize).catch(() => {});
-      });
-    }
-  }
+  cleanupPreviousLessonVideo(tenantId, lesson.video);
 
   const { USE_S3 } = require('../../services/storage/storage.service');
   const url = getPublicUrl(file.path);
@@ -565,6 +595,7 @@ async function confirmCfStreamVideo(tenantId, courseId, lessonId, videoUid, user
 
   const lesson = await lessonRepo.findById(tenantId, lessonId);
   if (!lesson || lesson.courseId.toString() !== courseId) throw new AppError('Lesson not found', 404);
+  cleanupPreviousLessonVideo(tenantId, lesson.video);
 
   const updated = await lessonRepo.updateById(tenantId, lessonId, {
     'video.url':      videoUid,
@@ -634,6 +665,7 @@ async function confirmBunnyVideo(tenantId, courseId, lessonId, videoGuid, user) 
 
   const lesson = await lessonRepo.findById(tenantId, lessonId);
   if (!lesson || lesson.courseId.toString() !== courseId) throw new AppError('Lesson not found', 404);
+  cleanupPreviousLessonVideo(tenantId, lesson.video);
 
   const updated = await lessonRepo.updateById(tenantId, lessonId, {
     'video.url':      videoGuid,
@@ -660,10 +692,11 @@ async function uploadLessonAudio(tenantId, courseId, lessonId, file, user) {
     });
   }
 
+  const { USE_S3 } = require('../../services/storage/storage.service');
   const url = getPublicUrl(file.path);
   const updated = await lessonRepo.updateById(tenantId, lessonId, {
     'audio.url': url,
-    'audio.provider': 'local',
+    'audio.provider': USE_S3 ? 's3' : 'local',
     updatedBy: user.sub,
   });
   await recalcCourseCounters(tenantId, courseId);
@@ -785,6 +818,8 @@ async function deleteLesson(tenantId, courseId, sectionId, lessonId, user) {
   if (lesson.video?.url) {
     if (lesson.video.provider === 'cloudflare') {
       cleanupCloudflareVideo(tenantId, lesson.video);
+    } else if (lesson.video.provider === 'bunny') {
+      cleanupBunnyVideo(tenantId, lesson.video);
     } else {
       reclaimBytes += getFileSizeBytes(lesson.video.url);
       deleteFile(lesson.video.url);
@@ -1050,7 +1085,7 @@ async function bulkEnrollCsv(tenantId, courseId, csvText, actingUser) {
 
     if (existing) {
       await enrollmentRepo.updateByUserAndCourse(tenantId, user._id.toString(), courseId, {
-        status: 'active', enrolledAt: new Date(), droppedAt: null,
+        status: 'active', enrolledAt: new Date(), droppedAt: null, completedAt: null,
         expiresAt: calcExpiresAt(course.accessDurationDays),
       });
     } else {
