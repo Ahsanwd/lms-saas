@@ -24,7 +24,7 @@ interface MediaItem {
   durationSeconds: number | null;
   provider: 'local' | 's3' | 'cloudflare';
   contextType: string | null;
-  createdBy?: { name: string; avatar?: string } | null;
+  createdBy?: { firstName: string; lastName: string; avatar?: string } | null;
   createdAt: string;
 }
 
@@ -272,7 +272,10 @@ export default function MediaLibraryPage() {
                     {item.contextType ? (CONTEXT_LABEL[item.contextType] ?? item.contextType) : '—'}
                   </td>
                   <td className="px-4 py-4 hidden sm:table-cell text-xs text-gray-400">
-                    {new Date(item.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    <p>{new Date(item.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                    {item.createdBy && (
+                      <p className="text-gray-400">by {item.createdBy.firstName} {item.createdBy.lastName}</p>
+                    )}
                   </td>
                   <td className="px-4 py-4">
                     <div className="flex items-center gap-1 justify-end">
