@@ -37,7 +37,8 @@ const RESERVED_SLUGS = new Set([
   // (dashboard)
   'activity', 'admin', 'analytics', 'announcements', 'assignments', 'billing',
   'bookmarks', 'bundles', 'certificate-builder', 'certificates', 'chat',
-  'cohorts', 'coupons', 'courses', 'dashboard', 'forum', 'groups',
+  'cohorts', 'contact-submissions', 'coupons', 'course-applications',
+  'courses', 'dashboard', 'forum', 'groups', 'media',
   'membership', 'membership-plans', 'my-learning', 'my-payments',
   'notifications', 'profile', 'quizzes', 'refunds', 'search', 'settings',
   'share-links', 'users', 'website-builder',
