@@ -39,7 +39,10 @@ const io     = new Server(server, {
     origin: (origin, cb) => {
       if (!origin) return cb(null, true);
       const appDomain = process.env.APP_DOMAIN;
-      const domainRe  = appDomain ? new RegExp(`(^https?://)([a-z0-9-]+\\.)?${appDomain.replace('.', '\\.')}$`) : null;
+      // Same fix as the Express CORS config below: escape every dot (not
+      // just the first) and allow an optional :port, or a non-default-port
+      // origin (any local/dev deployment) could never match.
+      const domainRe  = appDomain ? new RegExp(`^https?://([a-z0-9-]+\\.)?${appDomain.replace(/\./g, '\\.')}(:\\d+)?$`) : null;
       const ok = /\.vercel\.app$/.test(origin)
         || /localhost/.test(origin)
         || (process.env.ALLOWED_ORIGIN && origin === process.env.ALLOWED_ORIGIN)
@@ -68,8 +71,13 @@ const allowedOrigins = [
   _extraOrigin,
   /\.vercel\.app$/,
   /localhost:\d+$/,
-  // Match all subdomains of APP_DOMAIN (tenant subdomains)
-  _appDomain ? new RegExp(`(^https?://)([a-z0-9-]+\\.)?${_appDomain.replace('.', '\\.')}$`) : null,
+  // Match all subdomains of APP_DOMAIN (tenant subdomains). Escapes every
+  // dot (String#replace with a string pattern only replaces the first
+  // occurrence, which silently under-escaped any domain with 2+ dots) and
+  // allows an optional :port — without it, a non-default-port origin (any
+  // local/dev deployment) could never match, since the browser's Origin
+  // header always includes an explicit port in that case.
+  _appDomain ? new RegExp(`^https?://([a-z0-9-]+\\.)?${_appDomain.replace(/\./g, '\\.')}(:\\d+)?$`) : null,
 ].filter(Boolean);
 
 app.use(cors({
