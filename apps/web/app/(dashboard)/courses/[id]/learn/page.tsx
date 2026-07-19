@@ -1352,11 +1352,11 @@ function DripLockOverlay({ lesson }: { lesson: Lesson }) {
 // ── Live Lesson Content (full-featured) ───────────────────────────────────────
 
 const PLATFORM_LABELS: Record<string, string> = {
-  zoom: 'Zoom', meet: 'Google Meet', teams: 'Microsoft Teams',
+  livekit: 'Live Class', zoom: 'Zoom', meet: 'Google Meet', teams: 'Microsoft Teams',
   youtube_live: 'YouTube Live', custom: 'Online Meeting',
 };
 const PLATFORM_COLORS: Record<string, string> = {
-  zoom: 'bg-blue-600', meet: 'bg-green-600', teams: 'bg-purple-600',
+  livekit: 'bg-primary-600', zoom: 'bg-blue-600', meet: 'bg-green-600', teams: 'bg-purple-600',
   youtube_live: 'bg-red-600', custom: 'bg-gray-600',
 };
 
@@ -1388,7 +1388,7 @@ function parseYouTubeEmbed(url: string) {
 
 interface LiveSessionData {
   lesson: { liveClass: {
-    platform: string; meetingUrl: string | null; scheduledAt: string | null;
+    platform: string; meetingUrl: string | null; hasLiveKitRoom: boolean; scheduledAt: string | null;
     durationMinutes: number; instructions: string | null; status: string;
     liveStartedAt: string | null; liveEndedAt: string | null;
     recordingUrl: string | null; attendanceEnabled: boolean; checkinOpen: boolean;
@@ -1398,6 +1398,7 @@ interface LiveSessionData {
 
 function LiveLessonContent({ lesson }: { lesson: Lesson }) {
   const qc = useQueryClient();
+  const router = useRouter();
   const qKey = ['live-session', lesson._id];
 
   const { data, isLoading } = useQuery<LiveSessionData>({
@@ -1410,8 +1411,14 @@ function LiveLessonContent({ lesson }: { lesson: Lesson }) {
     mutationFn: () => api.post(`/live/lessons/${lesson._id}/join`),
     onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: qKey });
-      const url = res.data?.data?.meetingUrl;
-      if (url) window.open(url, '_blank', 'noopener,noreferrer');
+      const result = res.data?.data;
+      if (result?.platform === 'livekit') {
+        // In-app video room — a real page navigation, not a popup.
+        router.push(`/live-room/${lesson._id}`);
+      } else if (result?.meetingUrl) {
+        // Legacy zoom/meet/teams/custom — unchanged behavior.
+        window.open(result.meetingUrl, '_blank', 'noopener,noreferrer');
+      }
     },
   });
 
@@ -1424,7 +1431,9 @@ function LiveLessonContent({ lesson }: { lesson: Lesson }) {
   const myAttendance = data?.myAttendance ?? null;
   const status = lc?.status ?? 'scheduled';
   const scheduledAt = lc?.scheduledAt ? new Date(lc.scheduledAt) : null;
-  const platform = lc?.platform ?? 'zoom';
+  const platform = lc?.platform ?? 'livekit';
+  // A livekit lesson has meetingUrl:null by design (uses a room instead).
+  const hasMeeting = !!lc?.meetingUrl || (platform === 'livekit' && !!lc?.hasLiveKitRoom);
   const remaining = useCountdown(status === 'scheduled' && scheduledAt ? scheduledAt : null);
 
   const isLive      = status === 'live';
@@ -1519,7 +1528,7 @@ function LiveLessonContent({ lesson }: { lesson: Lesson }) {
           )}
 
           {/* Join button */}
-          {isLive && lc?.meetingUrl && (
+          {isLive && hasMeeting && (
             <button
               onClick={() => joinMut.mutate()}
               disabled={joinMut.isPending}
@@ -1536,13 +1545,13 @@ function LiveLessonContent({ lesson }: { lesson: Lesson }) {
             </button>
           )}
 
-          {isScheduled && lc?.meetingUrl && (
+          {isScheduled && hasMeeting && (
             <div className="text-center py-3 bg-white/60 rounded-xl border border-emerald-100 text-sm text-gray-500">
               Meeting link will be available when the session starts.
             </div>
           )}
 
-          {(isScheduled || isEnded) && !lc?.meetingUrl && !isEnded && (
+          {(isScheduled || isEnded) && !hasMeeting && !isEnded && (
             <div className="text-center py-3 bg-white border border-dashed border-gray-200 rounded-xl text-sm text-gray-500">
               Meeting link will be shared before the session.
             </div>

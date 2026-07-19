@@ -4,12 +4,10 @@ const scheduledTaskRepo = require('../database/repositories/scheduledTask.reposi
 
 const { handleScheduledPublish }    = require('./announcement.scheduler.job');
 const { handleLiveReminder }        = require('./liveReminder.job');
-const { handleZoomRecordingFetch }  = require('./zoomRecording.job');
 
 const HANDLERS = {
   'scheduled-publish':    handleScheduledPublish,
   'live-reminder':        handleLiveReminder,
-  'zoom-recording-fetch': handleZoomRecordingFetch,
 };
 
 // Polls MongoDB for due one-off tasks every minute — replaces Bull's

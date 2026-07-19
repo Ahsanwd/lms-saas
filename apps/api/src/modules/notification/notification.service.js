@@ -92,7 +92,7 @@ function buildEmailPayload(type, ctx, userDoc, appUrl, tenantName, branding = {}
       return liveSessionReminderTpl({
         ...base, recipientName: base.studentName,
         lessonTitle: ctx.lessonTitle, courseName: ctx.courseName || null,
-        scheduledAt: ctx.scheduledAt, platform: ctx.platform || 'zoom',
+        scheduledAt: ctx.scheduledAt, platform: ctx.platform || 'livekit',
         joinUrl: null,
         courseId: ctx.courseId,
       });

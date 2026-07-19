@@ -324,7 +324,7 @@ const features = [
   {
     icon: '💬',
     title: 'Live & Community',
-    desc: 'Host live sessions via Zoom, run discussion forums, and message students in real-time chat.',
+    desc: 'Host live video classes right inside your school, run discussion forums, and message students in real-time chat.',
   },
   {
     icon: '🔒',
@@ -383,7 +383,7 @@ const plans = [
       'Unlimited courses',
       '50 GB storage',
       'Everything in Basic',
-      'Live learning (Zoom)',
+      'Live learning',
       'Advanced analytics & CSV export',
       'Student memberships',
       'Custom domain support',

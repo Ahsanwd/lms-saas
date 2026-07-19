@@ -1,5 +1,5 @@
 function liveSessionReminder({ recipientName, lessonTitle, courseName, scheduledAt, platform, joinUrl, courseId, tenantName, branding, appUrl }) {
-  const platformLabel = { zoom: 'Zoom', meet: 'Google Meet', teams: 'Microsoft Teams', youtube_live: 'YouTube Live', custom: 'Online Meeting' }[platform] || 'Online Meeting';
+  const platformLabel = { livekit: 'Live Class', zoom: 'Zoom', meet: 'Google Meet', teams: 'Microsoft Teams', youtube_live: 'YouTube Live', custom: 'Online Meeting' }[platform] || 'Online Meeting';
   const dateStr = scheduledAt ? new Date(scheduledAt).toLocaleString('en-US', { weekday: 'long', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' }) : '';
   const accent = branding?.primaryColor || '#4f46e5';
   const logo = branding?.logoUrl || null;

@@ -1,10 +1,10 @@
 const mongoose = require('mongoose');
 
 // Replaces Bull/Redis delayed jobs for one-off, future-dated tasks
-// (scheduled announcement publish, live-class reminders, zoom-recording
-// fetch retries) — polled by apps/api/src/jobs/taskDispatcher.js instead of
-// held in Redis, so restarts/deploys don't lose pending work and no
-// always-on Redis connection is needed.
+// (scheduled announcement publish, live-class reminders) — polled by
+// apps/api/src/jobs/taskDispatcher.js instead of held in Redis, so
+// restarts/deploys don't lose pending work and no always-on Redis
+// connection is needed.
 const scheduledTaskSchema = new mongoose.Schema(
   {
     type:    { type: String, required: true },

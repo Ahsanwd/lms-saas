@@ -66,7 +66,7 @@ async function seed() {
         'Unlimited courses',
         '50 GB storage',
         'Everything in Basic',
-        'Live learning (Zoom)',
+        'Live learning',
         'Advanced analytics & CSV export',
         'Student memberships',
         'Custom domain support',

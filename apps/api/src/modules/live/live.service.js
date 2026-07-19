@@ -2,6 +2,7 @@ const Lesson           = require('../../database/models/Lesson.model');
 const enrollmentRepo   = require('../../database/repositories/enrollment.repository');
 const attendanceRepo   = require('../../database/repositories/liveAttendance.repository');
 const userRepo         = require('../../database/repositories/user.repository');
+const livekitService   = require('../../services/livekit/livekit.service');
 const AppError         = require('../../utils/AppError');
 
 const MOD_ROLES = ['instructor', 'tenant_admin'];
@@ -49,6 +50,10 @@ async function getSession(tenantId, lessonId, user) {
       liveClass: {
         platform:       lc.platform,
         meetingUrl:     lc.meetingUrl,
+        // Not the raw room name (not needed until the actual /join call) —
+        // just enough for the frontend to know whether a room has been
+        // created yet, since a livekit lesson has meetingUrl:null by design.
+        hasLiveKitRoom: !!lc.livekitRoomName,
         scheduledAt:    lc.scheduledAt,
         durationMinutes: lc.durationMinutes,
         instructions:   lc.instructions,
@@ -77,7 +82,14 @@ async function recordJoin(tenantId, lessonId, user) {
 
   const lc = lesson.liveClass ?? {};
   if (lc.status !== 'live') throw new AppError('This session is not currently live', 400);
-  if (!lc.meetingUrl)       throw new AppError('No meeting URL configured for this session', 400);
+
+  // Guard order matters: a livekit lesson has meetingUrl:null by design
+  // (it uses livekitRoomName instead), so the meetingUrl check below only
+  // applies to the non-livekit (legacy zoom/meet/teams/custom) branch.
+  if (lc.platform !== 'livekit' && !lc.meetingUrl)
+    throw new AppError('No meeting URL configured for this session', 400);
+  if (lc.platform === 'livekit' && !lc.livekitRoomName)
+    throw new AppError('No live room configured for this session', 400);
 
   // Upsert: only set joinedAt if not already recorded
   const existing = await attendanceRepo.findByUserAndLesson(tenantId, lessonId, user.sub);
@@ -88,7 +100,35 @@ async function recordJoin(tenantId, lessonId, user) {
     });
   }
 
-  return { meetingUrl: lc.meetingUrl };
+  if (lc.platform === 'livekit') {
+    const userDoc = await userRepo.findByIdRaw(user.sub);
+    const token = await livekitService.createAccessToken({
+      roomName: lc.livekitRoomName,
+      identity: `user_${user.sub}`,
+      name: userDoc ? `${userDoc.firstName} ${userDoc.lastName}` : 'Participant',
+      durationMinutes: lc.durationMinutes,
+    });
+    return { platform: 'livekit', roomName: lc.livekitRoomName, token };
+  }
+
+  return { platform: lc.platform, meetingUrl: lc.meetingUrl };
+}
+
+// ── Instructor: create/regenerate the LiveKit room for a lesson ──────────────
+async function createRoom(tenantId, lessonId, user) {
+  if (!MOD_ROLES.includes(user.role)) throw new AppError('Forbidden', 403);
+
+  const lesson = await getLiveLesson(tenantId, lessonId);
+  const roomName = livekitService.generateRoomName(lessonId);
+
+  await Lesson.findByIdAndUpdate(lessonId, {
+    $set: {
+      'liveClass.platform':        'livekit',
+      'liveClass.livekitRoomName': roomName,
+    },
+  });
+
+  return { platform: 'livekit', roomName };
 }
 
 // ── Student self check-in ─────────────────────────────────────────────────────
@@ -187,23 +227,6 @@ async function endSession(tenantId, lessonId, user) {
     }
   }
 
-  // Auto-fetch Zoom recording 30 minutes after session ends (gives Zoom time to process)
-  const zoomMeetingId = lesson.liveClass?.zoomMeetingId;
-  if (lesson.liveClass?.platform === 'zoom' && zoomMeetingId && !lesson.liveClass?.recordingUrl) {
-    setImmediate(() => {
-      const scheduledTaskRepo = require('../../database/repositories/scheduledTask.repository');
-      const THIRTY_MIN = 30 * 60 * 1000;
-      scheduledTaskRepo.schedule({
-        type:   'zoom-recording-fetch',
-        jobKey: `zoom-rec-${lessonId}`,
-        payload: { tenantId: tenantId.toString(), lessonId: lessonId.toString(), meetingId: zoomMeetingId },
-        runAt: new Date(Date.now() + THIRTY_MIN),
-        maxAttempts: 5,
-        backoffMs:   15 * 60 * 1000,
-      }).catch(() => {});
-    });
-  }
-
   return { status: 'ended', durationMinutes: duration };
 }
 
@@ -272,7 +295,7 @@ async function overrideAttendance(tenantId, lessonId, studentId, user, { status,
 }
 
 module.exports = {
-  getSession, recordJoin, selfCheckin,
+  getSession, recordJoin, selfCheckin, createRoom,
   startSession, endSession, setRecording,
   getAttendanceReport, overrideAttendance,
 };

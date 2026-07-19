@@ -27,7 +27,7 @@ require('./jobs/email.job'); // Register email job processor (Bull, optional —
 // weekly analytics report, assignment-due reminders, trial-expiring reminders)
 require('./jobs/scheduler');
 // Group B: one-off delayed tasks (scheduled announcement publish, live-class
-// reminders, zoom-recording fetch), polled from MongoDB every minute
+// reminders), polled from MongoDB every minute
 require('./jobs/taskDispatcher');
 
 const app    = express();

@@ -38,12 +38,12 @@ const RESERVED_SLUGS = new Set([
   'activity', 'admin', 'analytics', 'announcements', 'assignments', 'billing',
   'bookmarks', 'bundles', 'certificate-builder', 'certificates', 'chat',
   'cohorts', 'contact-submissions', 'coupons', 'course-applications',
-  'courses', 'dashboard', 'forum', 'groups', 'media',
+  'courses', 'dashboard', 'forum', 'groups', 'live-room', 'media',
   'membership', 'membership-plans', 'my-learning', 'my-payments',
   'notifications', 'profile', 'quizzes', 'refunds', 'search', 'settings',
   'share-links', 'users', 'website-builder',
   // top-level
-  'join', 'privacy', 'refund-policy', 'terms', 'verify', 'zoom',
+  'join', 'privacy', 'refund-policy', 'terms', 'verify',
 ]);
 
 // ─── Section conversion helper (used by the one-time migration backfill) ─────

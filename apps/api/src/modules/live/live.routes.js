@@ -10,6 +10,7 @@ router.post ('/lessons/:lessonId/join',     ctrl.recordJoin);
 router.post ('/lessons/:lessonId/checkin',  ctrl.selfCheckin);
 
 // Instructor / admin routes
+router.post ('/lessons/:lessonId/room',               ctrl.createRoom);
 router.patch('/lessons/:lessonId/start',              ctrl.startSession);
 router.patch('/lessons/:lessonId/end',                ctrl.endSession);
 router.put  ('/lessons/:lessonId/recording',          ctrl.setRecording);

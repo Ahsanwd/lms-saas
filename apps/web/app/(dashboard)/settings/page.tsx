@@ -213,134 +213,6 @@ function TwoFASection() {
   );
 }
 
-// ─── Zoom connect/disconnect — shared by instructors (their own personal
-// account) and tenant_admin/super_admin (the organisation's fallback
-// account). The backend scopes which credential gets touched based on the
-// requesting user's role, so this component's logic is identical for both —
-// only the copy differs. ──────────────────────────────────────────────────
-
-function ZoomSection() {
-  const { user: authUser } = useAuthStore();
-  const isInstructor = authUser?.role === 'instructor';
-
-  const [banner, setBanner] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
-  const [connecting, setConnecting] = useState(false);
-
-  const { data, isLoading, refetch } = useQuery<{ connected: boolean; email?: string }>({
-    queryKey: ['zoom-status'],
-    queryFn: () => api.get('/zoom/status').then(r => r.data.data),
-    staleTime: 30_000,
-  });
-
-  // Handle ?zoom=connected / ?zoom=error from the OAuth redirect
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const sp = new URLSearchParams(window.location.search);
-    const zoomParam = sp.get('zoom');
-    if (!zoomParam) return;
-    if (zoomParam === 'connected') {
-      setBanner({ type: 'success', msg: 'Zoom account connected successfully!' });
-      refetch();
-    } else if (zoomParam === 'error') {
-      setBanner({ type: 'error', msg: sp.get('msg') || 'Failed to connect Zoom.' });
-    }
-    const url = new URL(window.location.href);
-    url.searchParams.delete('zoom');
-    url.searchParams.delete('msg');
-    window.history.replaceState({}, '', url.toString());
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const disconnectMutation = useMutation({
-    mutationFn: () => api.delete('/zoom/disconnect'),
-    onSuccess: () => { refetch(); setBanner({ type: 'success', msg: 'Zoom account disconnected.' }); },
-    onError:   () => setBanner({ type: 'error', msg: 'Failed to disconnect Zoom.' }),
-  });
-
-  async function handleConnect() {
-    setConnecting(true);
-    try {
-      const res = await api.get('/zoom/auth-url');
-      window.location.href = res.data.data.url;
-    } catch {
-      setConnecting(false);
-      setBanner({ type: 'error', msg: 'Failed to get Zoom authorization URL. Check server config.' });
-    }
-  }
-
-  const ZoomIcon = (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.069A1 1 0 0121 8.845v6.31a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
-    </svg>
-  );
-
-  return (
-    <Section icon={ZoomIcon} title="Zoom Integration" desc={isInstructor
-      ? 'Connect your own Zoom account so your live lessons are hosted under your identity'
-      : 'Connect your organisation\'s Zoom account to auto-generate meeting links for live lessons'}>
-      {banner && (
-        <div className={cn('flex items-start gap-3 rounded-xl px-4 py-3 text-sm',
-          banner.type === 'success' ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700')}>
-          <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            {banner.type === 'success'
-              ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/>
-              : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>}
-          </svg>
-          <span className="flex-1">{banner.msg}</span>
-          <button onClick={() => setBanner(null)} className="text-current opacity-50 hover:opacity-100">
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
-          </button>
-        </div>
-      )}
-
-      {isLoading ? (
-        <div className="flex items-center gap-2 text-sm text-gray-400 py-1"><Spinner size="sm" /> Checking connection…</div>
-      ) : data?.connected ? (
-        <div className="space-y-4">
-          <div className="flex items-center gap-4 p-4 bg-blue-50 rounded-xl border border-blue-100">
-            <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center flex-shrink-0">
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.069A1 1 0 0121 8.845v6.31a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
-              </svg>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-blue-900">Zoom Connected</p>
-              <p className="text-xs text-blue-600 truncate">{data.email}</p>
-            </div>
-            <span className="flex-shrink-0 text-xs bg-green-100 text-green-700 border border-green-200 font-semibold px-2.5 py-1 rounded-full">Active</span>
-          </div>
-          <p className="text-xs text-gray-400">
-            {isInstructor
-              ? 'Your live lessons will be hosted under this Zoom account automatically.'
-              : 'Used as the fallback account for any instructor who hasn\'t connected their own Zoom.'}
-          </p>
-          <Button variant="outline" size="sm" onClick={() => disconnectMutation.mutate()} loading={disconnectMutation.isPending}>
-            Disconnect Zoom
-          </Button>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-xl border border-dashed border-gray-200">
-            <svg className="w-5 h-5 text-gray-300 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.069A1 1 0 0121 8.845v6.31a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
-            </svg>
-            <div>
-              <p className="text-sm font-semibold text-gray-700">No Zoom account connected</p>
-              <p className="text-xs text-gray-400 mt-0.5">
-                {isInstructor
-                  ? 'Connect your own Zoom account, or your live lessons will use the organisation\'s account if one is connected.'
-                  : 'Connect an organisation Zoom account to automatically create scheduled meetings for instructors who haven\'t connected their own.'}
-              </p>
-            </div>
-          </div>
-          <Button onClick={handleConnect} loading={connecting} disabled={connecting}>
-            Connect Zoom Account
-          </Button>
-        </div>
-      )}
-    </Section>
-  );
-}
-
 // ─── Admin: Payment Gateway (BYO — Stripe or Safepay) ─────────────────────────
 
 interface PaymentGatewayData {
@@ -882,9 +754,6 @@ function StudentSettings() {
 
       {/* ── 2FA ── */}
       <TwoFASection />
-
-      {/* ── Zoom connect (instructor's own personal account) ── */}
-      {authUser?.role === 'instructor' && <ZoomSection />}
     </div>
   );
 }
@@ -1220,7 +1089,7 @@ function AuthAuditLogSection() {
 }
 
 const FLAG_META: { key: keyof FeatureFlags; label: string; desc: string }[] = [
-  { key: 'liveClasses',   label: 'Live Classes',   desc: 'Zoom/live lesson scheduling for instructors' },
+  { key: 'liveClasses',   label: 'Live Classes',   desc: 'Live lesson scheduling for instructors' },
   { key: 'certificates',  label: 'Certificates',   desc: 'Issue completion certificates to students' },
   { key: 'assignments',   label: 'Assignments',    desc: 'Assignment submission and grading system' },
   { key: 'announcements', label: 'Announcements',  desc: 'Course and platform-wide announcements' },
@@ -1810,7 +1679,6 @@ function AdminSettings() {
       {activeTab === 'integrations' && (
         <>
           <PaymentGatewaySection />
-          <ZoomSection />
         </>
       )}
     </div>

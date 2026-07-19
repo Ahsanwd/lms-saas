@@ -35,7 +35,7 @@ async function handleLiveReminder(payload) {
     doc.courseId.toString(),
     lessonId,
     doc.liveClass.scheduledAt,
-    doc.liveClass.platform ?? 'zoom',
+    doc.liveClass.platform ?? 'livekit',
     { tenantName: tenant?.name ?? 'Learning Platform' }
   );
 

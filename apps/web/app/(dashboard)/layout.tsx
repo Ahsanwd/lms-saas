@@ -87,8 +87,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   // Distraction-free routes render full-width, without the sidebar/header chrome —
   // the page itself supplies its own minimal top bar (back button + title).
-  const FULL_SCREEN_ROUTES = ['/certificate-builder', '/website-builder'];
-  if (FULL_SCREEN_ROUTES.includes(pathname)) {
+  const FULL_SCREEN_ROUTES = ['/certificate-builder', '/website-builder', '/live-room'];
+  if (FULL_SCREEN_ROUTES.some((r) => pathname === r || pathname.startsWith(`${r}/`))) {
     return (
       <div className="h-screen overflow-hidden bg-gray-50">
         {children}

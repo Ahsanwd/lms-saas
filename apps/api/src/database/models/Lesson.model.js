@@ -87,8 +87,11 @@ const lessonSchema = new mongoose.Schema(
       meetingUrl:      { type: String, default: null },
       platform: {
         type: String,
-        enum: ['zoom', 'meet', 'teams', 'youtube_live', 'custom'],
-        default: 'zoom',
+        // 'zoom' kept only for lessons created before the Zoom→LiveKit
+        // switch — no longer offered/auto-creatable, behaves like the
+        // other manual-URL platforms (meet/teams/custom) going forward.
+        enum: ['livekit', 'zoom', 'meet', 'teams', 'youtube_live', 'custom'],
+        default: 'livekit',
       },
       scheduledAt:     { type: Date,    default: null },
       durationMinutes: { type: Number,  default: 60 },
@@ -110,13 +113,17 @@ const lessonSchema = new mongoose.Schema(
       attendanceEnabled: { type: Boolean, default: true },
       checkinWindowHours: { type: Number, default: 24 }, // hours after session ends when self check-in is allowed
 
-      // Zoom auto-created meeting ID (used to regenerate/delete via API)
+      // Legacy Zoom fields — Zoom integration was removed in favor of
+      // LiveKit; kept only so lessons created before the switch don't break
+      // schema validation. No longer written to for new lessons.
       zoomMeetingId: { type: String, default: null },
-      // Which ZoomCredential actually hosted this meeting (null = tenant's
-      // shared account, a User id = that instructor's own account) — recorded
-      // at creation time so recording-fetch/delete/regenerate always target
-      // the real host, never re-resolve via fallback logic after the fact.
       zoomHostUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+
+      // LiveKit room name for this lesson (platform: 'livekit'). Unlike
+      // Zoom, no external "create meeting" call is needed — LiveKit rooms
+      // auto-create on first join and auto-close once empty, so this is
+      // just a name we generate and store.
+      livekitRoomName: { type: String, default: null },
 
       // Restricts this session to one batch. null (default, every existing
       // lesson) means visible to every enrolled student, same as today.

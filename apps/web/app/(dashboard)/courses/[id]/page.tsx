@@ -454,7 +454,7 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
   const [liveDuration, setLiveDuration] = useState<number>(lesson?.liveClass?.durationMinutes ?? 60);
   const [liveInstructions, setLiveInstructions] = useState(lesson?.liveClass?.instructions ?? '');
   const [liveRecordingUrl, setLiveRecordingUrl] = useState((lesson?.liveClass as any)?.recordingUrl ?? '');
-  const [zoomMeetingId, setZoomMeetingId] = useState<string | null>(lesson?.liveClass?.zoomMeetingId ?? null);
+  const [livekitRoomName, setLivekitRoomName] = useState<string | null>((lesson?.liveClass as any)?.livekitRoomName ?? null);
   const [liveCohortId, setLiveCohortId] = useState((lesson?.liveClass as any)?.cohortId ?? '');
 
   const { data: liveCohortsRaw } = useQuery({
@@ -507,22 +507,13 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
   const cfStorageOverQuota = !!cfStreamSettings && cfPlanAllows &&
     cfStreamSettings.storage.used >= (cfStreamSettings.storage.limit + cfStreamSettings.storage.topup);
 
-  const { data: zoomStatus } = useQuery<{ connected: boolean; email?: string; source?: 'instructor' | 'tenant' }>({
-    queryKey: ['zoom-status', courseId],
-    queryFn: () => api.get(`/zoom/status?courseId=${courseId}`).then(r => r.data.data),
-    enabled: type === 'live',
-    staleTime: 60_000,
-  });
-
-  const createZoomMeetingMutation = useMutation({
-    mutationFn: () => api.post(`/zoom/lessons/${lesson!._id}/meeting`),
+  const createLiveRoomMutation = useMutation({
+    mutationFn: () => api.post(`/live/lessons/${lesson!._id}/room`),
     onSuccess: (res) => {
-      const { joinUrl, meetingId } = res.data.data;
-      setLiveUrl(joinUrl);
-      setZoomMeetingId(meetingId);
+      setLivekitRoomName(res.data.data.roomName);
     },
     onError: (err: AxiosError<{ message: string }>) =>
-      setError(err.response?.data?.message ?? 'Failed to create Zoom meeting'),
+      setError(err.response?.data?.message ?? 'Failed to create live class room'),
   });
 
   const saveMutation = useMutation({
@@ -620,7 +611,12 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
     };
     if (type === 'live') {
       payload.liveClass = {
-        meetingUrl: liveUrl || null, platform: 'zoom',
+        // platform/livekitRoomName are intentionally omitted — those are
+        // only ever set via the "Create/Regenerate Live Class Room" button
+        // (POST /live/lessons/:id/room), never by this general save, so an
+        // unrelated edit here (e.g. instructions) can't clobber an existing
+        // room.
+        meetingUrl: liveUrl || null,
         scheduledAt: liveScheduledAt || null, durationMinutes: liveDuration,
         instructions: liveInstructions || null,
         recordingUrl: liveRecordingUrl || null,
@@ -1553,7 +1549,7 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
               </div>
             )}
 
-            {/* ── Live class fields (Zoom only — fully automated) ── */}
+            {/* ── Live class fields (LiveKit — fully automated, in-app video) ── */}
             {type === 'live' && (
               <div className="space-y-4">
                 <div>
@@ -1563,68 +1559,34 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
                     className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 bg-gray-50" />
                 </div>
 
-              {/* ── Zoom auto-create ── */}
+              {/* ── LiveKit room create/regenerate ── */}
               <div className={cn('rounded-xl border p-3 space-y-2',
-                zoomMeetingId ? 'border-green-200 bg-green-50/60' : 'border-blue-100 bg-blue-50/50')}>
+                livekitRoomName ? 'border-green-200 bg-green-50/60' : 'border-blue-100 bg-blue-50/50')}>
                 {!isEdit ? (
-                  <p className="text-xs text-blue-600">Save this lesson first, then open Edit to auto-generate a Zoom meeting link.</p>
-                ) : !zoomStatus ? (
-                  <div className="flex items-center gap-2 text-xs text-gray-400">
-                    <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
-                    </svg>
-                    Checking Zoom…
-                  </div>
-                ) : !zoomStatus.connected ? (
-                  <div className="flex items-center gap-2 text-xs text-amber-700">
-                    <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-                    </svg>
-                    <span>No Zoom account connected.{' '}
-                      <a href="/settings" className="underline font-medium hover:text-amber-900">Connect in Settings → Zoom</a>
-                    </span>
-                  </div>
-                ) : zoomMeetingId ? (
+                  <p className="text-xs text-blue-600">Save this lesson first, then open Edit to create the live class room.</p>
+                ) : livekitRoomName ? (
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 text-xs text-green-700 font-medium">
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/>
                       </svg>
-                      Zoom meeting created
+                      Live class room created — students join in-app, no external link needed
                     </div>
                     <button type="button"
-                      onClick={() => createZoomMeetingMutation.mutate()}
-                      disabled={createZoomMeetingMutation.isPending}
+                      onClick={() => createLiveRoomMutation.mutate()}
+                      disabled={createLiveRoomMutation.isPending}
                       className="text-xs text-blue-600 hover:text-blue-800 font-medium disabled:opacity-50">
-                      {createZoomMeetingMutation.isPending ? 'Regenerating…' : 'Regenerate'}
+                      {createLiveRoomMutation.isPending ? 'Regenerating…' : 'Regenerate'}
                     </button>
                   </div>
                 ) : (
-                  <>
-                    <button type="button"
-                      onClick={() => createZoomMeetingMutation.mutate()}
-                      disabled={createZoomMeetingMutation.isPending}
-                      className="w-full py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-60">
-                      {createZoomMeetingMutation.isPending ? 'Creating Meeting…' : 'Create Zoom Meeting'}
-                    </button>
-                    <p className="text-xs text-blue-600">
-                      Will use: {zoomStatus.source === 'instructor' ? 'your Zoom account' : "the organisation's Zoom account"}
-                    </p>
-                  </>
+                  <button type="button"
+                    onClick={() => createLiveRoomMutation.mutate()}
+                    disabled={createLiveRoomMutation.isPending}
+                    className="w-full py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-60">
+                    {createLiveRoomMutation.isPending ? 'Creating Room…' : 'Create Live Class Room'}
+                  </button>
                 )}
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1.5">Meeting URL</label>
-                <div className="relative">
-                  <input type="url" value={liveUrl} readOnly
-                    placeholder="Generated automatically once you create the Zoom meeting above"
-                    className="w-full pl-4 pr-10 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-100 text-gray-500 cursor-not-allowed" />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.069A1 1 0 0121 8.845v6.31a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-                  </span>
-                </div>
               </div>
 
               <div>
@@ -1636,7 +1598,7 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
               <div>
                 <label className="block text-xs font-semibold text-gray-500 mb-1.5">Instructions for students</label>
                 <textarea rows={2} value={liveInstructions} onChange={(e) => setLiveInstructions(e.target.value)}
-                  placeholder="e.g. Join the Zoom link 5 minutes before class starts..."
+                  placeholder="e.g. Join 5 minutes before class starts..."
                   className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none bg-gray-50" />
               </div>
 
@@ -1657,18 +1619,10 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
                 <label className="block text-xs font-semibold text-gray-500 mb-1.5">
                   Recording URL <span className="font-normal text-gray-400">(add after session ends)</span>
                 </label>
-                {zoomMeetingId && (
-                  <div className="flex items-center gap-1.5 text-xs text-blue-600 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 mb-2">
-                    <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
-                    Zoom recording will be fetched automatically ~30 min after the session ends.
-                  </div>
-                )}
                 <input type="url" value={liveRecordingUrl} onChange={(e) => setLiveRecordingUrl(e.target.value)}
                   placeholder="https://youtube.com/watch?v=... or any recording link"
                   className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 bg-gray-50" />
-                <p className="text-xs text-gray-400 mt-1">Students will see an embedded player or watch link below the session info.</p>
+                <p className="text-xs text-gray-400 mt-1">Live classes aren't recorded automatically — paste a link here if you recorded separately. Students will see an embedded player or watch link below the session info.</p>
               </div>
             </div>
           )}
@@ -1858,7 +1812,7 @@ interface AttendanceRecord {
   joinedAt: string | null; checkedInAt: string | null; durationMinutes: number | null;
 }
 interface AttendanceReport {
-  lesson: { title: string; liveClass: { status: string; liveStartedAt: string | null; liveEndedAt: string | null; recordingUrl: string | null; platform?: string; zoomMeetingId?: string | null } };
+  lesson: { title: string; liveClass: { status: string; liveStartedAt: string | null; liveEndedAt: string | null; recordingUrl: string | null; platform?: string } };
   totalEnrolled: number; attendedCount: number; absentCount: number; attendanceRate: number;
   records: AttendanceRecord[];
 }
@@ -1962,14 +1916,6 @@ function LiveSessionModal({ lessonId, lessonTitle, onClose }: { lessonId: string
               {/* Recording URL */}
               <div className="border-t border-gray-100 pt-4">
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Recording URL</p>
-                {lc?.platform === 'zoom' && lc?.zoomMeetingId && status === 'ended' && !lc?.recordingUrl && (
-                  <div className="flex items-center gap-1.5 text-xs text-blue-600 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 mb-2">
-                    <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
-                    Zoom recording is being processed — it will appear here automatically in ~30 min.
-                  </div>
-                )}
                 <div className="flex gap-2">
                   <input type="url" value={recUrl} onChange={e => setRecUrl(e.target.value)}
                     placeholder="https://youtube.com/watch?v=... or any recording link"

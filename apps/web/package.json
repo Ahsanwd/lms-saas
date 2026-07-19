@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^3.6.0",
+    "@livekit/components-react": "^2.9.23",
+    "@livekit/components-styles": "^1.2.0",
     "@stripe/react-stripe-js": "^6.6.0",
     "@stripe/stripe-js": "^9.7.0",
     "@tanstack/react-query": "^5.45.0",
@@ -30,6 +32,7 @@
     "html2canvas": "^1.4.1",
     "js-cookie": "^3.0.5",
     "jspdf": "^2.5.1",
+    "livekit-client": "^2.20.1",
     "next": "^14.2.4",
     "pdfjs-dist": "^6.0.227",
     "react": "^18.3.1",
