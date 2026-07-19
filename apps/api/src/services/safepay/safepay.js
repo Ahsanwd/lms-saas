@@ -5,7 +5,13 @@ function baseUrl(environment) {
 }
 
 // Creates a payment session ("tracker") for a hosted checkout redirect.
-async function createSession({ apiKey, environment, amount, currency, metadata }) {
+// `orderId` is OUR OWN payment record's id — Safepay's `metadata` field only
+// accepts a fixed allowlist of keys (confirmed live: an arbitrary key like
+// `tenantId` gets rejected with "unsupported meta key tenantId"), and
+// `order_id` is the one documented/accepted key. We never need Safepay to
+// hand this back to us anyway — the tracker id we store locally is the
+// source of truth for confirming payment status.
+async function createSession({ apiKey, environment, amount, currency, orderId }) {
   const res = await fetch(`${baseUrl(environment)}/order/payments/v3/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -16,16 +22,13 @@ async function createSession({ apiKey, environment, amount, currency, metadata }
       entry_mode:  'raw',
       currency,
       amount,
-      metadata,
+      metadata: { order_id: orderId },
     }),
   });
   const json = await res.json().catch(() => null);
   const token = json?.data?.token;
   if (!res.ok || !token) {
-    // TEMP DIAGNOSTIC — surfaces Safepay's full raw response (no Render log
-    // access from this session) to debug a real sandbox integration issue.
-    // Revert to the original AppError below once diagnosed.
-    throw new AppError(`SAFEPAY_DEBUG status=${res.status} body=${JSON.stringify(json)}`, 502, 'SAFEPAY_SESSION_FAILED');
+    throw new AppError(json?.status?.message || 'Safepay session creation failed', 502, 'SAFEPAY_SESSION_FAILED');
   }
   return { tracker: token };
 }

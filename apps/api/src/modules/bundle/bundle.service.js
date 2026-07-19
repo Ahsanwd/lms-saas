@@ -220,12 +220,7 @@ async function initiateBundlePayment(tenantId, bundleId, userId, { couponCode } 
       environment: gateway.environment,
       amount:      finalAmount,
       currency:    currency.toUpperCase(),
-      metadata: {
-        paymentId: payment._id.toString(),
-        bundleId:  bundleId.toString(),
-        userId:    userId.toString(),
-        tenantId:  tenantId.toString(),
-      },
+      orderId:     payment._id.toString(),
     });
 
     payment.safepayTracker = tracker;

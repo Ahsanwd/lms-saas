@@ -127,12 +127,7 @@ async function initiatePayment(tenantId, courseId, userId, { couponCode } = {}) 
       environment: gateway.environment,
       amount:      finalAmount,
       currency:    currency.toUpperCase(),
-      metadata: {
-        paymentId: payment._id.toString(),
-        courseId:  courseId.toString(),
-        userId:    userId.toString(),
-        tenantId:  tenantId.toString(),
-      },
+      orderId:     payment._id.toString(),
     });
 
     payment.safepayTracker = tracker;
