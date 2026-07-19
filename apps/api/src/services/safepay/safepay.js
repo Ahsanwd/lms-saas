@@ -22,7 +22,10 @@ async function createSession({ apiKey, environment, amount, currency, metadata }
   const json = await res.json().catch(() => null);
   const token = json?.data?.token;
   if (!res.ok || !token) {
-    throw new AppError(json?.status?.message || 'Safepay session creation failed', 502, 'SAFEPAY_SESSION_FAILED');
+    // TEMP DIAGNOSTIC — surfaces Safepay's full raw response (no Render log
+    // access from this session) to debug a real sandbox integration issue.
+    // Revert to the original AppError below once diagnosed.
+    throw new AppError(`SAFEPAY_DEBUG status=${res.status} body=${JSON.stringify(json)}`, 502, 'SAFEPAY_SESSION_FAILED');
   }
   return { tracker: token };
 }
