@@ -66,12 +66,20 @@ async function getPublicLink(tenantId, token) {
   if (link.maxUses > 0 && link.uses >= link.maxUses)
     throw new AppError('This link has reached its maximum number of uses', 410);
 
+  // populate('courseIds', ...) runs the Course model's own soft-delete
+  // filter, so a course removed after the link was created comes back as
+  // null in that array slot (Mongoose populate convention) rather than
+  // being dropped — filter it out before it reaches the frontend, which
+  // renders each entry's `._id`/`.title` unconditionally.
+  const courses = link.courseIds.filter(Boolean);
+  if (courses.length === 0) throw new AppError('The courses in this link are no longer available', 410);
+
   const tenant = await tenantRepo.findById(tenantId);
   return {
     token: link.token,
     title: link.title,
-    courses: link.courseIds,
-    isBundle: link.courseIds.length > 1,
+    courses,
+    isBundle: courses.length > 1,
     tenantName: tenant?.name,
     expiresAt: link.expiresAt,
     maxUses: link.maxUses,
@@ -94,6 +102,9 @@ async function joinViaLink(tenantId, token, user) {
   const results = [];
 
   for (const course of link.courseIds) {
+    // Same soft-deleted-course-populates-to-null case as getPublicLink —
+    // skip rather than crash on `.` id access.
+    if (!course) continue;
     const courseId = course._id || course;
 
     // Skip if already actively enrolled
