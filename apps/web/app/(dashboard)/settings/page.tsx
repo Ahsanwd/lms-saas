@@ -512,11 +512,15 @@ function PaymentGatewaySection() {
                   Saved — will verify automatically on your first live payment
                 </div>
               )}
+              <p className="text-xs text-gray-400 -mt-1">
+                Find both keys in your Safepay dashboard under <span className="font-medium text-gray-500">Developer → API</span>.
+              </p>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={labelCls}>Merchant API Key</label>
+                  <label className={labelCls}>Merchant Public Key</label>
                   <input type="text" className={inputCls} value={safepayApiKey}
                     onChange={e => setSafepayApiKey(e.target.value)} placeholder="sec_..." />
+                  <p className="text-[11px] text-gray-400 mt-1">Labeled "Public key" on Safepay's API page — despite the name, it isn't secret.</p>
                 </div>
                 <div>
                   <label className={labelCls}>Environment</label>
@@ -533,6 +537,7 @@ function PaymentGatewaySection() {
                 <input type="password" className={inputCls} value={safepaySecretKey}
                   onChange={e => setSafepaySecretKey(e.target.value)}
                   placeholder={data?.safepay.hasSecretKey ? '••••••••••••••••' : 'Secret key'} />
+                <p className="text-[11px] text-gray-400 mt-1">Labeled "Secret key" on Safepay's API page — keep this one confidential.</p>
               </div>
               <div className="flex items-center gap-3">
                 <Button size="sm" loading={saveSafepayMutation.isPending}
