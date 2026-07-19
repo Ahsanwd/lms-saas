@@ -139,6 +139,11 @@ export interface HeaderConfig {
   signUpText: string;
   buttonStyle: 'solid' | 'outline';
   menuOverrides: MenuOverride[];
+  // Optional extra sandboxed HTML/CSS/JS block rendered below the built-in
+  // nav bar — additive, so tenants who never touch it keep today's exact
+  // header. Reuses CustomCodeData/CustomCodeSection (declared further down)
+  // — same shape and sandboxing as a page-level Custom Code section.
+  customCode?: CustomCodeData | null;
 }
 
 export type SocialPlatform = 'facebook' | 'twitter' | 'instagram' | 'linkedin' | 'youtube' | 'tiktok';
@@ -149,6 +154,9 @@ export interface FooterConfig {
   tagline: string | null;
   copyrightText: string | null;
   socialLinks: { platform: SocialPlatform; url: string }[];
+  // Optional extra sandboxed HTML/CSS/JS block rendered above the built-in
+  // footer content — additive, same shape/sandboxing as HeaderConfig's.
+  customCode?: CustomCodeData | null;
 }
 
 interface NavItem {
@@ -261,6 +269,7 @@ export function LandingNavBar({
   const outlineButton = headerConfig?.buttonStyle === 'outline';
 
   return (
+    <>
     <nav className="sticky top-0 z-50 border-b border-gray-100 shadow-sm" style={navStyle ?? { backgroundColor: '#ffffff' }}>
       <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
         {logoUrl ? (
@@ -377,6 +386,8 @@ export function LandingNavBar({
         </div>
       )}
     </nav>
+    {headerConfig?.customCode?.isEnabled && <CustomCodeSection data={headerConfig.customCode} />}
+    </>
   );
 }
 
@@ -1294,6 +1305,8 @@ export function LandingFooter({ displayName, linksDisabled, footerConfig }: { di
   const hasSocial = !!footerConfig?.socialLinks?.length;
 
   return (
+    <>
+    {footerConfig?.customCode?.isEnabled && <CustomCodeSection data={footerConfig.customCode} />}
     <footer className="py-8 px-6 border-t border-gray-100" style={style ?? { backgroundColor: '#ffffff' }}>
       <div className="max-w-6xl mx-auto space-y-4">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-sm" style={textStyle ?? { color: '#9ca3af' }}>
@@ -1329,6 +1342,7 @@ export function LandingFooter({ displayName, linksDisabled, footerConfig }: { di
         </div>
       </div>
     </footer>
+    </>
   );
 }
 

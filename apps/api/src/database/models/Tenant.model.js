@@ -96,6 +96,11 @@ const tenantSchema = new mongoose.Schema(
           order:      { type: Number, default: 0 },
           parentSlug: { type: String, default: null },  // set = nests this item under another page's dropdown
         }],
+        // Optional extra HTML/CSS/JS block rendered below the nav bar.
+        // Mixed like TenantPage's section `data` field, for the same reason
+        // (arbitrary code, no schema-level validation) — checked in
+        // tenant.service.js's validateHeader/validateCustomCode instead.
+        customCode: { type: mongoose.Schema.Types.Mixed, default: { html: '', css: '', js: '', heightPx: 80, isEnabled: false } },
       },
 
       // Public website footer — same zero-change-by-default rule as header.
@@ -110,6 +115,9 @@ const tenantSchema = new mongoose.Schema(
           platform: { type: String, enum: ['facebook', 'twitter', 'instagram', 'linkedin', 'youtube', 'tiktok'], required: true },
           url:      { type: String, required: true, maxlength: 500 },
         }],
+        // Optional extra HTML/CSS/JS block rendered above the footer — same
+        // Mixed/service-layer-validated pattern as header.customCode above.
+        customCode: { type: mongoose.Schema.Types.Mixed, default: { html: '', css: '', js: '', heightPx: 150, isEnabled: false } },
       },
     },
 

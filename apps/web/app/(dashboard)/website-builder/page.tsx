@@ -1283,6 +1283,7 @@ function PageEditorScreen({ pageId, onBack }: { pageId: string; onBack: () => vo
 const DEFAULT_HEADER: HeaderConfig = {
   logoHeightPx: 36, backgroundColor: '#ffffff', menuTextColor: '#4b5563',
   signInText: 'Sign in', signUpText: 'Sign up free', buttonStyle: 'solid', menuOverrides: [],
+  customCode: { html: '', css: '', js: '', heightPx: 80, isEnabled: false },
 };
 
 function HeaderEditorScreen({ onBack }: { onBack: () => void }) {
@@ -1516,6 +1517,43 @@ function HeaderEditorScreen({ onBack }: { onBack: () => void }) {
                 </div>
               );
             })}
+
+            <Section title="Custom Code" />
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={form.customCode?.isEnabled ?? false}
+                onChange={(e) => set('customCode', { ...(form.customCode ?? DEFAULT_HEADER.customCode!), isEnabled: e.target.checked })}
+                className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+              <span className="text-xs text-gray-600">Show an extra block below the header</span>
+            </label>
+            {form.customCode?.isEnabled && (
+              <>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">HTML</label>
+                  <textarea className={`${textareaCls} font-mono text-xs`} rows={4} value={form.customCode.html}
+                    onChange={(e) => set('customCode', { ...form.customCode!, html: e.target.value })} placeholder="<div>...</div>" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">CSS</label>
+                  <textarea className={`${textareaCls} font-mono text-xs`} rows={3} value={form.customCode.css}
+                    onChange={(e) => set('customCode', { ...form.customCode!, css: e.target.value })} placeholder=".my-class { ... }" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">JavaScript</label>
+                  <textarea className={`${textareaCls} font-mono text-xs`} rows={3} value={form.customCode.js}
+                    onChange={(e) => set('customCode', { ...form.customCode!, js: e.target.value })} placeholder="console.log('hello');" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Height <span className="text-gray-400 font-normal">(px)</span>
+                  </label>
+                  <input type="number" min={20} max={2000} className={inputCls} value={form.customCode.heightPx}
+                    onChange={(e) => set('customCode', { ...form.customCode!, heightPx: Math.max(20, Number(e.target.value) || 80) })} />
+                </div>
+                <p className="text-xs text-gray-400">
+                  Runs in a sandboxed frame — it can't access your site's cookies, login sessions, or other tenants' data.
+                </p>
+              </>
+            )}
             <div className="pb-6" />
           </div>
         </div>
@@ -1549,6 +1587,7 @@ function HeaderEditorScreen({ onBack }: { onBack: () => void }) {
 // ═══════════════════════════════════════════════════════════════════════════
 const DEFAULT_FOOTER: FooterConfig = {
   backgroundColor: '#ffffff', textColor: '#9ca3af', tagline: null, copyrightText: null, socialLinks: [],
+  customCode: { html: '', css: '', js: '', heightPx: 150, isEnabled: false },
 };
 
 const SOCIAL_PLATFORM_LABELS: Record<SocialPlatform, string> = {
@@ -1719,6 +1758,43 @@ function FooterEditorScreen({ onBack }: { onBack: () => void }) {
               </div>
             ) : (
               <p className="text-xs text-gray-400">No social links connected yet — click an icon above to add one.</p>
+            )}
+
+            <Section title="Custom Code" />
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={form.customCode?.isEnabled ?? false}
+                onChange={(e) => set('customCode', { ...(form.customCode ?? DEFAULT_FOOTER.customCode!), isEnabled: e.target.checked })}
+                className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+              <span className="text-xs text-gray-600">Show an extra block above the footer</span>
+            </label>
+            {form.customCode?.isEnabled && (
+              <>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">HTML</label>
+                  <textarea className={`${textareaCls} font-mono text-xs`} rows={4} value={form.customCode.html}
+                    onChange={(e) => set('customCode', { ...form.customCode!, html: e.target.value })} placeholder="<div>...</div>" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">CSS</label>
+                  <textarea className={`${textareaCls} font-mono text-xs`} rows={3} value={form.customCode.css}
+                    onChange={(e) => set('customCode', { ...form.customCode!, css: e.target.value })} placeholder=".my-class { ... }" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">JavaScript</label>
+                  <textarea className={`${textareaCls} font-mono text-xs`} rows={3} value={form.customCode.js}
+                    onChange={(e) => set('customCode', { ...form.customCode!, js: e.target.value })} placeholder="console.log('hello');" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Height <span className="text-gray-400 font-normal">(px)</span>
+                  </label>
+                  <input type="number" min={20} max={2000} className={inputCls} value={form.customCode.heightPx}
+                    onChange={(e) => set('customCode', { ...form.customCode!, heightPx: Math.max(20, Number(e.target.value) || 150) })} />
+                </div>
+                <p className="text-xs text-gray-400">
+                  Runs in a sandboxed frame — it can't access your site's cookies, login sessions, or other tenants' data.
+                </p>
+              </>
             )}
             <div className="pb-6" />
           </div>

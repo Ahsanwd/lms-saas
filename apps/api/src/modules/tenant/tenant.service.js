@@ -319,13 +319,36 @@ const MAX_MENU_OVERRIDES = 30;
 const MAX_SOCIAL_LINKS = 6;
 const SOCIAL_PLATFORMS = ['facebook', 'twitter', 'instagram', 'linkedin', 'youtube', 'tiktok'];
 
+// Same per-field cap as tenantPage.service.js's page-level Custom Code
+// sections — this is the same Mixed-typed, schema-unvalidated shape, just
+// stored on the tenant's header/footer settings instead of a page section.
+const MAX_CUSTOM_CODE_CHARS = 100_000;
+
+const DEFAULT_CUSTOM_CODE = { html: '', css: '', js: '', heightPx: 80, isEnabled: false };
+
 const DEFAULT_HEADER = {
   logoHeightPx: 36, backgroundColor: '#ffffff', menuTextColor: '#4b5563',
   signInText: 'Sign in', signUpText: 'Sign up free', buttonStyle: 'solid', menuOverrides: [],
+  customCode: DEFAULT_CUSTOM_CODE,
 };
 const DEFAULT_FOOTER = {
   backgroundColor: '#ffffff', textColor: '#9ca3af', tagline: null, copyrightText: null, socialLinks: [],
+  customCode: { ...DEFAULT_CUSTOM_CODE, heightPx: 150 },
 };
+
+// Shared by validateHeader/validateFooter — same emptiness/size rules as
+// tenantPage.service.js's page-level Custom Code section validation.
+function validateCustomCode(customCode, label) {
+  if (customCode === undefined) return;
+  if (typeof customCode !== 'object' || customCode === null) throw new AppError(`Invalid ${label} custom code`, 400);
+  const { html = '', css = '', js = '', heightPx = 80 } = customCode;
+  for (const [field, value] of Object.entries({ html, css, js })) {
+    if (String(value).length > MAX_CUSTOM_CODE_CHARS)
+      throw new AppError(`${label} custom code ${field} exceeds the ${MAX_CUSTOM_CODE_CHARS.toLocaleString()} character limit`, 400);
+  }
+  const h = Number(heightPx);
+  if (!Number.isFinite(h) || h < 20 || h > 2000) throw new AppError(`${label} custom code height must be between 20 and 2000px`, 400);
+}
 
 async function getHeaderFooterSettings(tenantId) {
   const tenant = await Tenant.findById(tenantId).select('settings.header settings.footer').lean();
@@ -364,6 +387,7 @@ function validateHeader(header) {
         throw new AppError('Each menu item needs a pageSlug', 400);
     }
   }
+  validateCustomCode(header.customCode, 'Header');
 }
 
 function validateFooter(footer) {
@@ -386,6 +410,7 @@ function validateFooter(footer) {
         throw new AppError('Each social link needs a valid URL', 400);
     }
   }
+  validateCustomCode(footer.customCode, 'Footer');
 }
 
 async function updateHeaderFooterSettings(tenantId, { header, footer }) {
