@@ -42,7 +42,10 @@ async function getBundle(tenantId, bundleId) {
   return bundle;
 }
 
-async function _validateCourseIds(tenantId, courseIds) {
+// requirePermission('course:manage') passes for every instructor tenant-wide
+// (same as certTemplate.service.js's assertCanEditTemplate) — so an
+// instructor is only allowed to bundle their OWN published courses.
+async function _validateCourseIds(tenantId, courseIds, actingUser) {
   if (!Array.isArray(courseIds) || courseIds.length < 2)
     throw new AppError('A bundle must include at least 2 courses', 400);
 
@@ -53,6 +56,20 @@ async function _validateCourseIds(tenantId, courseIds) {
   const unpublished = courses.filter(c => c.status !== 'published');
   if (unpublished.length > 0)
     throw new AppError(`All bundle courses must be published (unpublished: ${unpublished.map(c => c.title).join(', ')})`, 400);
+
+  if (actingUser?.role === 'instructor') {
+    const notOwned = courses.filter(c => c.instructorId?.toString() !== actingUser.sub.toString());
+    if (notOwned.length > 0)
+      throw new AppError(`You can only bundle your own courses (not yours: ${notOwned.map(c => c.title).join(', ')})`, 403);
+  }
+}
+
+// Same ownership rule as certTemplate.service.js's assertCanEditTemplate —
+// only a tenant admin or the bundle's own creator may edit/delete it, since
+// course:manage alone doesn't distinguish between instructors.
+function _assertCanManageBundle(bundle, actingUser) {
+  if (actingUser.role === 'instructor' && bundle.createdBy?.toString() !== actingUser.sub.toString())
+    throw new AppError('You can only manage bundles you created', 403);
 }
 
 async function createBundle(tenantId, data, actingUser) {
@@ -60,7 +77,7 @@ async function createBundle(tenantId, data, actingUser) {
   if (!title?.trim()) throw new AppError('Title is required', 400);
   if (price == null || Number(price) < 0) throw new AppError('A valid price is required', 400);
 
-  await _validateCourseIds(tenantId, courseIds);
+  await _validateCourseIds(tenantId, courseIds, actingUser);
 
   return CourseBundle.create({
     tenantId,
@@ -76,8 +93,9 @@ async function createBundle(tenantId, data, actingUser) {
 async function updateBundle(tenantId, bundleId, data, actingUser) {
   const bundle = await CourseBundle.findOne({ _id: bundleId, tenantId });
   if (!bundle) throw new AppError('Bundle not found', 404);
+  _assertCanManageBundle(bundle, actingUser);
 
-  if (data.courseIds) await _validateCourseIds(tenantId, data.courseIds);
+  if (data.courseIds) await _validateCourseIds(tenantId, data.courseIds, actingUser);
 
   const allowed = ['title', 'description', 'courseIds', 'price', 'status'];
   allowed.forEach(field => {
@@ -88,10 +106,11 @@ async function updateBundle(tenantId, bundleId, data, actingUser) {
   return bundle.save();
 }
 
-async function deleteBundle(tenantId, bundleId, actingUserId) {
+async function deleteBundle(tenantId, bundleId, actingUser) {
   const bundle = await CourseBundle.findOne({ _id: bundleId, tenantId });
   if (!bundle) throw new AppError('Bundle not found', 404);
-  return bundle.softDelete(actingUserId);
+  _assertCanManageBundle(bundle, actingUser);
+  return bundle.softDelete(actingUser.sub);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -358,9 +377,19 @@ async function _activateBundlePayment(payment) {
 }
 
 // ─── Refund bundle payment (admin) ───────────────────────────────────────────
-async function refundBundlePayment(tenantId, paymentId, actingUserId, { reason = '' } = {}) {
+async function refundBundlePayment(tenantId, paymentId, actingUser, { reason = '' } = {}) {
   const payment = await BundlePayment.findOne({ _id: paymentId, tenantId, status: 'completed' });
   if (!payment) throw new AppError('Completed payment not found', 404);
+
+  // route is course:manage-gated (every instructor tenant-wide) — same
+  // ownership gap as create/update/delete above, but here it would let an
+  // instructor trigger a real Stripe refund and un-enrollment for a bundle
+  // they had nothing to do with.
+  if (actingUser.role === 'instructor') {
+    const bundle = await CourseBundle.findOne({ _id: payment.bundleId, tenantId });
+    if (bundle && bundle.createdBy?.toString() !== actingUser.sub.toString())
+      throw new AppError('You can only refund bundles you created', 403);
+  }
 
   if (payment.provider === 'safepay') {
     throw new AppError('This was a Safepay payment — process the refund manually in the Safepay dashboard, then contact support to reconcile the record.', 400);
@@ -374,7 +403,7 @@ async function refundBundlePayment(tenantId, paymentId, actingUserId, { reason =
 
   payment.status       = 'refunded';
   payment.refundedAt   = new Date();
-  payment.refundedBy   = actingUserId;
+  payment.refundedBy   = actingUser.sub;
   payment.refundReason = reason;
   await payment.save();
 

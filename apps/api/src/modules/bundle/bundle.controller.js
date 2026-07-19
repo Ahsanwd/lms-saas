@@ -38,7 +38,7 @@ async function update(req, res, next) {
 
 async function remove(req, res, next) {
   try {
-    await bundleService.deleteBundle(req.tenant.tenantId, req.params.bundleId, req.user.sub);
+    await bundleService.deleteBundle(req.tenant.tenantId, req.params.bundleId, req.user);
     R.success(res, {}, 'Bundle deleted');
   } catch (err) { next(err); }
 }
