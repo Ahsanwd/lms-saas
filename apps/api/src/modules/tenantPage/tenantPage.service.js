@@ -144,6 +144,18 @@ async function assertSlugAvailable(tenantId, slug, excludePageId) {
     throw new AppError('A page with this URL already exists', 409);
 }
 
+// The {tenantId, slug} unique index isn't partial on deletedAt, so a slug
+// that belonged to a since-soft-deleted page still collides at the DB level
+// even though assertSlugAvailable (which filters deletedAt: null) reports it
+// as free — same for a genuine concurrent double-submit race. Both surface
+// as a raw MongoServerError here; translate to the same 409 a pre-check
+// would have given, instead of letting it escape as an uncaught 500.
+function rethrowIfSlugConflict(err) {
+  if (err?.code === 11000 && err?.keyPattern?.slug)
+    throw new AppError('A page with this URL already exists', 409);
+  throw err;
+}
+
 // ─── CRUD (tenant_admin, authenticated) ───────────────────────────────────────
 
 function listPages(tenantId) {
@@ -164,9 +176,13 @@ async function createPage(tenantId, { title, slug }) {
   const existingPages = await tenantPageRepo.findAll(tenantId);
   const navOrder = existingPages.length;
 
-  return tenantPageRepo.create({
-    tenantId, title: title.trim(), slug: finalSlug, navOrder, sections: [],
-  });
+  try {
+    return await tenantPageRepo.create({
+      tenantId, title: title.trim(), slug: finalSlug, navOrder, sections: [],
+    });
+  } catch (err) {
+    return rethrowIfSlugConflict(err);
+  }
 }
 
 async function updatePage(tenantId, id, data) {
@@ -191,7 +207,11 @@ async function updatePage(tenantId, id, data) {
   }
 
   if (!Object.keys(update).length) throw new AppError('No valid fields provided', 400);
-  return tenantPageRepo.updateById(tenantId, id, update);
+  try {
+    return await tenantPageRepo.updateById(tenantId, id, update);
+  } catch (err) {
+    return rethrowIfSlugConflict(err);
+  }
 }
 
 async function deletePage(tenantId, id, userId) {
