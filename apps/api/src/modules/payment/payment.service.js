@@ -292,9 +292,19 @@ async function _activatePayment(payment) {
 }
 
 // ─── Refund (admin) ───────────────────────────────────────────────────────────
-async function refundPayment(tenantId, paymentId, actingUserId, { reason = '', amount = null } = {}) {
+async function refundPayment(tenantId, paymentId, actingUser, { reason = '', amount = null } = {}) {
   const payment = await CoursePayment.findOne({ _id: paymentId, tenantId, status: 'completed' });
   if (!payment) throw new AppError('Completed payment not found', 404);
+
+  // route is course:manage-gated (every instructor tenant-wide, same gap
+  // fixed in bundle.service.js's refundBundlePayment) — without this an
+  // instructor could trigger a real Stripe refund + un-enrollment for any
+  // course in the tenant, not just their own.
+  if (actingUser.role === 'instructor') {
+    const course = await Course.findOne({ _id: payment.courseId, tenantId }).select('instructorId');
+    if (course && course.instructorId?.toString() !== actingUser.sub.toString())
+      throw new AppError('You can only refund payments for your own courses', 403);
+  }
 
   const refundCents = amount ? Math.round(Number(amount)) : null; // null = full refund
   const isPartial   = refundCents !== null && refundCents < payment.amount;
@@ -318,7 +328,7 @@ async function refundPayment(tenantId, paymentId, actingUserId, { reason = '', a
   if (isPartial) {
     payment.status       = 'refunded';
     payment.refundedAt   = new Date();
-    payment.refundedBy   = actingUserId;
+    payment.refundedBy   = actingUser.sub;
     payment.refundReason = reason;
     await payment.save();
     return payment;
@@ -326,7 +336,7 @@ async function refundPayment(tenantId, paymentId, actingUserId, { reason = '', a
 
   payment.status       = 'refunded';
   payment.refundedAt   = new Date();
-  payment.refundedBy   = actingUserId;
+  payment.refundedBy   = actingUser.sub;
   payment.refundReason = reason;
   await payment.save();
 
@@ -359,7 +369,16 @@ async function getMyPayments(tenantId, userId, query = {}) {
   return { payments, total, page: Number(page), limit: Number(limit) };
 }
 
-async function getCoursePayments(tenantId, courseId, query = {}) {
+async function getCoursePayments(tenantId, courseId, query = {}, actingUser) {
+  // Same course:manage gap as refundPayment above — without this an
+  // instructor could read another instructor's students' payment records
+  // (names, emails, amounts) for a course they don't teach.
+  if (actingUser?.role === 'instructor') {
+    const course = await Course.findOne({ _id: courseId, tenantId }).select('instructorId');
+    if (course && course.instructorId?.toString() !== actingUser.sub.toString())
+      throw new AppError('You can only view payments for your own courses', 403);
+  }
+
   const { page = 1, limit = 20 } = query;
   const skip = (page - 1) * limit;
   const [payments, total] = await Promise.all([

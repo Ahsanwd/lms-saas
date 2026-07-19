@@ -24,7 +24,7 @@ async function confirm(req, res, next) {
 async function refund(req, res, next) {
   try {
     const payment = await svc.refundPayment(
-      req.tenant.tenantId, req.params.paymentId, req.user.sub, req.body
+      req.tenant.tenantId, req.params.paymentId, req.user, req.body
     );
     R.success(res, { payment }, 'Payment refunded');
   } catch (err) { next(err); }
@@ -39,7 +39,7 @@ async function myPayments(req, res, next) {
 
 async function coursePayments(req, res, next) {
   try {
-    const result = await svc.getCoursePayments(req.tenant.tenantId, req.params.courseId, req.query);
+    const result = await svc.getCoursePayments(req.tenant.tenantId, req.params.courseId, req.query, req.user);
     R.success(res, result);
   } catch (err) { next(err); }
 }
@@ -115,7 +115,7 @@ async function confirmBundle(req, res, next) {
 async function refundBundle(req, res, next) {
   try {
     const payment = await bundleSvc.refundBundlePayment(
-      req.tenant.tenantId, req.params.paymentId, req.user.sub, req.body
+      req.tenant.tenantId, req.params.paymentId, req.user, req.body
     );
     R.success(res, { payment }, 'Bundle payment refunded');
   } catch (err) { next(err); }

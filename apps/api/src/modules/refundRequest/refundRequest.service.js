@@ -72,7 +72,10 @@ async function approveRequest(tenantId, requestId, adminId, refundAmount = null)
     ? Math.round(Number(refundAmount))
     : (refReq.requestedAmount ?? null);
 
-  await paymentSvc.refundPayment(tenantId, refReq.paymentId.toString(), adminId, {
+  // This route is requireRole('tenant_admin')-gated, so the acting user is
+  // always a tenant admin — refundPayment's ownership check only applies to
+  // the 'instructor' role and is a no-op here either way.
+  await paymentSvc.refundPayment(tenantId, refReq.paymentId.toString(), { sub: adminId, role: 'tenant_admin' }, {
     reason: refReq.reason,
     amount: approvedAmount,
   });
