@@ -17,14 +17,14 @@ async function create(req, res, next) {
 
 async function update(req, res, next) {
   try {
-    const coupon = await couponService.updateCoupon(req.tenant.tenantId, req.params.id, req.body);
+    const coupon = await couponService.updateCoupon(req.tenant.tenantId, req.params.id, req.body, req.user);
     R.success(res, { coupon }, 'Coupon updated');
   } catch (err) { next(err); }
 }
 
 async function remove(req, res, next) {
   try {
-    await couponService.deleteCoupon(req.tenant.tenantId, req.params.id);
+    await couponService.deleteCoupon(req.tenant.tenantId, req.params.id, req.user);
     R.success(res, {}, 'Coupon deactivated');
   } catch (err) { next(err); }
 }

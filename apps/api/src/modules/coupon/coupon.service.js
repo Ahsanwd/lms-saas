@@ -1,5 +1,35 @@
 const CourseCoupon = require('../../database/models/CourseCoupon.model');
+const Course = require('../../database/models/Course.model');
 const AppError = require('../../utils/AppError');
+
+// requirePermission('course:manage') passes for every instructor tenant-wide
+// (same gap already fixed in bundle.service.js) — an instructor may only
+// scope a coupon to their OWN courses, never tenant-wide (empty
+// applicableCourses = "all courses", which would reach other instructors'
+// courses too).
+async function _assertInstructorCanUseCourses(tenantId, applicableCourses, actingUser) {
+  if (actingUser?.role !== 'instructor') return;
+  if (!applicableCourses || applicableCourses.length === 0)
+    throw new AppError('Instructors must scope a coupon to specific courses they teach', 403);
+  const courses = await Course.find({ _id: { $in: applicableCourses }, tenantId, deletedAt: null });
+  const notOwned = courses.filter(c => c.instructorId?.toString() !== actingUser.sub.toString());
+  if (notOwned.length > 0 || courses.length !== applicableCourses.length)
+    throw new AppError('You can only apply coupons to your own courses', 403);
+}
+
+// Same ownership rule as bundle.service.js's _assertCanManageBundle.
+function _assertCanManageCoupon(coupon, actingUser) {
+  if (actingUser.role === 'instructor' && coupon.createdBy?.toString() !== actingUser.sub.toString())
+    throw new AppError('You can only manage coupons you created', 403);
+}
+
+function _assertDiscountValid(discountType, discountValue) {
+  if (!['percentage', 'fixed'].includes(discountType)) throw new AppError('discountType must be percentage or fixed', 400);
+  if (discountType === 'percentage' && (discountValue <= 0 || discountValue > 100))
+    throw new AppError('Percentage discount must be between 1 and 100', 400);
+  if (discountType === 'fixed' && discountValue <= 0)
+    throw new AppError('Fixed discount must be greater than 0', 400);
+}
 
 // ─── Validate a coupon code for a specific course ─────────────────────────────
 async function validateCoupon(tenantId, code, courseId, coursePrice) {
@@ -144,11 +174,8 @@ async function createCoupon(tenantId, data, actingUser) {
   const { code, description, discountType, discountValue, applicableCourses, maxUses, expiresAt } = data;
 
   if (!code?.trim()) throw new AppError('Coupon code is required', 400);
-  if (!['percentage', 'fixed'].includes(discountType)) throw new AppError('discountType must be percentage or fixed', 400);
-  if (discountType === 'percentage' && (discountValue <= 0 || discountValue > 100))
-    throw new AppError('Percentage discount must be between 1 and 100', 400);
-  if (discountType === 'fixed' && discountValue <= 0)
-    throw new AppError('Fixed discount must be greater than 0', 400);
+  _assertDiscountValid(discountType, discountValue);
+  await _assertInstructorCanUseCourses(tenantId, applicableCourses, actingUser);
 
   const existing = await CourseCoupon.findOne({ tenantId, code: code.trim().toUpperCase() });
   if (existing) throw new AppError('A coupon with this code already exists', 409);
@@ -168,22 +195,31 @@ async function createCoupon(tenantId, data, actingUser) {
 }
 
 // ─── Update coupon ────────────────────────────────────────────────────────────
-async function updateCoupon(tenantId, couponId, data) {
+async function updateCoupon(tenantId, couponId, data, actingUser) {
   const coupon = await CourseCoupon.findOne({ _id: couponId, tenantId });
   if (!coupon) throw new AppError('Coupon not found', 404);
+  _assertCanManageCoupon(coupon, actingUser);
+
+  if (data.applicableCourses !== undefined)
+    await _assertInstructorCanUseCourses(tenantId, data.applicableCourses, actingUser);
 
   const allowed = ['description', 'discountType', 'discountValue', 'applicableCourses', 'maxUses', 'expiresAt', 'isActive'];
   allowed.forEach(field => {
     if (data[field] !== undefined) coupon[field] = data[field];
   });
+  // Re-validate the final state — discountType/discountValue previously had
+  // no bounds check here at all (create's percentage 1-100 / fixed > 0 rules
+  // only ever ran on creation), so a PATCH could set e.g. a 500% discount.
+  _assertDiscountValid(coupon.discountType, coupon.discountValue);
 
   return coupon.save();
 }
 
 // ─── Delete (deactivate) coupon ───────────────────────────────────────────────
-async function deleteCoupon(tenantId, couponId) {
+async function deleteCoupon(tenantId, couponId, actingUser) {
   const coupon = await CourseCoupon.findOne({ _id: couponId, tenantId });
   if (!coupon) throw new AppError('Coupon not found', 404);
+  _assertCanManageCoupon(coupon, actingUser);
   coupon.isActive = false;
   return coupon.save();
 }
