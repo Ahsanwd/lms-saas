@@ -6,6 +6,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { Button, Spinner, ReorderControls } from '@/components/ui';
 import { moveArrayItem } from '@/lib/utils';
+import {
+  type FixedSectionType,
+  type SectionType,
+  SECTION_TYPE_ORDER,
+  SECTION_LABELS,
+  SectionIcon,
+} from '@/lib/websiteBuilderSections';
 import { AxiosError } from 'axios';
 import {
   PageSectionsRenderer,
@@ -31,45 +38,7 @@ import {
   type PublicMembershipPlan,
 } from '@/components/website/LandingPageSections';
 
-// Fixed types: 0-or-1 per page. 'custom' is the one repeatable type — any
-// number of Custom Code sections are allowed per page.
-type FixedSectionType = 'hero' | 'about' | 'coursesSection' | 'testimonials' | 'cta' | 'contact' | 'contactForm' | 'courseApplication' | 'team' | 'bundlesSection' | 'membershipPlansSection';
-type SectionType = FixedSectionType | 'custom';
 type InstituteType = 'school' | 'academy' | 'college' | 'university';
-
-const SECTION_TYPE_ORDER: FixedSectionType[] = ['hero', 'about', 'coursesSection', 'bundlesSection', 'membershipPlansSection', 'team', 'testimonials', 'cta', 'contact', 'contactForm', 'courseApplication'];
-const SECTION_LABELS: Record<SectionType, string> = {
-  hero: 'Hero', about: 'About', coursesSection: 'Courses Section',
-  testimonials: 'Testimonials', cta: 'Call To Action', contact: 'Contact', custom: 'Custom Code',
-  contactForm: 'Contact Form', courseApplication: 'Course Application', team: 'Team / Instructors',
-  bundlesSection: 'Bundles Section', membershipPlansSection: 'Membership Plans Section',
-};
-
-// One icon per section type, so the outline is scannable at a glance instead
-// of every card reading as an identical gray bar (matches the colored
-// icon-chip pattern already used for lesson types in the course curriculum).
-const SECTION_ICON_PATHS: Record<SectionType, string> = {
-  hero: 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M14 8h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z',
-  about: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
-  coursesSection: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253',
-  team: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z',
-  testimonials: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z',
-  cta: 'M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z',
-  contact: 'M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z',
-  contactForm: 'M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z',
-  courseApplication: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-5 9l2 2 4-4',
-  custom: 'M10 20l4-16M6 8l-4 4 4 4M18 8l4 4-4 4',
-  bundlesSection: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4',
-  membershipPlansSection: 'M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z',
-};
-
-function SectionIcon({ type, className = 'w-4 h-4' }: { type: SectionType; className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={SECTION_ICON_PATHS[type]} />
-    </svg>
-  );
-}
 
 const DEFAULT_SECTION_DATA: Record<SectionType, unknown> = {
   hero: { headline: '', subheadline: '', ctaText: '', ctaLink: '', backgroundImageUrl: null },
@@ -385,6 +354,59 @@ function PagesListScreen({ onEditPage, onEditChrome }: { onEditPage: (id: string
   );
 }
 
+// A compact, always-visible list of every section on the page — click a row
+// to open its editor below, reorder with the arrows, or remove it. This is
+// the left-panel counterpart to clicking a section directly in the canvas
+// preview (see BuilderSectionWrapper in LandingPageSections.tsx) — both are
+// wired to the same onSelect/onMove/onRemove handlers, so either one works.
+function SectionsNavigator({
+  sections, activeIndex, onSelect, onMove, onRemove,
+}: {
+  sections: PageSection[];
+  activeIndex: number | null;
+  onSelect: (index: number) => void;
+  onMove: (index: number, dir: -1 | 1) => void;
+  onRemove: (index: number) => void;
+}) {
+  if (sections.length === 0) return null;
+  return (
+    <div className="border border-gray-200 rounded-xl overflow-hidden divide-y divide-gray-100">
+      {sections.map((section, idx) => (
+        <div
+          key={section._id ?? idx}
+          role="button"
+          tabIndex={0}
+          onClick={() => onSelect(idx)}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(idx); } }}
+          className={`w-full flex items-center justify-between gap-2 px-3 py-2 text-left transition-colors cursor-pointer ${
+            activeIndex === idx ? 'bg-primary-50' : 'bg-white hover:bg-gray-50'
+          }`}
+        >
+          <span className="flex items-center gap-1.5 text-xs font-medium min-w-0">
+            <span className={`w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 ${
+              activeIndex === idx ? 'bg-primary-100 text-primary-700' : 'bg-gray-100 text-gray-500'
+            }`}>
+              <SectionIcon type={section.type as SectionType} className="w-3 h-3" />
+            </span>
+            <span className={`truncate ${activeIndex === idx ? 'text-primary-700' : 'text-gray-700'}`}>
+              {SECTION_LABELS[section.type as SectionType]}
+              {section.type === 'custom' && ` #${sections.slice(0, idx + 1).filter((s) => s.type === 'custom').length}`}
+            </span>
+          </span>
+          <span className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+            <ReorderControls index={idx} length={sections.length} onMove={(dir) => onMove(idx, dir)} />
+            <button onClick={() => onRemove(idx)} className="p-1 text-gray-300 hover:text-red-500 transition-colors" title="Remove section">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Page Editor screen
 // ═══════════════════════════════════════════════════════════════════════════
@@ -397,6 +419,10 @@ function PageEditorScreen({ pageId, onBack }: { pageId: string; onBack: () => vo
   const [loaded, setLoaded] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState('');
+  // Which section's editor is shown in the left panel — selected by clicking
+  // a section (or an "add section" placeholder) in the canvas, or a row in
+  // SectionsNavigator.
+  const [activeSectionIndex, setActiveSectionIndex] = useState<number | null>(null);
   const heroImgRef = useRef<HTMLInputElement>(null);
   const aboutImgRef = useRef<HTMLInputElement>(null);
 
@@ -454,10 +480,14 @@ function PageEditorScreen({ pageId, onBack }: { pageId: string; onBack: () => vo
       // Sections state is always kept in display order (array index === .order)
       // from here on — every mutation below preserves that invariant, so a
       // plain .map() renders correctly with no separate sort step needed.
-      setSections([...(pageData.sections ?? [])].sort((a, b) => a.order - b.order));
+      const loadedSections = [...(pageData.sections ?? [])].sort((a, b) => a.order - b.order);
+      setSections(loadedSections);
       setTitle(pageData.title);
       setIsPublished(pageData.isPublished);
       setInstituteType(pageData.instituteType);
+      // Auto-open the first section so the editor never opens to a blank
+      // left panel when a page already has saved content.
+      setActiveSectionIndex(loadedSections.length > 0 ? 0 : null);
       setLoaded(true);
     }
   }, [pageData, loaded]);
@@ -519,21 +549,42 @@ function PageEditorScreen({ pageId, onBack }: { pageId: string; onBack: () => vo
 
   function hasSection(type: FixedSectionType) { return sections.some((s) => s.type === type); }
 
-  function addSection(type: SectionType) {
-    setSections((prev) => [...prev, { type, order: prev.length, data: DEFAULT_SECTION_DATA[type] }]);
+  // insertAt lets the canvas's "add section" placeholders insert at a
+  // specific position (e.g. before the first section, or after the last);
+  // omitting it keeps the original "always append" behavior.
+  function addSection(type: SectionType, insertAt?: number) {
+    const idx = insertAt === undefined ? sections.length : Math.max(0, Math.min(insertAt, sections.length));
+    setSections((prev) => {
+      const next = [...prev.slice(0, idx), { type, order: idx, data: DEFAULT_SECTION_DATA[type] }, ...prev.slice(idx)];
+      return next.map((s, i) => ({ ...s, order: i }));
+    });
+    setActiveSectionIndex(idx);
   }
 
   function removeSectionAt(index: number) {
     setSections((prev) => prev.filter((_, i) => i !== index).map((s, i) => ({ ...s, order: i })));
+    setActiveSectionIndex((current) => {
+      if (current === null) return null;
+      if (current < index) return current;
+      const newLength = sections.length - 1;
+      if (newLength <= 0) return null;
+      return Math.min(current === index ? index : current - 1, newLength - 1);
+    });
   }
 
   function moveSectionAt(index: number, dir: -1 | 1) {
     setSections((prev) => moveArrayItem(prev, index, dir).map((s, i) => ({ ...s, order: i })));
+    setActiveSectionIndex((current) => {
+      if (current === index) return index + dir;
+      if (current === index + dir) return index;
+      return current;
+    });
   }
 
   function pickInstituteType(type: InstituteType) {
     setInstituteType(type);
     setSections(TEMPLATES[type]);
+    setActiveSectionIndex(0);
   }
 
   if (isLoading || !loaded) return <div className="flex justify-center py-24"><Spinner size="lg" /></div>;
@@ -648,8 +699,19 @@ function PageEditorScreen({ pageId, onBack }: { pageId: string; onBack: () => vo
               </div>
             )}
 
-            {sections.map((section, idx) => (
-              <div key={section._id ?? idx} className="border border-gray-200 rounded-xl overflow-hidden">
+            <SectionsNavigator
+              sections={sections}
+              activeIndex={activeSectionIndex}
+              onSelect={setActiveSectionIndex}
+              onMove={moveSectionAt}
+              onRemove={removeSectionAt}
+            />
+
+            {activeSectionIndex !== null && sections[activeSectionIndex] && (() => {
+              const section = sections[activeSectionIndex];
+              const idx = activeSectionIndex;
+              return (
+              <div className="border border-gray-200 rounded-xl overflow-hidden">
                 <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-b border-gray-200">
                   <span className="flex items-center gap-1.5 text-xs font-bold text-gray-500 uppercase tracking-wide">
                     <span className="w-5 h-5 rounded-md bg-primary-50 text-primary-600 flex items-center justify-center flex-shrink-0">
@@ -1163,7 +1225,8 @@ function PageEditorScreen({ pageId, onBack }: { pageId: string; onBack: () => vo
                   })()}
                 </div>
               </div>
-            ))}
+              );
+            })()}
 
             {sections.length === 0 && (
               <div className="flex flex-col items-center justify-center text-center py-10 border border-dashed border-gray-200 rounded-xl">
@@ -1199,6 +1262,13 @@ function PageEditorScreen({ pageId, onBack }: { pageId: string; onBack: () => vo
               linksDisabled
               bundles={allBundles}
               membershipPlans={allPlans}
+              builderMode
+              activeSectionIndex={activeSectionIndex}
+              availableSectionTypes={availableToAdd}
+              onSelectSection={setActiveSectionIndex}
+              onMoveSection={moveSectionAt}
+              onRemoveSection={removeSectionAt}
+              onAddSectionAt={(insertIndex, type) => addSection(type, insertIndex)}
             />
           </div>
         </div>

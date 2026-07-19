@@ -4,6 +4,8 @@ import { useRef, useState } from 'react';
 import Link from 'next/link';
 import axios from 'axios';
 import { executeRecaptcha } from '@/lib/recaptcha';
+import { ReorderControls } from '@/components/ui/ReorderControls';
+import { SectionIcon, SECTION_LABELS, type SectionType } from '@/lib/websiteBuilderSections';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1350,9 +1352,117 @@ export interface CustomCodeData {
   isEnabled: boolean;
 }
 
+// Builder-only wrapper around a rendered section — adds a hover outline, a
+// floating select/reorder/remove toolbar, and an active-state ring. Never
+// rendered outside builderMode, so the public site's output is untouched.
+function BuilderSectionWrapper({
+  index, length, isActive, onSelect, onMove, onRemove, children,
+}: {
+  index: number;
+  length: number;
+  isActive: boolean;
+  onSelect: () => void;
+  onMove: (dir: -1 | 1) => void;
+  onRemove: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      onClick={onSelect}
+      className={`group/section relative cursor-pointer transition-shadow ${
+        isActive ? 'ring-2 ring-inset ring-primary-500' : 'hover:ring-2 hover:ring-inset hover:ring-primary-200'
+      }`}
+    >
+      <div
+        className={`absolute top-2 right-2 z-30 flex items-center gap-1 bg-white rounded-lg shadow-md border border-gray-200 px-1.5 py-1 transition-opacity ${
+          isActive ? 'opacity-100' : 'opacity-0 group-hover/section:opacity-100'
+        }`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <ReorderControls index={index} length={length} onMove={onMove} />
+        <button
+          type="button"
+          onClick={onRemove}
+          className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+          title="Remove section"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// Builder-only "add a section here" affordance — a dashed bar that expands
+// in place into a widget picker. variant="empty" fills the canvas instead,
+// used when the page has no sections at all yet.
+function AddSectionPlaceholder({
+  availableTypes, onAdd, variant = 'inline',
+}: {
+  availableTypes: SectionType[];
+  onAdd: (type: SectionType) => void;
+  variant?: 'inline' | 'empty';
+}) {
+  const [expanded, setExpanded] = useState(variant === 'empty');
+  const pickable: SectionType[] = [...availableTypes, 'custom'];
+
+  if (!expanded) {
+    return (
+      <button
+        type="button"
+        onClick={() => setExpanded(true)}
+        className="w-full flex items-center justify-center gap-2 py-4 border-2 border-dashed border-gray-200 text-gray-400 hover:border-primary-300 hover:text-primary-500 transition-colors"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+        </svg>
+        <span className="text-sm font-medium">Add section</span>
+      </button>
+    );
+  }
+
+  return (
+    <div className={variant === 'empty' ? 'py-20 px-6' : 'py-6 px-6 bg-gray-50 border-y border-gray-100'}>
+      <div className="max-w-3xl mx-auto">
+        <div className="flex items-center justify-between mb-4">
+          <p className="text-sm font-semibold text-gray-600">Choose a section to add</p>
+          {variant === 'inline' && (
+            <button type="button" onClick={() => setExpanded(false)} className="text-gray-400 hover:text-gray-600">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {pickable.map((type) => (
+            <button
+              key={type}
+              type="button"
+              onClick={() => {
+                onAdd(type);
+                if (variant === 'inline') setExpanded(false);
+              }}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm font-medium text-gray-700 hover:border-primary-300 hover:text-primary-600 transition-colors"
+            >
+              <SectionIcon type={type} className="w-4 h-4" />
+              {SECTION_LABELS[type]}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function PageSectionsRenderer({
   sections, courses, coursesLoading, displayName, logoUrl, linksDisabled, pages, subdomain, pageId, headerConfig, footerConfig,
   bundles = [], bundlesLoading = false, membershipPlans = [], membershipPlansLoading = false,
+  builderMode = false, activeSectionIndex = null, availableSectionTypes = [],
+  onSelectSection, onMoveSection, onRemoveSection, onAddSectionAt,
 }: {
   sections: PageSection[];
   courses: PublicCourse[];
@@ -1369,6 +1479,16 @@ export function PageSectionsRenderer({
   bundlesLoading?: boolean;
   membershipPlans?: PublicMembershipPlan[];
   membershipPlansLoading?: boolean;
+  // Canvas-first editing mode for the Website Builder — all omitted (the
+  // default) so the real public site (app/page.tsx, app/[pageSlug]/page.tsx)
+  // renders exactly as before. Only page.tsx's PageEditorScreen passes these.
+  builderMode?: boolean;
+  activeSectionIndex?: number | null;
+  availableSectionTypes?: SectionType[];
+  onSelectSection?: (index: number) => void;
+  onMoveSection?: (index: number, dir: -1 | 1) => void;
+  onRemoveSection?: (index: number) => void;
+  onAddSectionAt?: (insertIndex: number, type: SectionType) => void;
 }) {
   const hasAbout = sections.some((s) => {
     if (s.type !== 'about') return false;
@@ -1398,60 +1518,126 @@ export function PageSectionsRenderer({
         pages={pages}
         headerConfig={headerConfig}
       />
+      {builderMode && ordered.length === 0 && (
+        <AddSectionPlaceholder
+          variant="empty"
+          availableTypes={availableSectionTypes}
+          onAdd={(type) => onAddSectionAt?.(0, type)}
+        />
+      )}
       {ordered.map((section, i) => {
-        switch (section.type) {
-          case 'hero':
-            return <HeroSection key={i} hero={section.data as WebsiteContent['hero']} displayName={displayName} linksDisabled={linksDisabled} />;
-          case 'about':
-            return <AboutSection key={i} about={section.data as WebsiteContent['about']} linksDisabled={linksDisabled} />;
-          case 'coursesSection':
-            return (
-              <CoursesGrid
-                key={i}
-                courses={courses}
-                loading={coursesLoading}
-                coursesSection={section.data as WebsiteContent['coursesSection']}
-                linksDisabled={linksDisabled}
-              />
-            );
-          case 'testimonials':
-            return <TestimonialsSection key={i} testimonials={section.data as Testimonial[]} />;
-          case 'team':
-            return <TeamSection key={i} team={section.data as TeamMember[]} />;
-          case 'cta':
-            return <CTASection key={i} cta={section.data as WebsiteContent['cta']} linksDisabled={linksDisabled} />;
-          case 'contact':
-            return <ContactSection key={i} contact={section.data as WebsiteContent['contact']} />;
-          case 'custom':
-            return <CustomCodeSection key={i} data={section.data as CustomCodeData} />;
-          case 'contactForm':
-            return <ContactFormSection key={i} data={section.data as ContactFormData} subdomain={subdomain} pageId={pageId} linksDisabled={linksDisabled} />;
-          case 'courseApplication':
-            return <CourseApplicationSection key={i} data={section.data as CourseApplicationData} courses={courses} subdomain={subdomain} pageId={pageId} linksDisabled={linksDisabled} />;
-          case 'bundlesSection':
-            return (
-              <BundlesGrid
-                key={i}
-                bundles={bundles}
-                loading={bundlesLoading}
-                bundlesSection={section.data as BundlesSectionData}
-                linksDisabled={linksDisabled}
-              />
-            );
-          case 'membershipPlansSection':
-            return (
-              <MembershipPlansSection
-                key={i}
-                plans={membershipPlans}
-                loading={membershipPlansLoading}
-                membershipPlansSection={section.data as MembershipPlansSectionData}
-                linksDisabled={linksDisabled}
-              />
-            );
-          default:
-            return null;
-        }
+        const el = (() => {
+          switch (section.type) {
+            case 'hero':
+              return <HeroSection key={i} hero={section.data as WebsiteContent['hero']} displayName={displayName} linksDisabled={linksDisabled} />;
+            case 'about':
+              return <AboutSection key={i} about={section.data as WebsiteContent['about']} linksDisabled={linksDisabled} />;
+            case 'coursesSection':
+              return (
+                <CoursesGrid
+                  key={i}
+                  courses={courses}
+                  loading={coursesLoading}
+                  coursesSection={section.data as WebsiteContent['coursesSection']}
+                  linksDisabled={linksDisabled}
+                />
+              );
+            case 'testimonials':
+              return <TestimonialsSection key={i} testimonials={section.data as Testimonial[]} />;
+            case 'team':
+              return <TeamSection key={i} team={section.data as TeamMember[]} />;
+            case 'cta':
+              return <CTASection key={i} cta={section.data as WebsiteContent['cta']} linksDisabled={linksDisabled} />;
+            case 'contact':
+              return <ContactSection key={i} contact={section.data as WebsiteContent['contact']} />;
+            case 'custom':
+              return <CustomCodeSection key={i} data={section.data as CustomCodeData} />;
+            case 'contactForm':
+              return <ContactFormSection key={i} data={section.data as ContactFormData} subdomain={subdomain} pageId={pageId} linksDisabled={linksDisabled} />;
+            case 'courseApplication':
+              return <CourseApplicationSection key={i} data={section.data as CourseApplicationData} courses={courses} subdomain={subdomain} pageId={pageId} linksDisabled={linksDisabled} />;
+            case 'bundlesSection':
+              return (
+                <BundlesGrid
+                  key={i}
+                  bundles={bundles}
+                  loading={bundlesLoading}
+                  bundlesSection={section.data as BundlesSectionData}
+                  linksDisabled={linksDisabled}
+                />
+              );
+            case 'membershipPlansSection':
+              return (
+                <MembershipPlansSection
+                  key={i}
+                  plans={membershipPlans}
+                  loading={membershipPlansLoading}
+                  membershipPlansSection={section.data as MembershipPlansSectionData}
+                  linksDisabled={linksDisabled}
+                />
+              );
+            default:
+              return null;
+          }
+        })();
+
+        if (!builderMode) return el;
+        // Some section types render nothing until their fields are filled in
+        // (About/Testimonials/Team/Contact all `return null` when empty). A
+        // JSX element like <AboutSection .../> is always a truthy object —
+        // its own "return null" only happens deep inside React's render, so
+        // `el` itself is never null/falsy here and can't be used to detect
+        // this. Mirror each component's own emptiness check instead, so the
+        // canvas-first builder can stand in a placeholder purely for
+        // builderMode; the real public site is unaffected since `el` (not
+        // this placeholder) is what non-builder mode returns above.
+        const isEmptySection = (() => {
+          switch (section.type) {
+            case 'about': {
+              const d = section.data as WebsiteContent['about'];
+              return !d?.heading && !d?.body;
+            }
+            case 'testimonials':
+            case 'team':
+              return !Array.isArray(section.data) || section.data.length === 0;
+            case 'cta': {
+              const d = section.data as WebsiteContent['cta'];
+              return !d?.heading && !d?.subtext;
+            }
+            case 'contact': {
+              const d = section.data as WebsiteContent['contact'];
+              return !d?.email && !d?.phone && !d?.address;
+            }
+            default:
+              return false;
+          }
+        })();
+        const content = isEmptySection ? (
+          <div className="py-14 px-6 text-center text-gray-400 border-y border-dashed border-gray-200 bg-gray-50">
+            <p className="text-sm font-medium">{SECTION_LABELS[section.type as SectionType]} — no content yet</p>
+            <p className="text-xs mt-1">Fill in its fields on the left to see it here.</p>
+          </div>
+        ) : el;
+        return (
+          <BuilderSectionWrapper
+            key={i}
+            index={i}
+            length={ordered.length}
+            isActive={activeSectionIndex === i}
+            onSelect={() => onSelectSection?.(i)}
+            onMove={(dir) => onMoveSection?.(i, dir)}
+            onRemove={() => onRemoveSection?.(i)}
+          >
+            {content}
+          </BuilderSectionWrapper>
+        );
       })}
+      {builderMode && ordered.length > 0 && (
+        <AddSectionPlaceholder
+          availableTypes={availableSectionTypes}
+          onAdd={(type) => onAddSectionAt?.(ordered.length, type)}
+        />
+      )}
       <LandingFooter displayName={displayName} linksDisabled={linksDisabled} footerConfig={footerConfig} />
     </div>
   );
