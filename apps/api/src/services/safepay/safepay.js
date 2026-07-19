@@ -17,7 +17,12 @@ async function createSession({ apiKey, environment, amount, currency, orderId })
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       merchant_api_key: apiKey,
-      intent:      'CYBERSOURCE',
+      // TEMP: trying MPGS instead of CYBERSOURCE — clicking "Credit/Debit
+      // Card" on the hosted checkout page redirected to getsafepay.pk
+      // instead of showing a card form, for every CYBERSOURCE tracker
+      // tested live. Testing whether that's specific to CYBERSOURCE not
+      // being fully activated on this sandbox account, or account-wide.
+      intent:      'MPGS',
       mode:        'payment',
       entry_mode:  'raw',
       currency,
