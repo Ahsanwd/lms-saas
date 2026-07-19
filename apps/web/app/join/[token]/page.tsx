@@ -97,9 +97,17 @@ export default function JoinPage() {
   const joinMutation = useMutation({
     mutationFn: () => api.post(`/enrollment-links/join/${token}`),
     onSuccess: (res) => {
+      const data = res.data?.data as { enrolled?: string[]; results?: { status: string }[]; redirectCourseId?: string } | undefined;
+      const succeeded = (data?.enrolled?.length ?? 0) > 0 || data?.results?.some((r) => r.status === 'already_enrolled');
+      if (!succeeded) {
+        // Every course in the link resolved to 'skipped'/'full' — nothing
+        // was actually enrolled, so don't show the success screen/redirect.
+        setJoinError('These courses are no longer available.');
+        return;
+      }
       setJoined(true);
       // Redirect after a short pause so user sees the success state
-      const redirectId = res.data?.data?.redirectCourseId;
+      const redirectId = data?.redirectCourseId;
       setTimeout(() => {
         router.push(redirectId ? `/courses/${redirectId}` : '/dashboard');
       }, 2000);

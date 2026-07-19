@@ -46,7 +46,16 @@ async function join(req, res, next) {
   try {
     if (!req.tenant) return R.error(res, 'Tenant context missing', 400);
     const result = await svc.joinViaLink(req.tenant.tenantId, req.params.token, req.user);
-    R.success(res, result, result.enrolled.length > 0 ? 'Enrolled successfully!' : 'Already enrolled');
+    // Every course could resolve to 'skipped' (unpublished since the link
+    // was created) or 'full' (capacity reached) — anything but a blanket
+    // "Enrolled successfully!"/"Already enrolled" would be misleading in
+    // that case, since the student ends up enrolled in nothing.
+    const message = result.enrolled.length > 0
+      ? 'Enrolled successfully!'
+      : result.results.some(r => r.status === 'already_enrolled')
+        ? 'Already enrolled'
+        : 'These courses are no longer available';
+    R.success(res, result, message);
   } catch (err) { next(err); }
 }
 
