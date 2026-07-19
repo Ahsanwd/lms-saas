@@ -26,13 +26,11 @@ async function createSession({ apiKey, environment, amount, currency, orderId })
     }),
   });
   const json = await res.json().catch(() => null);
-  const token = json?.data?.token;
+  // Confirmed live against a real sandbox response: the tracker token sits
+  // at data.tracker.token, not data.token as originally assumed.
+  const token = json?.data?.tracker?.token;
   if (!res.ok || !token) {
-    // TEMP DIAGNOSTIC — status.message now says "success" but we still can't
-    // find a token at data.token, so the real response shape differs from
-    // what this code assumed. Surfacing the full body to find the real
-    // field name. Revert once diagnosed.
-    throw new AppError(`SAFEPAY_DEBUG2 status=${res.status} ok=${res.ok} body=${JSON.stringify(json)}`, 502, 'SAFEPAY_SESSION_FAILED');
+    throw new AppError(json?.status?.message || 'Safepay session creation failed', 502, 'SAFEPAY_SESSION_FAILED');
   }
   return { tracker: token };
 }
