@@ -16,6 +16,18 @@ import { CheckoutModal, useCheckoutReturn } from '@/components/payment/CheckoutM
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+// <input type="datetime-local"> wants "YYYY-MM-DDTHH:mm" in the viewer's own
+// local wall-clock time — plain toISOString() gives UTC digits instead, which
+// silently renders as a wrong time whenever the viewer isn't in UTC (e.g. off
+// by exactly +5h for a PKT instructor). Shift by the browser's own tz offset
+// before slicing so the picker shows what the stored instant really means
+// for whoever is looking at it.
+function toLocalDatetimeInputValue(dateInput: string | Date) {
+  const d = new Date(dateInput);
+  const tzOffsetMs = d.getTimezoneOffset() * 60000;
+  return new Date(d.getTime() - tzOffsetMs).toISOString().slice(0, 16);
+}
+
 const STATUS_BADGE: Record<string, 'default' | 'success' | 'warning' | 'danger'> = {
   draft: 'default', published: 'success', archived: 'danger',
 };
@@ -449,7 +461,7 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
   // Live class
   const [liveUrl, setLiveUrl] = useState(lesson?.liveClass?.meetingUrl ?? '');
   const [liveScheduledAt, setLiveScheduledAt] = useState(
-    lesson?.liveClass?.scheduledAt ? new Date(lesson.liveClass.scheduledAt).toISOString().slice(0, 16) : ''
+    lesson?.liveClass?.scheduledAt ? toLocalDatetimeInputValue(lesson.liveClass.scheduledAt) : ''
   );
   const [liveDuration, setLiveDuration] = useState<number>(lesson?.liveClass?.durationMinutes ?? 60);
   const [liveInstructions, setLiveInstructions] = useState(lesson?.liveClass?.instructions ?? '');
@@ -617,7 +629,16 @@ function LessonModal({ courseId, sectionId, lesson, onClose, onSaved }: LessonMo
         // unrelated edit here (e.g. instructions) can't clobber an existing
         // room.
         meetingUrl: liveUrl || null,
-        scheduledAt: liveScheduledAt || null, durationMinutes: liveDuration,
+        // liveScheduledAt is a naive "YYYY-MM-DDTHH:mm" string with no
+        // timezone info — new Date() here parses it as the browser's own
+        // local time (correct, since this runs on the instructor's actual
+        // device), then toISOString() converts it to an explicit UTC instant
+        // before it leaves the browser. Sending the naive string as-is
+        // would let the backend's own server timezone (not the instructor's)
+        // decide what "14:30" means, silently shifting the schedule by
+        // whatever offset separates the two.
+        scheduledAt: liveScheduledAt ? new Date(liveScheduledAt).toISOString() : null,
+        durationMinutes: liveDuration,
         instructions: liveInstructions || null,
         recordingUrl: liveRecordingUrl || null,
         cohortId: liveCohortId || null,
