@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const slugify = require('../../utils/slugify');
 const courseRepo = require('../../database/repositories/course.repository');
 const sectionRepo = require('../../database/repositories/section.repository');
@@ -9,6 +10,7 @@ const userRepo = require('../../database/repositories/user.repository');
 const cohortMemberRepo = require('../../database/repositories/cohortMember.repository');
 const Cohort = require('../../database/models/Cohort.model');
 const { getPublicUrl, deleteFile, getFileSizeBytes } = require('../../services/storage/storage.service');
+const livekitService = require('../../services/livekit/livekit.service');
 const AppError = require('../../utils/AppError');
 const logger   = require('../../utils/logger');
 
@@ -459,7 +461,23 @@ async function createLesson(tenantId, courseId, sectionId, data, user) {
   const existing = await lessonRepo.findBySection(tenantId, courseId, sectionId);
   const order = existing.length;
 
+  // Live lessons get their LiveKit room generated automatically at creation —
+  // no separate "Create Live Class Room" step needed. Room name is derived
+  // from the lesson's own id, so the id is minted up front instead of left
+  // to Mongo's default auto-assignment.
+  let lessonId;
+  let liveClass = data.liveClass ? { ...data.liveClass } : undefined;
+  if (data.type === 'live') {
+    lessonId = new mongoose.Types.ObjectId();
+    liveClass = {
+      ...(liveClass || {}),
+      platform: 'livekit',
+      livekitRoomName: livekitService.generateRoomName(lessonId.toString()),
+    };
+  }
+
   const lesson = await lessonRepo.create({
+    ...(lessonId ? { _id: lessonId } : {}),
     tenantId, courseId, sectionId,
     title: data.title.trim(),
     type: data.type,
@@ -472,7 +490,7 @@ async function createLesson(tenantId, courseId, sectionId, data, user) {
     dripDate: data.dripDate || null,
     notes: data.notes || null,
     durationSeconds: data.durationSeconds || 0,
-    ...(data.liveClass ? { liveClass: data.liveClass } : {}),
+    ...(liveClass ? { liveClass } : {}),
     ...(data.video ? { video: data.video } : {}),
     ...(data.audio ? { audio: data.audio } : {}),
     ...(data.file  ? { file:  data.file  } : {}),
@@ -508,6 +526,14 @@ async function updateLesson(tenantId, courseId, sectionId, lessonId, data, user)
     }
     if (data.liveClass.cohortId !== undefined) update['liveClass.cohortId'] = data.liveClass.cohortId || null;
     if (data.liveClass.scheduledAt) newScheduledAt = new Date(data.liveClass.scheduledAt);
+  }
+  // A lesson turned into type 'live' after creation (or one saved before
+  // rooms were auto-generated on create) still needs a room — same
+  // auto-provisioning as createLesson, so there's never a manual step.
+  const becomingLive = (data.type ?? lesson.type) === 'live';
+  if (becomingLive && !lesson.liveClass?.livekitRoomName) {
+    update['liveClass.platform'] = 'livekit';
+    update['liveClass.livekitRoomName'] = livekitService.generateRoomName(lessonId);
   }
   // Video source + settings update (non-upload path — URL/embed/settings changes)
   if (data.video !== undefined) {
