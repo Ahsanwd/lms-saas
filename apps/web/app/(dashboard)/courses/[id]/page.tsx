@@ -1818,6 +1818,7 @@ interface AttendanceReport {
 }
 
 function LiveSessionModal({ lessonId, lessonTitle, onClose }: { lessonId: string; lessonTitle: string; onClose: () => void }) {
+  const router = useRouter();
   const [recUrl, setRecUrl] = useState('');
   const qKey = ['live-attendance', lessonId];
 
@@ -1880,6 +1881,11 @@ function LiveSessionModal({ lessonId, lessonTitle, onClose }: { lessonId: string
                     <Button size="sm" loading={startMut.isPending}
                       onClick={() => { if (confirm('Start this session? Students will be notified.')) startMut.mutate(); }}>
                       🔴 Start Session
+                    </Button>
+                  )}
+                  {status === 'live' && lc?.platform === 'livekit' && (
+                    <Button size="sm" onClick={() => router.push(`/live-room/${lessonId}`)}>
+                      🎥 Join Live Class
                     </Button>
                   )}
                   {status === 'live' && (
