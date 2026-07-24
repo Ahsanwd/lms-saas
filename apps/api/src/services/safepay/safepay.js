@@ -51,14 +51,16 @@ async function createSession({ apiKey, environment, amount, currency, orderId })
 // alongside the tracker. Per Safepay's Express Checkout docs, this is a SEPARATE
 // call from session creation — POST /client/passport/v1/token, authenticated with
 // the SECRET key (not the public merchant_api_key used for createSession above).
-// Their docs only show this via the @sfpy/node-core SDK (`authType: 'secret'`);
-// mirrors the existing getPaymentStatus() Bearer-auth pattern below since no raw
-// HTTP example is published. Token lasts 1 hour per the docs, fetched fresh per
-// checkout here rather than cached.
+// Their docs only show this via the @sfpy/node-core SDK (`authType: 'secret'`), no
+// raw HTTP example published. Confirmed live against a real sandbox account: a
+// `Bearer <secretKey>` Authorization header 401s with "merchant webhook secret not
+// found in the request header" — the secret key must go in a plain
+// `x-sfpy-merchant-secret` header instead. Token lasts 1 hour per the docs, fetched
+// fresh per checkout here rather than cached.
 async function getPassportToken({ secretKey, environment }) {
   const res = await fetch(`${baseUrl(environment)}/client/passport/v1/token`, {
     method:  'POST',
-    headers: { Authorization: `Bearer ${secretKey}` },
+    headers: { 'x-sfpy-merchant-secret': secretKey },
   });
   const json = await res.json().catch(() => null);
   const tbt = json?.data;
