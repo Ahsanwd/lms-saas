@@ -71,13 +71,21 @@ async function getPassportToken({ secretKey, environment }) {
 }
 
 // Builds the hosted-checkout redirect URL the browser is sent to.
-// Param names (tracker, tbt, environment, source, redirect_url, cancel_url) are
-// verbatim from Safepay's safepay.checkouts.payment.create() SDK example.
+// Param names here are NOT what Safepay's docs show (those describe their SDK's
+// JS function signature — tracker/tbt/environment — which the SDK itself
+// translates before building the real URL; the docs never publish that mapping).
+// Confirmed by pulling and reading the actual deployed checkout app's JS bundle
+// (main.*.chunk.js from this exact /checkout/pay/ path): its own query-param
+// parser reads `env` (not `environment`), `beacon` (not `tracker` — must contain
+// "track_"), and `auth_token` (not `tbt`) into React state. `env` and `beacon`
+// must be present or the app immediately shows a "missing" error screen before
+// ever reaching a payment form; `auth_token` isn't in that same initial gate for
+// the /pay/ path but is parsed for later use, so it's included regardless.
 function buildCheckoutUrl({ environment, tracker, tbt, redirectUrl, cancelUrl }) {
   const params = new URLSearchParams({
-    environment,
-    tracker,
-    tbt,
+    env:          environment,
+    beacon:       tracker,
+    auth_token:   tbt,
     source:       'hosted',
     redirect_url: redirectUrl,
     cancel_url:   cancelUrl,
