@@ -97,9 +97,12 @@ function buildCheckoutUrl({ environment, tracker, tbt, redirectUrl, cancelUrl })
 // session-creation time — never a client-supplied value — so this is the source of truth
 // for confirming a payment server-side.
 async function getPaymentStatus({ secretKey, environment, tracker }) {
+  // Same auth mistake as getPassportToken above: Bearer <secretKey> 401s here too
+  // ("merchant webhook secret not found in the request header") — confirmed live,
+  // the secret key goes in x-sfpy-merchant-secret, not an Authorization header.
   const res = await fetch(`${baseUrl(environment)}/reporter/api/v1/payments/${tracker}`, {
     method:  'GET',
-    headers: { Authorization: `Bearer ${secretKey}` },
+    headers: { 'x-sfpy-merchant-secret': secretKey },
   });
   const json = await res.json().catch(() => null);
   if (!res.ok || !json?.data) {
