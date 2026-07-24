@@ -122,13 +122,16 @@ async function initiatePayment(tenantId, courseId, userId, { couponCode } = {}) 
     // smallest currency unit (cents) or whole units — sending cents here to match
     // the rest of this codebase's convention. Verify against a real sandbox account
     // and adjust if Safepay charges 100x too much/little.
-    const { tracker, tbt } = await safepay.createSession({
-      apiKey:      gateway.apiKey,
-      environment: gateway.environment,
-      amount:      finalAmount,
-      currency:    currency.toUpperCase(),
-      orderId:     payment._id.toString(),
-    });
+    const [{ tracker }, tbt] = await Promise.all([
+      safepay.createSession({
+        apiKey:      gateway.apiKey,
+        environment: gateway.environment,
+        amount:      finalAmount,
+        currency:    currency.toUpperCase(),
+        orderId:     payment._id.toString(),
+      }),
+      safepay.getPassportToken({ secretKey: gateway.secretKey, environment: gateway.environment }),
+    ]);
 
     payment.safepayTracker = tracker;
     await payment.save();

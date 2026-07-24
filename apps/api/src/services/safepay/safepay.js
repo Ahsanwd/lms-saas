@@ -41,20 +41,39 @@ async function createSession({ apiKey, environment, amount, currency, orderId })
   // Confirmed live against a real sandbox response: the tracker token sits
   // at data.tracker.token, not data.token as originally assumed.
   const token = json?.data?.tracker?.token;
-  // The checkout page separately requires a "tbt" token alongside the tracker
-  // (per Safepay support) — this is the same response's data.tracker.client
-  // field (a "sec_..." value), which we previously fetched but discarded.
-  const tbt = json?.data?.tracker?.client;
-  if (!res.ok || !token || !tbt) {
+  if (!res.ok || !token) {
     throw new AppError(json?.status?.message || 'Safepay session creation failed', 502, 'SAFEPAY_SESSION_FAILED');
   }
-  return { tracker: token, tbt };
+  return { tracker: token };
+}
+
+// Fetches the short-lived "tbt" (authentication) token the checkout URL needs
+// alongside the tracker. Per Safepay's Express Checkout docs, this is a SEPARATE
+// call from session creation — POST /client/passport/v1/token, authenticated with
+// the SECRET key (not the public merchant_api_key used for createSession above).
+// Their docs only show this via the @sfpy/node-core SDK (`authType: 'secret'`);
+// mirrors the existing getPaymentStatus() Bearer-auth pattern below since no raw
+// HTTP example is published. Token lasts 1 hour per the docs, fetched fresh per
+// checkout here rather than cached.
+async function getPassportToken({ secretKey, environment }) {
+  const res = await fetch(`${baseUrl(environment)}/client/passport/v1/token`, {
+    method:  'POST',
+    headers: { Authorization: `Bearer ${secretKey}` },
+  });
+  const json = await res.json().catch(() => null);
+  const tbt = json?.data;
+  if (!res.ok || !tbt) {
+    throw new AppError(json?.status?.message || 'Safepay authentication failed', 502, 'SAFEPAY_AUTH_FAILED');
+  }
+  return tbt;
 }
 
 // Builds the hosted-checkout redirect URL the browser is sent to.
+// Param names (tracker, tbt, environment, source, redirect_url, cancel_url) are
+// verbatim from Safepay's safepay.checkouts.payment.create() SDK example.
 function buildCheckoutUrl({ environment, tracker, tbt, redirectUrl, cancelUrl }) {
   const params = new URLSearchParams({
-    env:          environment,
+    environment,
     tracker,
     tbt,
     source:       'hosted',
@@ -79,4 +98,4 @@ async function getPaymentStatus({ secretKey, environment, tracker }) {
   return json.data; // { state: 'TRACKER_ENDED' | ..., ... }
 }
 
-module.exports = { createSession, buildCheckoutUrl, getPaymentStatus };
+module.exports = { createSession, getPassportToken, buildCheckoutUrl, getPaymentStatus };
