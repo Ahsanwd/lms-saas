@@ -122,7 +122,7 @@ async function initiatePayment(tenantId, courseId, userId, { couponCode } = {}) 
     // smallest currency unit (cents) or whole units — sending cents here to match
     // the rest of this codebase's convention. Verify against a real sandbox account
     // and adjust if Safepay charges 100x too much/little.
-    const { tracker } = await safepay.createSession({
+    const { tracker, tbt } = await safepay.createSession({
       apiKey:      gateway.apiKey,
       environment: gateway.environment,
       amount:      finalAmount,
@@ -136,6 +136,7 @@ async function initiatePayment(tenantId, courseId, userId, { couponCode } = {}) 
     const redirectUrl = safepay.buildCheckoutUrl({
       environment: gateway.environment,
       tracker,
+      tbt,
       redirectUrl: `${returnBase}?safepayPaymentId=${payment._id}`,
       cancelUrl:   `${returnBase}?safepayCancelled=1`,
     });

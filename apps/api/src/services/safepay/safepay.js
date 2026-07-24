@@ -4,6 +4,12 @@ function baseUrl(environment) {
   return environment === 'production' ? 'https://api.getsafepay.com' : 'https://sandbox.api.getsafepay.com';
 }
 
+// The hosted-checkout page is served at `/checkout/pay/` on the SAME host as
+// the API (confirmed live: `sandbox.getsafepay.com`, as literally written in
+// Safepay support's example URL, doesn't resolve in DNS at all — it's a typo
+// for `sandbox.api.getsafepay.com`, which serves the real Safepay Checkout
+// React app at that path). Reuses baseUrl() rather than a separate host.
+
 // Creates a payment session ("tracker") for a hosted checkout redirect.
 // `orderId` is OUR OWN payment record's id — Safepay's `metadata` field only
 // accepts a fixed allowlist of keys (confirmed live: an arbitrary key like
@@ -35,22 +41,27 @@ async function createSession({ apiKey, environment, amount, currency, orderId })
   // Confirmed live against a real sandbox response: the tracker token sits
   // at data.tracker.token, not data.token as originally assumed.
   const token = json?.data?.tracker?.token;
-  if (!res.ok || !token) {
+  // The checkout page separately requires a "tbt" token alongside the tracker
+  // (per Safepay support) — this is the same response's data.tracker.client
+  // field (a "sec_..." value), which we previously fetched but discarded.
+  const tbt = json?.data?.tracker?.client;
+  if (!res.ok || !token || !tbt) {
     throw new AppError(json?.status?.message || 'Safepay session creation failed', 502, 'SAFEPAY_SESSION_FAILED');
   }
-  return { tracker: token };
+  return { tracker: token, tbt };
 }
 
 // Builds the hosted-checkout redirect URL the browser is sent to.
-function buildCheckoutUrl({ environment, tracker, redirectUrl, cancelUrl }) {
+function buildCheckoutUrl({ environment, tracker, tbt, redirectUrl, cancelUrl }) {
   const params = new URLSearchParams({
     env:          environment,
-    beacon:       tracker,
+    tracker,
+    tbt,
     source:       'hosted',
     redirect_url: redirectUrl,
     cancel_url:   cancelUrl,
   });
-  return `${baseUrl(environment)}/components?${params.toString()}`;
+  return `${baseUrl(environment)}/checkout/pay/?${params.toString()}`;
 }
 
 // Fetches the current status of a tracker. Always called with the tracker WE stored at

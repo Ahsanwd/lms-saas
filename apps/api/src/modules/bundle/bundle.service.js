@@ -215,7 +215,7 @@ async function initiateBundlePayment(tenantId, bundleId, userId, { couponCode } 
 
     const returnBase = `${tenantBaseUrl(tenant)}/bundles`;
 
-    const { tracker } = await safepay.createSession({
+    const { tracker, tbt } = await safepay.createSession({
       apiKey:      gateway.apiKey,
       environment: gateway.environment,
       amount:      finalAmount,
@@ -229,6 +229,7 @@ async function initiateBundlePayment(tenantId, bundleId, userId, { couponCode } 
     const redirectUrl = safepay.buildCheckoutUrl({
       environment: gateway.environment,
       tracker,
+      tbt,
       redirectUrl: `${returnBase}?safepayPaymentId=${payment._id}`,
       cancelUrl:   `${returnBase}?safepayCancelled=1`,
     });
