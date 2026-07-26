@@ -145,8 +145,8 @@ function generateSignedToken(videoUid, signingKeyId, signingKeyPem) {
 // via CF's GraphQL Analytics API (only populated when CF's own iframe/Stream
 // Player is used for playback — true here, see learn/page.tsx CfStreamPlayer).
 // NOTE: the `uid_in` array filter is best-effort against CF's public docs
-// (only single-`uid` examples are published) — same "unverified until tested
-// against a real account" caveat this codebase already carries for Safepay.
+// (only single-`uid` examples are published) — unverified until tested
+// against a real account.
 async function getViewerMinutesSince(accountId, apiToken, videoUids, sinceDate) {
   if (!videoUids?.length) return 0;
   const query = `

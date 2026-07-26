@@ -213,25 +213,43 @@ function TwoFASection() {
   );
 }
 
-// ─── Admin: Payment Gateway (BYO — Stripe or Safepay) ─────────────────────────
+// ─── Admin: Payment Gateway (BYO — Stripe or Manual) ──────────────────────────
+
+interface ManualAccount {
+  type: 'bank' | 'jazzcash' | 'easypaisa';
+  label: string | null;
+  accountTitle: string;
+  accountNumber: string;
+  bankName: string | null;
+}
 
 interface PaymentGatewayData {
-  activeProvider: 'stripe' | 'safepay' | null;
+  activeProvider: 'stripe' | 'safepay' | 'manual' | null;
   stripe: { hasSecretKey: boolean; publishableKey: string | null; verified: boolean; verifiedAt: string | null };
+  // Legacy — Safepay is no longer a selectable gateway, this is only read to
+  // show the "clear legacy setting" banner for a tenant that had it configured.
   safepay: { apiKey: string | null; hasSecretKey: boolean; environment: 'sandbox' | 'production'; verified: boolean; verifiedAt: string | null };
+  manual: { accounts: ManualAccount[]; instructions: string | null };
+}
+
+const MANUAL_ACCOUNT_TYPE_LABELS: Record<ManualAccount['type'], string> = {
+  bank: 'Bank Transfer', jazzcash: 'JazzCash', easypaisa: 'EasyPaisa',
+};
+
+function emptyManualAccount(): ManualAccount {
+  return { type: 'bank', label: null, accountTitle: '', accountNumber: '', bankName: null };
 }
 
 function PaymentGatewaySection() {
   const qc = useQueryClient();
-  const [tab, setTab]       = useState<'none' | 'stripe' | 'safepay'>('none');
+  const [tab, setTab]       = useState<'none' | 'stripe' | 'manual'>('none');
   const [banner, setBanner] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
 
   const [stripeSecretKey, setStripeSecretKey]           = useState('');
   const [stripePublishableKey, setStripePublishableKey] = useState('');
 
-  const [safepayApiKey, setSafepayApiKey]       = useState('');
-  const [safepaySecretKey, setSafepaySecretKey] = useState('');
-  const [safepayEnv, setSafepayEnv]             = useState<'sandbox' | 'production'>('sandbox');
+  const [manualAccounts, setManualAccounts]         = useState<ManualAccount[]>([]);
+  const [manualInstructions, setManualInstructions] = useState('');
 
   const { data, isLoading } = useQuery<PaymentGatewayData>({
     queryKey: ['payment-gateway'],
@@ -240,10 +258,10 @@ function PaymentGatewaySection() {
 
   useEffect(() => {
     if (!data) return;
-    setTab(data.activeProvider ?? 'none');
+    setTab(data.activeProvider === 'stripe' || data.activeProvider === 'manual' ? data.activeProvider : 'none');
     setStripePublishableKey(data.stripe.publishableKey || '');
-    setSafepayApiKey(data.safepay.apiKey || '');
-    setSafepayEnv(data.safepay.environment || 'sandbox');
+    setManualAccounts(data.manual.accounts?.length ? data.manual.accounts : []);
+    setManualInstructions(data.manual.instructions || '');
   }, [data]);
 
   const saveStripeMutation = useMutation({
@@ -259,28 +277,37 @@ function PaymentGatewaySection() {
     onError: (err: any) => setBanner({ type: 'error', msg: err.response?.data?.message ?? 'Failed to save Stripe key' }),
   });
 
-  const saveSafepayMutation = useMutation({
-    mutationFn: () => api.put('/tenant/payment-gateway/safepay', {
-      apiKey: safepayApiKey,
-      secretKey: safepaySecretKey || undefined,
-      environment: safepayEnv,
+  const saveManualMutation = useMutation({
+    mutationFn: () => api.put('/tenant/payment-gateway/manual', {
+      accounts: manualAccounts,
+      instructions: manualInstructions || undefined,
     }),
     onSuccess: (res) => {
       qc.setQueryData(['payment-gateway'], res.data.data);
-      setSafepaySecretKey('');
-      setBanner({ type: 'success', msg: 'Safepay credentials saved — will verify automatically on your first live payment.' });
+      setBanner({ type: 'success', msg: 'Manual payment details saved.' });
     },
-    onError: (err: any) => setBanner({ type: 'error', msg: err.response?.data?.message ?? 'Failed to save Safepay credentials' }),
+    onError: (err: any) => setBanner({ type: 'error', msg: err.response?.data?.message ?? 'Failed to save payment details' }),
   });
 
   const disconnectMutation = useMutation({
-    mutationFn: (provider: 'stripe' | 'safepay') => api.delete(`/tenant/payment-gateway/${provider}`),
+    mutationFn: (provider: 'stripe' | 'safepay' | 'manual') => api.delete(`/tenant/payment-gateway/${provider}`),
     onSuccess: (res) => {
       qc.setQueryData(['payment-gateway'], res.data.data);
       setBanner({ type: 'success', msg: 'Gateway disconnected.' });
     },
     onError: () => setBanner({ type: 'error', msg: 'Failed to disconnect gateway.' }),
   });
+
+  const manualValid = manualAccounts.length > 0 && manualAccounts.every(a =>
+    a.accountTitle.trim() && a.accountNumber.trim() && (a.type !== 'bank' || a.bankName?.trim())
+  );
+
+  function updateManualAccount(index: number, patch: Partial<ManualAccount>) {
+    setManualAccounts(prev => prev.map((a, i) => i === index ? { ...a, ...patch } : a));
+  }
+  function removeManualAccount(index: number) {
+    setManualAccounts(prev => prev.filter((_, i) => i !== index));
+  }
 
   const CardIcon = (
     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -289,7 +316,15 @@ function PaymentGatewaySection() {
   );
 
   return (
-    <Section icon={CardIcon} title="Payment Gateway" desc="Bring your own Stripe or Safepay account — students pay you directly, the platform never touches the money.">
+    <Section icon={CardIcon} title="Payment Gateway" desc="Bring your own Stripe account, or collect payment manually via bank/JazzCash/EasyPaisa — students pay you directly, the platform never touches the money.">
+      {data?.activeProvider === 'safepay' && (
+        <div className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm bg-amber-50 border border-amber-200 text-amber-700">
+          <span className="flex-1">This school was previously configured with Safepay, which has been discontinued. Choose Stripe or Manual Payment below.</span>
+          <Button size="sm" variant="outline" onClick={() => disconnectMutation.mutate('safepay')} loading={disconnectMutation.isPending}>
+            Clear legacy setting
+          </Button>
+        </div>
+      )}
       {banner && (
         <div className={cn('flex items-start gap-3 rounded-xl px-4 py-3 text-sm',
           banner.type === 'success' ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700')}>
@@ -310,13 +345,13 @@ function PaymentGatewaySection() {
       ) : (
         <>
           <div className="grid grid-cols-3 gap-2">
-            {(['none', 'stripe', 'safepay'] as const).map(p => {
+            {(['none', 'stripe', 'manual'] as const).map(p => {
               const isActive = p !== 'none' && data?.activeProvider === p;
               return (
                 <button key={p} type="button" onClick={() => setTab(p)}
                   className={cn('px-3 py-2.5 rounded-xl border text-sm font-semibold transition-colors',
                     tab === p ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-200 text-gray-500 hover:border-gray-300')}>
-                  {p === 'none' ? 'None' : p === 'stripe' ? 'Stripe' : 'Safepay'}
+                  {p === 'none' ? 'None' : p === 'stripe' ? 'Stripe' : 'Manual Payment'}
                   {isActive && <span className="ml-1.5 text-[10px] text-green-600">● active</span>}
                 </button>
               );
@@ -325,7 +360,7 @@ function PaymentGatewaySection() {
 
           {tab === 'none' && (
             <p className="text-xs text-gray-400">
-              No gateway configured — course purchases run in demo mode (no real charge). Pick Stripe or Safepay above to accept real payments.
+              No gateway configured — course purchases run in demo mode (no real charge). Pick Stripe or Manual Payment above to accept real payments.
             </p>
           )}
 
@@ -371,59 +406,77 @@ function PaymentGatewaySection() {
             </div>
           )}
 
-          {tab === 'safepay' && (
+          {tab === 'manual' && (
             <div className="space-y-4 bg-gray-50 rounded-xl border border-gray-200 p-4">
-              {data?.safepay.verified ? (
-                <div className="flex items-center gap-2 text-xs font-semibold text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                  Verified · confirmed via a completed payment {data.safepay.verifiedAt ? `on ${new Date(data.safepay.verifiedAt).toLocaleDateString()}` : ''}
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                  Saved — will verify automatically on your first live payment
-                </div>
-              )}
               <p className="text-xs text-gray-400 -mt-1">
-                Find both keys in your Safepay dashboard under <span className="font-medium text-gray-500">Developer → API</span>.
+                Students will see these account details at checkout, pay you directly, then upload a screenshot as proof. You review and approve each payment before the student is enrolled.
               </p>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={labelCls}>Merchant Public Key</label>
-                  <input type="text" className={inputCls} value={safepayApiKey}
-                    onChange={e => setSafepayApiKey(e.target.value)} placeholder="sec_..." />
-                  <p className="text-[11px] text-gray-400 mt-1">Labeled "Public key" on Safepay's API page — despite the name, it isn't secret.</p>
-                </div>
-                <div>
-                  <label className={labelCls}>Environment</label>
-                  <select className={inputCls} value={safepayEnv} onChange={e => setSafepayEnv(e.target.value as 'sandbox' | 'production')}>
-                    <option value="sandbox">Sandbox</option>
-                    <option value="production">Production</option>
-                  </select>
-                </div>
+
+              <div className="space-y-3">
+                {manualAccounts.map((acc, i) => (
+                  <div key={i} className="rounded-lg border border-gray-200 bg-white p-3 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <select className={cn(inputCls, 'w-auto')} value={acc.type}
+                        onChange={e => updateManualAccount(i, { type: e.target.value as ManualAccount['type'], bankName: e.target.value === 'bank' ? acc.bankName : null })}>
+                        {(['bank', 'jazzcash', 'easypaisa'] as const).map(t => (
+                          <option key={t} value={t}>{MANUAL_ACCOUNT_TYPE_LABELS[t]}</option>
+                        ))}
+                      </select>
+                      <button type="button" onClick={() => removeManualAccount(i)} className="text-gray-400 hover:text-red-500 text-xs font-medium">
+                        Remove
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className={labelCls}>Account Title</label>
+                        <input type="text" className={inputCls} value={acc.accountTitle}
+                          onChange={e => updateManualAccount(i, { accountTitle: e.target.value })} placeholder="Account holder name" />
+                      </div>
+                      <div>
+                        <label className={labelCls}>{acc.type === 'bank' ? 'IBAN / Account Number' : 'Wallet Number'}</label>
+                        <input type="text" className={inputCls} value={acc.accountNumber}
+                          onChange={e => updateManualAccount(i, { accountNumber: e.target.value })} placeholder={acc.type === 'bank' ? 'PK00XXXX0000000000000000' : '03XXXXXXXXX'} />
+                      </div>
+                    </div>
+                    {acc.type === 'bank' && (
+                      <div>
+                        <label className={labelCls}>Bank Name</label>
+                        <input type="text" className={inputCls} value={acc.bankName || ''}
+                          onChange={e => updateManualAccount(i, { bankName: e.target.value })} placeholder="e.g. HBL, Meezan Bank" />
+                      </div>
+                    )}
+                    <div>
+                      <label className={labelCls}>Label <span className="font-normal normal-case text-gray-400">(optional)</span></label>
+                      <input type="text" className={inputCls} value={acc.label || ''}
+                        onChange={e => updateManualAccount(i, { label: e.target.value })} placeholder="e.g. Main Account" />
+                    </div>
+                  </div>
+                ))}
+                <Button size="sm" variant="outline" onClick={() => setManualAccounts(prev => [...prev, emptyManualAccount()])}>
+                  + Add account
+                </Button>
               </div>
+
               <div>
-                <label className={labelCls}>
-                  Secret Key {data?.safepay.hasSecretKey && <span className="font-normal normal-case text-gray-400">(blank = keep existing)</span>}
-                </label>
-                <input type="password" className={inputCls} value={safepaySecretKey}
-                  onChange={e => setSafepaySecretKey(e.target.value)}
-                  placeholder={data?.safepay.hasSecretKey ? '••••••••••••••••' : 'Secret key'} />
-                <p className="text-[11px] text-gray-400 mt-1">Labeled "Secret key" on Safepay's API page — keep this one confidential.</p>
+                <label className={labelCls}>Instructions for students <span className="font-normal normal-case text-gray-400">(optional)</span></label>
+                <textarea className={cn(inputCls, 'min-h-[80px]')} value={manualInstructions}
+                  onChange={e => setManualInstructions(e.target.value)}
+                  placeholder="e.g. Please include your name in the transfer reference, and allow up to 24 hours for approval." />
               </div>
+
               <div className="flex items-center gap-3">
-                <Button size="sm" loading={saveSafepayMutation.isPending}
-                  disabled={!safepayApiKey || (!safepaySecretKey && !data?.safepay.hasSecretKey)}
-                  onClick={() => { setBanner(null); saveSafepayMutation.mutate(); }}>
+                <Button size="sm" loading={saveManualMutation.isPending}
+                  disabled={!manualValid}
+                  onClick={() => { setBanner(null); saveManualMutation.mutate(); }}>
                   Save
                 </Button>
-                {data?.activeProvider === 'safepay' && (
-                  <Button size="sm" variant="outline" onClick={() => disconnectMutation.mutate('safepay')} loading={disconnectMutation.isPending}>
+                {data?.activeProvider === 'manual' && (
+                  <Button size="sm" variant="outline" onClick={() => disconnectMutation.mutate('manual')} loading={disconnectMutation.isPending}>
                     Disconnect
                   </Button>
                 )}
               </div>
-              <p className="text-xs text-gray-400">Student payments are collected via Safepay's hosted checkout and settle directly to your account.</p>
+              <p className="text-xs text-gray-400">Payments are collected outside the platform — you're responsible for verifying proof and refunding students directly if needed.</p>
             </div>
           )}
         </>

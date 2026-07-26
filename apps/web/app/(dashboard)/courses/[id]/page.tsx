@@ -12,7 +12,7 @@ import type { Course, Section, Lesson, LessonType, CourseLevel, Category } from 
 import { toast } from 'sonner';
 import { SmartContent } from '@/components/ui/SmartContent';
 import { useForumThreads, ThreadCard, CreateThreadModal } from '@/components/forum/shared';
-import { CheckoutModal, useCheckoutReturn } from '@/components/payment/CheckoutModal';
+import { CheckoutModal } from '@/components/payment/CheckoutModal';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -4371,27 +4371,6 @@ function StudentView() {
     },
   });
 
-  // Confirms a payment after returning from Safepay's hosted checkout redirect,
-  // and opens the modal directly on the success screen.
-  const checkoutReturn = useCheckoutReturn(
-    '/payments',
-    () => {
-      setShowPayment(true);
-      qc.invalidateQueries({ queryKey: ['my-enrollments'] });
-      qc.invalidateQueries({ queryKey: ['course-progress', courseId] });
-    },
-    () => {
-      setEnrollError('Payment was cancelled.');
-      setTimeout(() => setEnrollError(''), 4000);
-    }
-  );
-
-  useEffect(() => {
-    if (checkoutReturn.status === 'error') {
-      setEnrollError(checkoutReturn.errorMsg);
-      setTimeout(() => setEnrollError(''), 5000);
-    }
-  }, [checkoutReturn.status, checkoutReturn.errorMsg]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const trialMutation = useMutation({
     mutationFn: () => api.post(`/payments/courses/${courseId}/trial`),
@@ -4520,7 +4499,6 @@ function StudentView() {
       confirmUrlBase="/payments"
       couponCode={appliedCoupon?.code}
       successMessage="You are now enrolled. Enjoy the course!"
-      initialStep={checkoutReturn.status === 'success' ? 'done' : 'method'}
       onSuccess={() => {
         qc.invalidateQueries({ queryKey: ['my-enrollments'] });
         qc.invalidateQueries({ queryKey: ['course-progress', courseId] });

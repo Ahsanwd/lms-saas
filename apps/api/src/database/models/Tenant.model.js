@@ -129,7 +129,7 @@ const tenantSchema = new mongoose.Schema(
 
     // Bring-your-own payment gateway for course purchases (tenant is paid directly, platform takes no cut)
     paymentGateway: {
-      activeProvider: { type: String, enum: ['stripe', 'safepay', null], default: null },
+      activeProvider: { type: String, enum: ['stripe', 'safepay', 'manual', null], default: null },
 
       stripe: {
         secretKeyEncrypted: { type: String,  default: null, select: false }, // AES-256 encrypted
@@ -138,12 +138,31 @@ const tenantSchema = new mongoose.Schema(
         verifiedAt:         { type: Date,    default: null },
       },
 
+      // Legacy — Safepay integration removed (never completed a live transaction;
+      // blocked by an unresolved sandbox-account issue on Safepay's side). Fields
+      // kept, and 'safepay' kept in activeProvider above, only so a tenant that
+      // had this configured doesn't crash on read. No live code acts on this anymore.
       safepay: {
         apiKey:             { type: String,  default: null }, // merchant_api_key
         secretKeyEncrypted: { type: String,  default: null, select: false }, // AES-256 encrypted
         environment:        { type: String,  enum: ['sandbox', 'production'], default: 'sandbox' },
         verified:           { type: Boolean, default: false },
         verifiedAt:         { type: Date,    default: null },
+      },
+
+      // Manual payment — tenant publishes their own bank/JazzCash/EasyPaisa
+      // account details; student pays externally and uploads a screenshot as
+      // proof, admin reviews and approves/rejects. No secrets here (account
+      // numbers, not credentials) so nothing needs encryption.
+      manual: {
+        accounts: [{
+          type:          { type: String, enum: ['bank', 'jazzcash', 'easypaisa'], required: true },
+          label:         { type: String, default: null },
+          accountTitle:  { type: String, required: true },
+          accountNumber: { type: String, required: true }, // IBAN / wallet number
+          bankName:      { type: String, default: null },  // only meaningful when type === 'bank'
+        }],
+        instructions: { type: String, default: null, maxlength: 2000 },
       },
     },
 

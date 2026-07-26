@@ -1,6 +1,8 @@
 const svc = require('./payment.service');
 const trialSvc = require('../course/trial.service');
 const bundleSvc = require('../bundle/bundle.service');
+const AppError = require('../../utils/AppError');
+const { getPublicUrl } = require('../../services/storage/storage.service');
 const R = require('../../utils/response');
 
 async function initiate(req, res, next) {
@@ -129,10 +131,77 @@ async function receiptPdf(req, res, next) {
   } catch (err) { next(err); }
 }
 
+// ── Manual payment: proof upload (student) ────────────────────────────────────
+async function submitProof(req, res, next) {
+  try {
+    if (!req.file) throw new AppError('Proof image is required', 400);
+    const payment = await svc.uploadPaymentProof(
+      req.tenant.tenantId, req.params.paymentId, req.user.sub, getPublicUrl(req.file.path)
+    );
+    R.success(res, { payment }, 'Proof submitted — pending review');
+  } catch (err) { next(err); }
+}
+
+async function submitBundleProof(req, res, next) {
+  try {
+    if (!req.file) throw new AppError('Proof image is required', 400);
+    const payment = await bundleSvc.uploadBundlePaymentProof(
+      req.tenant.tenantId, req.params.paymentId, req.user.sub, getPublicUrl(req.file.path)
+    );
+    R.success(res, { payment }, 'Proof submitted — pending review');
+  } catch (err) { next(err); }
+}
+
+// ── Manual payment: admin review ───────────────────────────────────────────────
+async function pendingManual(req, res, next) {
+  try {
+    const result = await svc.listPendingManualPayments(req.tenant.tenantId, req.user, req.query);
+    R.success(res, result);
+  } catch (err) { next(err); }
+}
+
+async function approveManual(req, res, next) {
+  try {
+    const result = await svc.approveManualPayment(req.tenant.tenantId, req.params.paymentId, req.user, req.body);
+    R.success(res, result, 'Payment approved — student enrolled');
+  } catch (err) { next(err); }
+}
+
+async function rejectManual(req, res, next) {
+  try {
+    const payment = await svc.rejectManualPayment(req.tenant.tenantId, req.params.paymentId, req.user, req.body);
+    R.success(res, { payment }, 'Payment rejected');
+  } catch (err) { next(err); }
+}
+
+async function pendingManualBundle(req, res, next) {
+  try {
+    const result = await bundleSvc.listPendingManualBundlePayments(req.tenant.tenantId, req.user, req.query);
+    R.success(res, result);
+  } catch (err) { next(err); }
+}
+
+async function approveManualBundle(req, res, next) {
+  try {
+    const result = await bundleSvc.approveManualBundlePayment(req.tenant.tenantId, req.params.paymentId, req.user, req.body);
+    R.success(res, result, 'Payment approved — student enrolled in bundle');
+  } catch (err) { next(err); }
+}
+
+async function rejectManualBundle(req, res, next) {
+  try {
+    const payment = await bundleSvc.rejectManualBundlePayment(req.tenant.tenantId, req.params.paymentId, req.user, req.body);
+    R.success(res, { payment }, 'Payment rejected');
+  } catch (err) { next(err); }
+}
+
 module.exports = {
   initiate, confirm, refund, myPayments, coursePayments,
   startTrial, upgradeTrial, trialStatus,
   listMethods, setupIntent, deleteMethod,
   initiateBundle, confirmBundle, refundBundle,
   receiptPdf,
+  submitProof, submitBundleProof,
+  pendingManual, approveManual, rejectManual,
+  pendingManualBundle, approveManualBundle, rejectManualBundle,
 };

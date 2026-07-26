@@ -6,7 +6,6 @@ const Enrollment     = require('../../database/models/Enrollment.model');
 const User           = require('../../database/models/User.model');
 const AppError       = require('../../utils/AppError');
 const { getTenantStripeClient, createOrGetCustomer } = require('../../services/stripe/stripe');
-const safepay        = require('../../services/safepay/safepay');
 const tenantRepo     = require('../../database/repositories/tenant.repository');
 const tenantService  = require('../tenant/tenant.service');
 
@@ -114,7 +113,7 @@ async function deleteBundle(tenantId, bundleId, actingUser) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// CHECKOUT — mirrors payment.service.js's Stripe/Safepay/mock branching
+// CHECKOUT — mirrors payment.service.js's Stripe/manual/mock branching
 // ═══════════════════════════════════════════════════════════════════════════
 
 async function providerCreateIntent(stripeClient, amount, currency, metadata, customerId = null) {
@@ -152,13 +151,6 @@ function receiptNumber() {
 function calcExpiresAt(days) {
   if (!days || days <= 0) return null;
   return new Date(Date.now() + days * 24 * 60 * 60 * 1000);
-}
-
-function tenantBaseUrl(tenant) {
-  const rootDomain = process.env.ROOT_DOMAIN || 'coursel.space';
-  return tenant?.subdomain
-    ? `https://${tenant.subdomain}.${rootDomain}`
-    : (process.env.APP_URL || 'http://localhost:3000');
 }
 
 // ─── Initiate bundle payment ───────────────────────────────────────────────
@@ -201,43 +193,27 @@ async function initiateBundlePayment(tenantId, bundleId, userId, { couponCode } 
 
   const gateway = await tenantService.getActiveGateway(tenantId);
 
-  // ── Safepay: hosted-checkout redirect ────────────────────────────────────
-  if (gateway.provider === 'safepay') {
+  // ── Manual: tenant's own bank/JazzCash/EasyPaisa accounts, student uploads proof ──
+  if (gateway.provider === 'manual') {
     const payment = await BundlePayment.create({
       tenantId, bundleId, userId,
       courseIds: bundle.courseIds,
       amount: finalAmount, currency, discountAmount,
       couponCode: appliedCoupon,
-      provider: 'safepay',
+      provider: 'manual',
       receiptNumber: receiptNumber(),
-      status: 'pending',
+      status: 'pending', // awaiting proof upload
     });
 
-    const returnBase = `${tenantBaseUrl(tenant)}/bundles`;
-
-    const [{ tracker }, tbt] = await Promise.all([
-      safepay.createSession({
-        apiKey:      gateway.apiKey,
-        environment: gateway.environment,
-        amount:      finalAmount,
-        currency:    currency.toUpperCase(),
-        orderId:     payment._id.toString(),
-      }),
-      safepay.getPassportToken({ secretKey: gateway.secretKey, environment: gateway.environment }),
-    ]);
-
-    payment.safepayTracker = tracker;
-    await payment.save();
-
-    const redirectUrl = safepay.buildCheckoutUrl({
-      environment: gateway.environment,
-      tracker,
-      tbt,
-      redirectUrl: `${returnBase}?safepayPaymentId=${payment._id}`,
-      cancelUrl:   `${returnBase}?safepayCancelled=1`,
-    });
-
-    return { paymentId: payment._id, provider: 'safepay', redirectUrl, amount: finalAmount, currency, bundleTitle: bundle.title };
+    return {
+      paymentId:    payment._id,
+      provider:     'manual',
+      amount:       finalAmount,
+      currency,
+      bundleTitle:  bundle.title,
+      accounts:     gateway.accounts,
+      instructions: gateway.instructions,
+    };
   }
 
   // ── Stripe (tenant's own key) or mock fallback ───────────────────────────
@@ -279,23 +255,11 @@ async function initiateBundlePayment(tenantId, bundleId, userId, { couponCode } 
 }
 
 // ─── Confirm bundle payment ──────────────────────────────────────────────────
+// Manual payments never use this path — they only reach 'completed' via admin
+// approval (see approveManualBundlePayment below).
 async function confirmBundlePayment(tenantId, paymentId, userId) {
   const payment = await BundlePayment.findOne({ _id: paymentId, tenantId, userId, status: 'pending' });
   if (!payment) throw new AppError('Payment not found or already processed', 404);
-
-  if (payment.provider === 'safepay') {
-    const gateway = await tenantService.getActiveGateway(tenantId);
-    if (gateway.provider !== 'safepay') throw new AppError('Safepay is no longer configured for this school', 409);
-
-    const status = await safepay.getPaymentStatus({
-      secretKey: gateway.secretKey, environment: gateway.environment, tracker: payment.safepayTracker,
-    });
-    if (status.state !== 'TRACKER_ENDED') throw new AppError('Payment not confirmed by Safepay', 402, 'PAYMENT_FAILED');
-
-    const result = await _activateBundlePayment(payment);
-    tenantService.markSafepayVerified(tenantId).catch(() => {});
-    return result;
-  }
 
   let stripeClient = null;
   if (payment.provider === 'stripe') {
@@ -375,6 +339,96 @@ async function _activateBundlePayment(payment) {
   return { payment, enrollmentIds };
 }
 
+// ─── Manual payment: student uploads proof screenshot ─────────────────────────
+async function uploadBundlePaymentProof(tenantId, paymentId, userId, proofUrl) {
+  const payment = await BundlePayment.findOne({
+    _id: paymentId, tenantId, userId, provider: 'manual', status: { $in: ['pending', 'rejected'] },
+  });
+  if (!payment) throw new AppError('Payment not found or not awaiting proof submission', 404);
+
+  payment.proofImageUrl   = proofUrl;
+  payment.proofUploadedAt = new Date();
+  payment.status          = 'awaiting_review';
+  payment.reviewNote      = null;
+  payment.reviewedBy      = null;
+  payment.reviewedAt      = null;
+  await payment.save();
+  return payment;
+}
+
+// ─── Manual payment: admin approves — enrolls the student in the bundle + notifies ─
+async function approveManualBundlePayment(tenantId, paymentId, actingUser, { reviewNote = '' } = {}) {
+  const payment = await BundlePayment.findOne({ _id: paymentId, tenantId, provider: 'manual', status: 'awaiting_review' });
+  if (!payment) throw new AppError('Pending manual payment not found', 404);
+
+  if (actingUser.role === 'instructor') {
+    const bundle = await CourseBundle.findOne({ _id: payment.bundleId, tenantId });
+    if (bundle && bundle.createdBy?.toString() !== actingUser.sub.toString())
+      throw new AppError('You can only review payments for bundles you created', 403);
+  }
+
+  payment.reviewedBy = actingUser.sub;
+  payment.reviewedAt = new Date();
+  payment.reviewNote = reviewNote;
+  await payment.save();
+
+  const result = await _activateBundlePayment(payment);
+
+  const bundle = await CourseBundle.findById(payment.bundleId).select('title');
+  require('../notification/notification.service')
+    .notifyPaymentApproved(tenantId, payment.userId.toString(), bundle?.title ?? 'the bundle', '/bundles', 'Bundle')
+    .catch(() => {});
+
+  return result;
+}
+
+// ─── Manual payment: admin rejects — student can re-upload on the same record ─
+async function rejectManualBundlePayment(tenantId, paymentId, actingUser, { reviewNote = '' } = {}) {
+  if (!reviewNote?.trim()) throw new AppError('A reason is required when rejecting a payment', 400);
+
+  const payment = await BundlePayment.findOne({ _id: paymentId, tenantId, provider: 'manual', status: 'awaiting_review' });
+  if (!payment) throw new AppError('Pending manual payment not found', 404);
+
+  if (actingUser.role === 'instructor') {
+    const bundle = await CourseBundle.findOne({ _id: payment.bundleId, tenantId });
+    if (bundle && bundle.createdBy?.toString() !== actingUser.sub.toString())
+      throw new AppError('You can only review payments for bundles you created', 403);
+  }
+
+  payment.status     = 'rejected';
+  payment.reviewedBy = actingUser.sub;
+  payment.reviewedAt = new Date();
+  payment.reviewNote = reviewNote.trim();
+  await payment.save();
+
+  const bundle = await CourseBundle.findById(payment.bundleId).select('title');
+  require('../notification/notification.service')
+    .notifyPaymentRejected(tenantId, payment.userId.toString(), bundle?.title ?? 'the bundle', reviewNote.trim(), 'Bundle')
+    .catch(() => {});
+
+  return payment;
+}
+
+// ─── Manual payment: admin review queue ───────────────────────────────────────
+async function listPendingManualBundlePayments(tenantId, actingUser, { status = 'awaiting_review', page = 1, limit = 20 } = {}) {
+  const filter = { tenantId, provider: 'manual' };
+  if (status) filter.status = status;
+  if (actingUser.role === 'instructor') {
+    filter.bundleId = { $in: await CourseBundle.distinct('_id', { tenantId, createdBy: actingUser.sub }) };
+  }
+
+  const skip = (Number(page) - 1) * Number(limit);
+  const [payments, total] = await Promise.all([
+    BundlePayment.find(filter)
+      .sort({ proofUploadedAt: -1, createdAt: -1 })
+      .skip(skip).limit(Number(limit))
+      .populate('userId', 'firstName lastName email')
+      .populate('bundleId', 'title'),
+    BundlePayment.countDocuments(filter),
+  ]);
+  return { payments, total, page: Number(page), limit: Number(limit) };
+}
+
 // ─── Refund bundle payment (admin) ───────────────────────────────────────────
 async function refundBundlePayment(tenantId, paymentId, actingUser, { reason = '' } = {}) {
   const payment = await BundlePayment.findOne({ _id: paymentId, tenantId, status: 'completed' });
@@ -391,7 +445,10 @@ async function refundBundlePayment(tenantId, paymentId, actingUser, { reason = '
   }
 
   if (payment.provider === 'safepay') {
-    throw new AppError('This was a Safepay payment — process the refund manually in the Safepay dashboard, then contact support to reconcile the record.', 400);
+    // Legacy — Safepay is no longer integrated. Admin reconciles manually.
+    throw new AppError('This was a Safepay payment — process the refund manually and contact support to reconcile the record.', 400);
+  } else if (payment.provider === 'manual') {
+    throw new AppError('This was a manually verified payment — there is no gateway to auto-refund. Unenroll the student and settle any refund with them directly.', 400);
   } else if (payment.provider === 'stripe') {
     const gateway = await tenantService.getActiveGateway(tenantId);
     const stripeClient = gateway.provider === 'stripe' ? getTenantStripeClient(gateway.secretKey) : null;
@@ -427,4 +484,5 @@ async function refundBundlePayment(tenantId, paymentId, actingUser, { reason = '
 module.exports = {
   listBundles, listPublicBundles, getBundle, createBundle, updateBundle, deleteBundle,
   initiateBundlePayment, confirmBundlePayment, refundBundlePayment,
+  uploadBundlePaymentProof, approveManualBundlePayment, rejectManualBundlePayment, listPendingManualBundlePayments,
 };

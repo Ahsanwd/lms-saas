@@ -17,6 +17,8 @@ const trialExpiringTpl      = require('../../services/email/templates/trialExpir
 const quizGradedTpl           = require('../../services/email/templates/quizGraded');
 const refundApprovedTpl       = require('../../services/email/templates/refundApproved');
 const refundRejectedTpl       = require('../../services/email/templates/refundRejected');
+const paymentApprovedTpl      = require('../../services/email/templates/paymentApproved');
+const paymentRejectedTpl      = require('../../services/email/templates/paymentRejected');
 const liveSessionReminderTpl  = require('../../services/email/templates/liveSessionReminder');
 const forumReplyTpl          = require('../../services/email/templates/forumReply');
 const discussionQuestionTpl  = require('../../services/email/templates/discussionQuestion');
@@ -32,6 +34,7 @@ const TYPE_SOURCE = {
   chat_message: 'chat', forum_reply: 'discussion', quiz_graded: 'quiz', quiz_published: 'quiz',
   refund_approved: 'refund', refund_rejected: 'refund', live_session_reminder: 'liveClass',
   email_delivery_failed: 'email', discussion_comment: 'discussion', discussion_reply: 'discussion',
+  payment_proof_approved: 'payment', payment_proof_rejected: 'payment',
 };
 
 // ── Push (lazy-loaded so server still boots if web-push isn't configured) ─────
@@ -107,6 +110,15 @@ function buildEmailPayload(type, ctx, userDoc, appUrl, tenantName, branding = {}
         ...base, recipientName: base.studentName,
         studentName: ctx.studentName, lessonTitle: ctx.lessonTitle,
         preview: ctx.preview, threadUrl: `${appUrl}${ctx.link || ''}`,
+      });
+    case 'payment_proof_approved':
+      return paymentApprovedTpl({
+        ...base, itemLabel: ctx.itemLabel || 'Course', itemName: ctx.itemName,
+        ctaUrl: `${appUrl}${ctx.ctaPath || '/my-payments'}`,
+      });
+    case 'payment_proof_rejected':
+      return paymentRejectedTpl({
+        ...base, itemLabel: ctx.itemLabel || 'Course', itemName: ctx.itemName, note: ctx.note || '',
       });
     // chat_message: in-app + push only, no email — it's a real-time conversation
     default:
@@ -324,6 +336,24 @@ async function notifyEnrollmentRejected(tenantId, userId, courseName, note = '',
   });
 }
 
+async function notifyPaymentApproved(tenantId, userId, itemName, ctaPath, itemLabel = 'Course', ctx = {}) {
+  return create(tenantId, userId, {
+    type: 'payment_proof_approved', title: "Payment approved — you're enrolled!",
+    message: `Your payment for "${itemName}" was verified. You're now enrolled.`,
+    link: ctaPath,
+    ctx: { itemName, itemLabel, ctaPath, ...ctx },
+  });
+}
+
+async function notifyPaymentRejected(tenantId, userId, itemName, note = '', itemLabel = 'Course', ctx = {}) {
+  return create(tenantId, userId, {
+    type: 'payment_proof_rejected', title: 'Payment proof rejected',
+    message: `Your payment proof for "${itemName}" could not be verified.${note ? ` Reason: ${note}` : ''} Please re-upload.`,
+    link: null,
+    ctx: { itemName, itemLabel, note, ...ctx },
+  });
+}
+
 async function notifyAssignmentGraded(tenantId, userId, assignmentTitle, grade, courseId, ctx = {}) {
   return create(tenantId, userId, {
     type: 'assignment_graded', title: 'Assignment graded',
@@ -471,4 +501,5 @@ module.exports = {
   notifyQuizGraded, notifyRefundApproved, notifyRefundRejected,
   notifyLiveSessionReminder, notifyAssignmentPublished,
   notifyQuizPublished, notifyAssignmentDue, notifyTrialExpiring,
+  notifyPaymentApproved, notifyPaymentRejected,
 };

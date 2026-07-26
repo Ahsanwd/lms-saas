@@ -17,6 +17,7 @@ const ALLOWED_TYPES = {
     'image/jpeg', 'image/png', 'image/webp', 'image/gif',
     'application/pdf',
   ],
+  'payment-proof': ['image/jpeg', 'image/png', 'image/webp'],
   attachment: [
     'application/pdf',
     'application/msword',
@@ -52,6 +53,7 @@ const MAX_SIZE = {
   audio:            500 * 1024 * 1024,
   attachment:       100 * 1024 * 1024,
   chat:             10  * 1024 * 1024,
+  'payment-proof':  5   * 1024 * 1024,
 };
 
 // ── Build S3Client (lazy singleton) ──────────────────────────────────────────

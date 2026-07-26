@@ -13,9 +13,14 @@ const coursePaymentSchema = new mongoose.Schema(
     discountAmount: { type: Number, default: 0 },
     couponCode:     { type: String, default: null },
 
+    // awaiting_review/rejected are manual-payment-only states: awaiting_review
+    // means a proof screenshot was uploaded and needs admin review; rejected
+    // means the admin rejected it — distinct from failed because the student
+    // is expected to re-upload a new proof on the same record (see
+    // uploadPaymentProof in payment.service.js).
     status: {
       type: String,
-      enum: ['pending', 'completed', 'failed', 'refunded'],
+      enum: ['pending', 'awaiting_review', 'completed', 'failed', 'rejected', 'refunded'],
       default: 'pending',
     },
 
@@ -23,8 +28,15 @@ const coursePaymentSchema = new mongoose.Schema(
     paymentIntentId:  { type: String, default: null },   // pi_xxx or mock_pi_xxx (Stripe)
     paypalOrderId:    { type: String, default: null },   // PayPal order ID
     paypalCaptureId:  { type: String, default: null },   // PayPal capture ID (needed for refunds)
-    safepayTracker:   { type: String, default: null },   // track_xxx — Safepay hosted-checkout session
-    provider:         { type: String, enum: ['mock', 'stripe', 'safepay', 'paypal'], default: 'mock' },
+    safepayTracker:   { type: String, default: null },   // track_xxx — legacy Safepay hosted-checkout session
+    provider:         { type: String, enum: ['mock', 'stripe', 'safepay', 'paypal', 'manual'], default: 'mock' },
+
+    // Manual payment proof (provider === 'manual' only)
+    proofImageUrl:   { type: String, default: null },
+    proofUploadedAt: { type: Date,   default: null },
+    reviewedBy:      { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    reviewedAt:      { type: Date,   default: null },
+    reviewNote:      { type: String, default: null }, // admin's approval note or rejection reason
 
     paidAt:     { type: Date, default: null },
     refundedAt: { type: Date, default: null },

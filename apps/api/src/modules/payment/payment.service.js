@@ -5,7 +5,6 @@ const Enrollment                  = require('../../database/models/Enrollment.mo
 const User                        = require('../../database/models/User.model');
 const AppError                    = require('../../utils/AppError');
 const { getTenantStripeClient, createOrGetCustomer } = require('../../services/stripe/stripe');
-const safepay                     = require('../../services/safepay/safepay');
 const tenantRepo                  = require('../../database/repositories/tenant.repository');
 const tenantService                = require('../tenant/tenant.service');
 
@@ -59,16 +58,10 @@ function calcExpiresAt(days) {
   return new Date(Date.now() + days * 24 * 60 * 60 * 1000);
 }
 
-function tenantBaseUrl(tenant) {
-  const rootDomain = process.env.ROOT_DOMAIN || 'coursel.space';
-  return tenant?.subdomain
-    ? `https://${tenant.subdomain}.${rootDomain}`
-    : (process.env.APP_URL || 'http://localhost:3000');
-}
-
 // ─── Initiate payment ─────────────────────────────────────────────────────────
-// Returns either a Stripe shape ({ clientSecret, publishableKey }) or a Safepay
-// shape ({ redirectUrl }) depending on which gateway the tenant has configured.
+// Returns either a Stripe shape ({ clientSecret, publishableKey }) or a manual-
+// payment shape ({ accounts, instructions }) depending on which gateway the
+// tenant has configured.
 async function initiatePayment(tenantId, courseId, userId, { couponCode } = {}) {
   const [course, tenant, user] = await Promise.all([
     Course.findOne({ _id: courseId, tenantId, deletedAt: null }),
@@ -103,54 +96,27 @@ async function initiatePayment(tenantId, courseId, userId, { couponCode } = {}) 
 
   const gateway = await tenantService.getActiveGateway(tenantId);
 
-  // ── Safepay: hosted-checkout redirect, no clientSecret ──────────────────────
-  if (gateway.provider === 'safepay') {
+  // ── Manual: tenant's own bank/JazzCash/EasyPaisa accounts, student uploads proof ──
+  if (gateway.provider === 'manual') {
     const payment = await CoursePayment.create({
       tenantId, courseId, userId,
       amount:        finalAmount,
       currency,
       discountAmount,
       couponCode:    appliedCoupon,
-      provider:      'safepay',
+      provider:      'manual',
       receiptNumber: receiptNumber(),
-      status:        'pending',
-    });
-
-    const returnBase = `${tenantBaseUrl(tenant)}/courses/${courseId}`;
-
-    // NOTE: Safepay's public docs are inconsistent about whether `amount` is in the
-    // smallest currency unit (cents) or whole units — sending cents here to match
-    // the rest of this codebase's convention. Verify against a real sandbox account
-    // and adjust if Safepay charges 100x too much/little.
-    const [{ tracker }, tbt] = await Promise.all([
-      safepay.createSession({
-        apiKey:      gateway.apiKey,
-        environment: gateway.environment,
-        amount:      finalAmount,
-        currency:    currency.toUpperCase(),
-        orderId:     payment._id.toString(),
-      }),
-      safepay.getPassportToken({ secretKey: gateway.secretKey, environment: gateway.environment }),
-    ]);
-
-    payment.safepayTracker = tracker;
-    await payment.save();
-
-    const redirectUrl = safepay.buildCheckoutUrl({
-      environment: gateway.environment,
-      tracker,
-      tbt,
-      redirectUrl: `${returnBase}?safepayPaymentId=${payment._id}`,
-      cancelUrl:   `${returnBase}?safepayCancelled=1`,
+      status:        'pending', // awaiting proof upload
     });
 
     return {
-      paymentId:  payment._id,
-      provider:   'safepay',
-      redirectUrl,
-      amount:     finalAmount,
+      paymentId:    payment._id,
+      provider:     'manual',
+      amount:       finalAmount,
       currency,
-      courseName: course.title,
+      courseName:   course.title,
+      accounts:     gateway.accounts,
+      instructions: gateway.instructions,
     };
   }
 
@@ -193,7 +159,9 @@ async function initiatePayment(tenantId, courseId, userId, { couponCode } = {}) 
   };
 }
 
-// ─── Confirm payment (step 2 — after client confirms card, or after Safepay redirect) ─
+// ─── Confirm payment (step 2 — after client confirms card) ───────────────────
+// Manual payments never use this path — they only reach 'completed' via admin
+// approval (see approveManualPayment below).
 async function confirmPayment(tenantId, paymentId, userId) {
   const payment = await CoursePayment.findOne({ _id: paymentId, tenantId, userId, status: 'pending' });
   if (!payment) throw new AppError('Payment not found or already processed', 404);
@@ -211,22 +179,6 @@ async function confirmPaymentByIntentId(paymentIntentId) {
 
 // ─── Shared confirm — branches by provider, then activates enrollment ────────
 async function _confirmAndActivate(payment) {
-  if (payment.provider === 'safepay') {
-    const gateway = await tenantService.getActiveGateway(payment.tenantId);
-    if (gateway.provider !== 'safepay') throw new AppError('Safepay is no longer configured for this school', 409);
-
-    const status = await safepay.getPaymentStatus({
-      secretKey:   gateway.secretKey,
-      environment: gateway.environment,
-      tracker:     payment.safepayTracker,
-    });
-    if (status.state !== 'TRACKER_ENDED') throw new AppError('Payment not confirmed by Safepay', 402, 'PAYMENT_FAILED');
-
-    const result = await _activatePayment(payment);
-    tenantService.markSafepayVerified(payment.tenantId).catch(() => {});
-    return result;
-  }
-
   let stripeClient = null;
   if (payment.provider === 'stripe') {
     const gateway = await tenantService.getActiveGateway(payment.tenantId);
@@ -290,6 +242,99 @@ async function _activatePayment(payment) {
   return { payment, enrollment };
 }
 
+// ─── Manual payment: student uploads proof screenshot ─────────────────────────
+// Allowed from 'pending' (first submission) or 'rejected' (resubmission after
+// admin rejected an earlier proof) — resubmitting clears the prior review so
+// the record goes back into the admin's review queue clean.
+async function uploadPaymentProof(tenantId, paymentId, userId, proofUrl) {
+  const payment = await CoursePayment.findOne({
+    _id: paymentId, tenantId, userId, provider: 'manual', status: { $in: ['pending', 'rejected'] },
+  });
+  if (!payment) throw new AppError('Payment not found or not awaiting proof submission', 404);
+
+  payment.proofImageUrl   = proofUrl;
+  payment.proofUploadedAt = new Date();
+  payment.status          = 'awaiting_review';
+  payment.reviewNote      = null;
+  payment.reviewedBy      = null;
+  payment.reviewedAt      = null;
+  await payment.save();
+  return payment;
+}
+
+// ─── Manual payment: admin approves — enrolls the student + notifies ─────────
+async function approveManualPayment(tenantId, paymentId, actingUser, { reviewNote = '' } = {}) {
+  const payment = await CoursePayment.findOne({ _id: paymentId, tenantId, provider: 'manual', status: 'awaiting_review' });
+  if (!payment) throw new AppError('Pending manual payment not found', 404);
+
+  if (actingUser.role === 'instructor') {
+    const course = await Course.findOne({ _id: payment.courseId, tenantId }).select('instructorId');
+    if (course && course.instructorId?.toString() !== actingUser.sub.toString())
+      throw new AppError('You can only review payments for your own courses', 403);
+  }
+
+  payment.reviewedBy = actingUser.sub;
+  payment.reviewedAt = new Date();
+  payment.reviewNote = reviewNote;
+  await payment.save();
+
+  const result = await _activatePayment(payment);
+
+  const course = await Course.findById(payment.courseId).select('title');
+  require('../notification/notification.service')
+    .notifyPaymentApproved(tenantId, payment.userId.toString(), course?.title ?? 'the course', `/courses/${payment.courseId}/learn`)
+    .catch(() => {});
+
+  return result;
+}
+
+// ─── Manual payment: admin rejects — student can re-upload on the same record ─
+async function rejectManualPayment(tenantId, paymentId, actingUser, { reviewNote = '' } = {}) {
+  if (!reviewNote?.trim()) throw new AppError('A reason is required when rejecting a payment', 400);
+
+  const payment = await CoursePayment.findOne({ _id: paymentId, tenantId, provider: 'manual', status: 'awaiting_review' });
+  if (!payment) throw new AppError('Pending manual payment not found', 404);
+
+  if (actingUser.role === 'instructor') {
+    const course = await Course.findOne({ _id: payment.courseId, tenantId }).select('instructorId');
+    if (course && course.instructorId?.toString() !== actingUser.sub.toString())
+      throw new AppError('You can only review payments for your own courses', 403);
+  }
+
+  payment.status      = 'rejected';
+  payment.reviewedBy  = actingUser.sub;
+  payment.reviewedAt  = new Date();
+  payment.reviewNote  = reviewNote.trim();
+  await payment.save();
+
+  const course = await Course.findById(payment.courseId).select('title');
+  require('../notification/notification.service')
+    .notifyPaymentRejected(tenantId, payment.userId.toString(), course?.title ?? 'the course', reviewNote.trim())
+    .catch(() => {});
+
+  return payment;
+}
+
+// ─── Manual payment: admin review queue ───────────────────────────────────────
+async function listPendingManualPayments(tenantId, actingUser, { status = 'awaiting_review', page = 1, limit = 20 } = {}) {
+  const filter = { tenantId, provider: 'manual' };
+  if (status) filter.status = status;
+  if (actingUser.role === 'instructor') {
+    filter.courseId = { $in: await Course.distinct('_id', { tenantId, instructorId: actingUser.sub }) };
+  }
+
+  const skip = (Number(page) - 1) * Number(limit);
+  const [payments, total] = await Promise.all([
+    CoursePayment.find(filter)
+      .sort({ proofUploadedAt: -1, createdAt: -1 })
+      .skip(skip).limit(Number(limit))
+      .populate('userId', 'firstName lastName email')
+      .populate('courseId', 'title thumbnail'),
+    CoursePayment.countDocuments(filter),
+  ]);
+  return { payments, total, page: Number(page), limit: Number(limit) };
+}
+
 // ─── Refund (admin) ───────────────────────────────────────────────────────────
 async function refundPayment(tenantId, paymentId, actingUser, { reason = '', amount = null } = {}) {
   const payment = await CoursePayment.findOne({ _id: paymentId, tenantId, status: 'completed' });
@@ -311,10 +356,15 @@ async function refundPayment(tenantId, paymentId, actingUser, { reason = '', amo
   if (payment.provider === 'paypal') {
     throw new AppError('This was a PayPal payment — PayPal is no longer integrated. Process the refund manually in the PayPal dashboard.', 400);
   } else if (payment.provider === 'safepay') {
-    // Safepay's refund endpoint isn't confirmed in public docs — don't guess at
-    // money-movement code. Admin refunds manually; we still don't mark it refunded
-    // here so our records stay honest about what actually happened.
-    throw new AppError('This was a Safepay payment — process the refund manually in the Safepay dashboard, then contact support to reconcile the record.', 400);
+    // Legacy — Safepay is no longer integrated. No automated refund path was
+    // ever confirmed working for it; admin reconciles manually.
+    throw new AppError('This was a Safepay payment — process the refund manually and contact support to reconcile the record.', 400);
+  } else if (payment.provider === 'manual') {
+    // This was a manually verified bank/JazzCash/EasyPaisa payment — there's no
+    // gateway to auto-refund. Admin unenrolls the student and settles any
+    // refund with them directly (same "record the fact, don't move money we
+    // can't verify" precedent as the Safepay/PayPal branches above).
+    throw new AppError('This was a manually verified payment — there is no gateway to auto-refund. Unenroll the student and settle any refund with them directly.', 400);
   } else if (payment.provider === 'stripe') {
     const gateway = await tenantService.getActiveGateway(tenantId);
     const stripeClient = gateway.provider === 'stripe' ? getTenantStripeClient(gateway.secretKey) : null;
@@ -390,8 +440,8 @@ async function getCoursePayments(tenantId, courseId, query = {}, actingUser) {
 }
 
 // ─── Saved payment methods ────────────────────────────────────────────────────
-// Only available for tenants on the Stripe gateway — Safepay's hosted checkout
-// doesn't give us a saved-card concept in this integration.
+// Only available for tenants on the Stripe gateway — manual/mock have no
+// saved-card concept in this integration.
 
 async function getPaymentMethods(userId, tenantId) {
   const gateway = await tenantService.getActiveGateway(tenantId);
@@ -528,4 +578,5 @@ module.exports = {
   refundPayment, getMyPayments, getCoursePayments,
   getPaymentMethods, createSetupIntent, deletePaymentMethod,
   generateReceiptPdf,
+  uploadPaymentProof, approveManualPayment, rejectManualPayment, listPendingManualPayments,
 };

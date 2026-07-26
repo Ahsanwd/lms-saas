@@ -42,10 +42,10 @@ router.delete('/domain', requirePermission('settings:manage'), ctrl.removeCustom
 router.get( '/email-settings',      requireRole('tenant_admin'), ctrl.getEmailSettings);
 router.put( '/email-settings',      requireRole('tenant_admin'), ctrl.saveEmailSettings);
 
-// Payment gateway BYOK for course purchases — Stripe or Safepay (tenant admin only)
+// Payment gateway BYOK for course purchases — Stripe or Manual (tenant admin only)
 router.get(   '/payment-gateway',           requireRole('tenant_admin'), ctrl.getPaymentGateway);
 router.put(   '/payment-gateway/stripe',    requireRole('tenant_admin'), ctrl.savePaymentGatewayStripe);
-router.put(   '/payment-gateway/safepay',   requireRole('tenant_admin'), ctrl.savePaymentGatewaySafepay);
+router.put(   '/payment-gateway/manual',    requireRole('tenant_admin'), ctrl.savePaymentGatewayManual);
 router.delete('/payment-gateway/:provider', requireRole('tenant_admin'), ctrl.disconnectPaymentGateway);
 
 // Cloudflare Stream — shared platform-level account, any authenticated user can

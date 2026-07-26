@@ -33,6 +33,8 @@ const notificationSchema = new mongoose.Schema(
         'group_announcement',   // announcement posted in a group you're a member of
         'contact_submission',   // someone submitted the public Contact Form (tenant admin only)
         'course_application',   // someone submitted the public Course Application form (tenant admin only)
+        'payment_proof_approved', // manual payment proof approved — enrolled
+        'payment_proof_rejected', // manual payment proof rejected — needs re-upload
       ],
       required: true,
     },

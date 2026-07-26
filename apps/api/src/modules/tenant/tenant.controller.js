@@ -156,10 +156,10 @@ async function savePaymentGatewayStripe(req, res, next) {
   } catch (err) { next(err); }
 }
 
-async function savePaymentGatewaySafepay(req, res, next) {
+async function savePaymentGatewayManual(req, res, next) {
   try {
-    const data = await tenantService.saveSafepayGateway(req.tenant.tenantId, req.body);
-    R.success(res, data, 'Safepay gateway saved');
+    const data = await tenantService.saveManualGateway(req.tenant.tenantId, req.body);
+    R.success(res, data, 'Manual payment details saved');
   } catch (err) { next(err); }
 }
 
@@ -295,7 +295,7 @@ module.exports = {
   saveEmailSettings,
   getPaymentGateway,
   savePaymentGatewayStripe,
-  savePaymentGatewaySafepay,
+  savePaymentGatewayManual,
   disconnectPaymentGateway,
   getCfStreamStatus,
   getBunnyStreamSettings,

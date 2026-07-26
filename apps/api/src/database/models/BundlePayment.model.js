@@ -24,15 +24,24 @@ const bundlePaymentSchema = new mongoose.Schema(
     discountAmount: { type: Number, default: 0 },
     couponCode:     { type: String, default: null },
 
+    // awaiting_review/rejected are manual-payment-only states — see the same
+    // note in CoursePayment.model.js.
     status: {
       type: String,
-      enum: ['pending', 'completed', 'failed', 'refunded'],
+      enum: ['pending', 'awaiting_review', 'completed', 'failed', 'rejected', 'refunded'],
       default: 'pending',
     },
 
     paymentIntentId: { type: String, default: null }, // pi_xxx or mock_pi_xxx (Stripe)
-    safepayTracker:  { type: String, default: null }, // track_xxx — Safepay hosted-checkout session
-    provider:        { type: String, enum: ['mock', 'stripe', 'safepay'], default: 'mock' },
+    safepayTracker:  { type: String, default: null }, // track_xxx — legacy Safepay hosted-checkout session
+    provider:        { type: String, enum: ['mock', 'stripe', 'safepay', 'manual'], default: 'mock' },
+
+    // Manual payment proof (provider === 'manual' only)
+    proofImageUrl:   { type: String, default: null },
+    proofUploadedAt: { type: Date,   default: null },
+    reviewedBy:      { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    reviewedAt:      { type: Date,   default: null },
+    reviewNote:      { type: String, default: null },
 
     paidAt:       { type: Date, default: null },
     refundedAt:   { type: Date, default: null },

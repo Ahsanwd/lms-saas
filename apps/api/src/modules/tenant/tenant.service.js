@@ -162,6 +162,7 @@ async function getPaymentGatewaySettings(tenantId) {
   const pg      = tenant.paymentGateway || {};
   const stripe  = pg.stripe  || {};
   const safepay = pg.safepay || {};
+  const manual  = pg.manual  || {};
 
   return {
     activeProvider: pg.activeProvider || null,
@@ -171,12 +172,19 @@ async function getPaymentGatewaySettings(tenantId) {
       verified:       stripe.verified || false,
       verifiedAt:     stripe.verifiedAt || null,
     },
+    // Legacy — Safepay is no longer a usable gateway (see the note on
+    // Tenant.model.js's paymentGateway.safepay field). Kept here only so a
+    // tenant that had it configured can still see + clear the old setting.
     safepay: {
       apiKey:       safepay.apiKey || null,
       hasSecretKey: !!safepay.secretKeyEncrypted,
       environment:  safepay.environment || 'sandbox',
       verified:     safepay.verified || false,
       verifiedAt:   safepay.verifiedAt || null,
+    },
+    manual: {
+      accounts:     manual.accounts || [],
+      instructions: manual.instructions || null,
     },
   };
 }
@@ -203,47 +211,71 @@ async function saveStripeGateway(tenantId, { secretKey, publishableKey }) {
   return getPaymentGatewaySettings(tenantId);
 }
 
-// ─── Save Safepay Gateway ──────────────────────────────────────────────────────
-// No live verification call here (avoids creating a stray tracker on Safepay's side) —
-// `verified` flips true the first time a real payment through this tenant confirms
-// successfully (see markSafepayVerified, called from payment.service.js).
-async function saveSafepayGateway(tenantId, { apiKey, secretKey, environment }) {
-  const update = {
-    'paymentGateway.activeProvider':      'safepay',
-    'paymentGateway.safepay.apiKey':      apiKey || null,
-    'paymentGateway.safepay.environment': environment === 'production' ? 'production' : 'sandbox',
-  };
+const MANUAL_ACCOUNT_TYPES = ['bank', 'jazzcash', 'easypaisa'];
 
-  if (secretKey && secretKey.trim()) {
-    update['paymentGateway.safepay.secretKeyEncrypted'] = encrypt(secretKey.trim());
-    update['paymentGateway.safepay.verified']   = false;
-    update['paymentGateway.safepay.verifiedAt'] = null;
+// ─── Save Manual Payment Gateway ───────────────────────────────────────────────
+// Tenant publishes their own bank/JazzCash/EasyPaisa account details for
+// students to pay into directly. No secrets here (account numbers, not
+// credentials) so nothing is encrypted, and there's no API to live-verify against.
+async function saveManualGateway(tenantId, { accounts, instructions }) {
+  if (!Array.isArray(accounts) || accounts.length === 0)
+    throw new AppError('At least one payment account is required', 400);
+
+  for (const acc of accounts) {
+    if (!MANUAL_ACCOUNT_TYPES.includes(acc.type))
+      throw new AppError('Invalid account type', 400);
+    if (!acc.accountTitle?.trim() || !acc.accountNumber?.trim())
+      throw new AppError('Account title and number are required for every account', 400);
+    if (acc.type === 'bank' && !acc.bankName?.trim())
+      throw new AppError('Bank name is required for bank transfer accounts', 400);
   }
 
-  await Tenant.findByIdAndUpdate(tenantId, { $set: update });
+  const cleanAccounts = accounts.map(acc => ({
+    type:          acc.type,
+    label:         acc.label?.trim() || null,
+    accountTitle:  acc.accountTitle.trim(),
+    accountNumber: acc.accountNumber.trim(),
+    bankName:      acc.type === 'bank' ? acc.bankName.trim() : null,
+  }));
+
+  await Tenant.findByIdAndUpdate(tenantId, {
+    $set: {
+      'paymentGateway.activeProvider':      'manual',
+      'paymentGateway.manual.accounts':     cleanAccounts,
+      'paymentGateway.manual.instructions': instructions?.trim() || null,
+    },
+  });
   return getPaymentGatewaySettings(tenantId);
 }
 
 // ─── Disconnect a Gateway ───────────────────────────────────────────────────────
 async function disconnectGateway(tenantId, provider) {
-  if (!['stripe', 'safepay'].includes(provider)) throw new AppError('Invalid provider', 400);
+  if (!['stripe', 'safepay', 'manual'].includes(provider)) throw new AppError('Invalid provider', 400);
 
   const tenant = await Tenant.findById(tenantId).select('paymentGateway.activeProvider').lean();
   if (!tenant) throw new AppError('Tenant not found', 404);
 
-  const update = provider === 'stripe'
-    ? {
-        'paymentGateway.stripe.secretKeyEncrypted': null,
-        'paymentGateway.stripe.publishableKey':     null,
-        'paymentGateway.stripe.verified':           false,
-        'paymentGateway.stripe.verifiedAt':         null,
-      }
-    : {
-        'paymentGateway.safepay.apiKey':             null,
-        'paymentGateway.safepay.secretKeyEncrypted': null,
-        'paymentGateway.safepay.verified':           false,
-        'paymentGateway.safepay.verifiedAt':         null,
-      };
+  let update;
+  if (provider === 'stripe') {
+    update = {
+      'paymentGateway.stripe.secretKeyEncrypted': null,
+      'paymentGateway.stripe.publishableKey':     null,
+      'paymentGateway.stripe.verified':           false,
+      'paymentGateway.stripe.verifiedAt':         null,
+    };
+  } else if (provider === 'manual') {
+    update = {
+      'paymentGateway.manual.accounts':     [],
+      'paymentGateway.manual.instructions': null,
+    };
+  } else {
+    update = {
+      'paymentGateway.safepay.apiKey':             null,
+      'paymentGateway.safepay.secretKeyEncrypted': null,
+      'paymentGateway.safepay.verified':           false,
+      'paymentGateway.safepay.verifiedAt':         null,
+    };
+  }
 
   if (tenant.paymentGateway?.activeProvider === provider) {
     update['paymentGateway.activeProvider'] = null;
@@ -272,6 +304,9 @@ async function getActiveGateway(tenantId) {
     };
   }
 
+  // Legacy — Safepay is no longer a usable gateway (nothing downstream acts on
+  // provider:'safepay' anymore), but this branch is left returning its shape
+  // for symmetry/debuggability rather than silently falling through.
   if (pg.activeProvider === 'safepay' && pg.safepay?.secretKeyEncrypted && pg.safepay?.apiKey) {
     return {
       provider:    'safepay',
@@ -281,14 +316,15 @@ async function getActiveGateway(tenantId) {
     };
   }
 
-  return { provider: null };
-}
+  if (pg.activeProvider === 'manual' && pg.manual?.accounts?.length) {
+    return {
+      provider:     'manual',
+      accounts:     pg.manual.accounts,
+      instructions: pg.manual.instructions || null,
+    };
+  }
 
-// ─── Internal: flip Safepay verified flag after the tenant's first real payment ─
-async function markSafepayVerified(tenantId) {
-  await Tenant.findByIdAndUpdate(tenantId, {
-    $set: { 'paymentGateway.safepay.verified': true, 'paymentGateway.safepay.verifiedAt': new Date() },
-  });
+  return { provider: null };
 }
 
 // ─── Get Feature Flags ────────────────────────────────────────────────────────
@@ -449,12 +485,11 @@ module.exports = {
   saveEmailSettings,
   getPaymentGatewaySettings,
   saveStripeGateway,
-  saveSafepayGateway,
+  saveManualGateway,
   disconnectGateway,
   getActiveGateway,
   getHeaderFooterSettings,
   updateHeaderFooterSettings,
-  markSafepayVerified,
   getFeatureFlags,
   updateFeatureFlags,
 };

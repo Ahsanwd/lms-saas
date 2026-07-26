@@ -7,7 +7,7 @@ import { Button, Spinner, Alert } from '@/components/ui';
 import { useAuthStore } from '@/stores/auth.store';
 import { cn } from '@/lib/utils';
 import { AxiosError } from 'axios';
-import { CheckoutModal, useCheckoutReturn } from '@/components/payment/CheckoutModal';
+import { CheckoutModal } from '@/components/payment/CheckoutModal';
 
 interface BundleCourseRef { _id: string; title: string }
 interface Bundle {
@@ -317,7 +317,6 @@ function BundleManagementTable() {
 function BundleCatalog() {
   const qc = useQueryClient();
   const [buyingBundle, setBuyingBundle] = useState<Bundle | null>(null);
-  const [banner, setBanner] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['bundles-public'],
@@ -327,18 +326,6 @@ function BundleCatalog() {
     },
   });
 
-  // Handles the Safepay hosted-checkout return — this is a list page (no single
-  // bundle in scope on a fresh load), so success/cancel surfaces as a banner
-  // rather than reopening a specific bundle's CheckoutModal.
-  useCheckoutReturn(
-    '/payments/bundles',
-    () => {
-      qc.invalidateQueries({ queryKey: ['my-enrollments'] });
-      setBanner({ type: 'success', msg: 'Payment successful — you now have access to every course in the bundle!' });
-    },
-    () => setBanner({ type: 'error', msg: 'Payment was cancelled.' })
-  );
-
   const bundles = data?.bundles ?? [];
 
   return (
@@ -347,14 +334,6 @@ function BundleCatalog() {
         <h1 className="text-2xl font-bold text-gray-900">Course Bundles</h1>
         <p className="text-sm text-gray-500 mt-0.5">Save by getting multiple courses together in one purchase</p>
       </div>
-
-      {banner && (
-        <div className={cn('flex items-center justify-between gap-3 rounded-xl px-4 py-3 text-sm',
-          banner.type === 'success' ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700')}>
-          <span>{banner.msg}</span>
-          <button onClick={() => setBanner(null)} className="text-current opacity-50 hover:opacity-100">✕</button>
-        </div>
-      )}
 
       {isLoading ? (
         <div className="flex justify-center py-20"><Spinner size="lg" /></div>

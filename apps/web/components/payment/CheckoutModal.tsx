@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { AxiosError } from 'axios';
@@ -15,6 +15,18 @@ export interface CouponResult {
   discountAmount: number;
   finalPrice: number;
 }
+
+interface ManualAccount {
+  type: 'bank' | 'jazzcash' | 'easypaisa';
+  label: string | null;
+  accountTitle: string;
+  accountNumber: string;
+  bankName: string | null;
+}
+
+const MANUAL_ACCOUNT_TYPE_LABELS: Record<ManualAccount['type'], string> = {
+  bank: 'Bank Transfer', jazzcash: 'JazzCash', easypaisa: 'EasyPaisa',
+};
 
 function StripeCardForm({
   paymentId, clientSecret, confirmUrlBase, amount, onSuccess,
@@ -101,8 +113,6 @@ export interface CheckoutModalProps {
   validateCoupon?: (code: string) => Promise<CouponResult>;
   successTitle?: string;
   successMessage?: string;
-  /** Open directly on the success screen — used after a Safepay return-redirect
-   * already confirmed the payment before this modal ever mounted. */
   initialStep?: 'method' | 'done';
   onSuccess: () => void;
   onClose: () => void;
@@ -113,10 +123,15 @@ export function CheckoutModal({
   successTitle = 'Payment successful!', successMessage = 'You now have access. Enjoy!',
   initialStep = 'method', onSuccess, onClose,
 }: CheckoutModalProps) {
-  const [paymentStep, setPaymentStep]       = useState<'method' | 'card' | 'done'>(initialStep);
+  const [paymentStep, setPaymentStep]       = useState<'method' | 'card' | 'manual-proof' | 'pending-review' | 'done'>(initialStep);
   const [paymentId, setPaymentId]           = useState<string | null>(null);
   const [clientSecret, setClientSecret]     = useState<string | null>(null);
   const [publishableKey, setPublishableKey] = useState<string | null>(null);
+
+  const [manualAccounts, setManualAccounts]         = useState<ManualAccount[]>([]);
+  const [manualInstructions, setManualInstructions] = useState<string | null>(null);
+  const [proofFile, setProofFile]                   = useState<File | null>(null);
+  const [proofError, setProofError]                 = useState('');
 
   const [couponInput, setCouponInput]           = useState('');
   const [appliedCoupon, setAppliedCoupon]       = useState<CouponResult | null>(null);
@@ -139,14 +154,30 @@ export function CheckoutModal({
     mutationFn: () => api.post(initiateUrl, { couponCode: effectiveCouponCode }),
     onSuccess: (res) => {
       const d = res.data.data;
-      if (d.provider === 'safepay') {
-        window.location.href = d.redirectUrl; // hosted checkout — leaves the page
+      setPaymentId(d.paymentId);
+      if (d.provider === 'manual') {
+        setManualAccounts(d.accounts ?? []);
+        setManualInstructions(d.instructions ?? null);
+        setPaymentStep('manual-proof');
         return;
       }
-      setPaymentId(d.paymentId);
       setClientSecret(d.clientSecret ?? null);
       setPublishableKey(d.publishableKey ?? null);
       setPaymentStep('card');
+    },
+  });
+
+  const uploadProofMutation = useMutation({
+    mutationFn: () => {
+      const fd = new FormData();
+      fd.append('proof', proofFile as File);
+      return api.post(`${confirmUrlBase}/${paymentId}/proof`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+    },
+    onSuccess: () => { setPaymentStep('pending-review'); },
+    onError: (err: AxiosError<{ message: string }>) => {
+      setProofError(err.response?.data?.message ?? 'Failed to upload proof');
     },
   });
 
@@ -291,45 +322,77 @@ export function CheckoutModal({
           </>
         )}
 
+        {/* ── Manual payment: show accounts, upload proof ── */}
+        {paymentStep === 'manual-proof' && (
+          <>
+            <div className="flex items-center gap-3">
+              <button onClick={() => setPaymentStep('method')} className="text-gray-400 hover:text-gray-600">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
+                </svg>
+              </button>
+              <h2 className="text-lg font-semibold text-gray-900 flex-1">Bank / Wallet Transfer</h2>
+              <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
+
+            <div className="bg-gray-50 rounded-xl px-4 py-3 flex items-center justify-between">
+              <span className="text-sm text-gray-600 truncate">{itemLabel}</span>
+              <span className="text-base font-bold text-gray-900 ml-3 flex-shrink-0">${displayPrice.toFixed(2)}</span>
+            </div>
+
+            <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+              {manualAccounts.map((acc, i) => (
+                <div key={i} className="rounded-xl border border-gray-200 p-3 space-y-1">
+                  <p className="text-xs font-semibold text-primary-600">{MANUAL_ACCOUNT_TYPE_LABELS[acc.type]}{acc.label ? ` — ${acc.label}` : ''}</p>
+                  {acc.bankName && <p className="text-sm text-gray-700">{acc.bankName}</p>}
+                  <p className="text-sm text-gray-700">{acc.accountTitle}</p>
+                  <p className="text-sm font-mono text-gray-900">{acc.accountNumber}</p>
+                </div>
+              ))}
+            </div>
+
+            {manualInstructions && (
+              <p className="text-xs text-gray-500 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">{manualInstructions}</p>
+            )}
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">Upload payment screenshot</label>
+              <input type="file" accept="image/*"
+                onChange={e => { setProofError(''); setProofFile(e.target.files?.[0] ?? null); }}
+                className="block w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100" />
+            </div>
+
+            {proofError && <p className="text-sm text-red-600">{proofError}</p>}
+
+            <Button className="w-full" loading={uploadProofMutation.isPending}
+              disabled={!proofFile}
+              onClick={() => uploadProofMutation.mutate()}>
+              Submit for Review
+            </Button>
+          </>
+        )}
+
+        {/* ── Manual payment: pending admin review ── */}
+        {paymentStep === 'pending-review' && (
+          <>
+            <div className="flex flex-col items-center py-4 space-y-3">
+              <div className="w-14 h-14 bg-amber-100 rounded-full flex items-center justify-center">
+                <svg className="w-7 h-7 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+              </div>
+              <p className="text-lg font-semibold text-gray-900">Payment submitted — pending review</p>
+              <p className="text-sm text-gray-500 text-center">We'll verify your payment and enroll you shortly. You'll get an email once it's approved.</p>
+            </div>
+            <Button className="w-full" onClick={onClose}>Close</Button>
+          </>
+        )}
+
       </div>
     </div>
   );
-}
-
-// ─── Safepay hosted-checkout return handling ─────────────────────────────────
-// Call from the host page's own useEffect on mount to confirm a payment after
-// the student returns from Safepay, and to surface a cancelled message. The
-// redirect lands back on whichever page initiated checkout, so each host page
-// runs this itself rather than the (unmounted, closed) CheckoutModal handling it.
-export function useCheckoutReturn(confirmUrlBase: string, onSuccess: () => void, onCancelled?: () => void) {
-  const [status, setStatus] = useState<'idle' | 'confirming' | 'success' | 'error' | 'cancelled'>('idle');
-  const [errorMsg, setErrorMsg] = useState('');
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const sp = new URLSearchParams(window.location.search);
-    const pid = sp.get('safepayPaymentId');
-    const cancelled = sp.get('safepayCancelled');
-    if (!pid && !cancelled) return;
-
-    if (pid) {
-      setStatus('confirming');
-      api.post(`${confirmUrlBase}/${pid}/confirm`)
-        .then(() => { setStatus('success'); onSuccess(); })
-        .catch((err: AxiosError<{ message: string }>) => {
-          setStatus('error');
-          setErrorMsg(err.response?.data?.message ?? 'Payment could not be confirmed');
-        });
-    } else {
-      setStatus('cancelled');
-      onCancelled?.();
-    }
-
-    const url = new URL(window.location.href);
-    url.searchParams.delete('safepayPaymentId');
-    url.searchParams.delete('safepayCancelled');
-    window.history.replaceState({}, '', url.toString());
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  return { status, errorMsg };
 }
