@@ -9,6 +9,7 @@ import { useAuthStore } from '@/stores/auth.store';
 import { AxiosError } from 'axios';
 import { cn } from '@/lib/utils';
 import type { Course } from '@/types';
+import { CheckoutModal } from '@/components/payment/CheckoutModal';
 
 const STATUS_BADGE: Record<string, 'default' | 'success' | 'warning' | 'danger'> = {
   draft: 'default', published: 'success', archived: 'danger',
@@ -30,7 +31,7 @@ type ViewMode = 'grid' | 'list' | 'compact';
 function ctaText(course: Course, enrolled: boolean): string {
   if (enrolled) return 'Continue Learning';
   if (course.ctaLabel?.trim()) return course.ctaLabel.trim();
-  return course.isFree ? 'Enroll Free' : 'Enroll Now';
+  return course.isFree ? 'Enroll Free' : 'Buy Now';
 }
 
 function fmtDuration(s: number) {
@@ -322,6 +323,7 @@ function StudentCatalog() {
   const [enrollingId, setEnrollingId] = useState<string | null>(null);
   const [enrollError, setEnrollError] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [buyingCourse, setBuyingCourse] = useState<Course | null>(null);
 
   const { data: coursesData, isLoading } = useQuery({
     queryKey: ['courses', search, levelFilter],
@@ -348,14 +350,24 @@ function StudentCatalog() {
 
   const enrollMutation = useMutation({
     mutationFn: (courseId: string) => api.post(`/courses/${courseId}/enroll`),
-    onSuccess: () => {
+    onSuccess: (_res, courseId) => {
       qc.invalidateQueries({ queryKey: ['my-enrollments'] });
       qc.invalidateQueries({ queryKey: ['courses'] });
       setEnrollingId(null);
+      router.push(`/courses/${courseId}/learn`);
     },
-    onError: (err: AxiosError<{ message: string }>) => {
-      setEnrollError(err.response?.data?.message ?? 'Failed to enroll');
+    onError: (err: AxiosError<{ message: string; code?: string }>) => {
       setEnrollingId(null);
+      // This endpoint is for free/membership-covered courses only — a genuinely
+      // paid course correctly rejects with PAYMENT_REQUIRED, and the button
+      // just looked like it "did nothing" without this branch (the error alert
+      // renders up in the hero header, easy to miss below the fold). Open the
+      // real checkout instead of just surfacing the rejection.
+      if (err.response?.data?.code === 'PAYMENT_REQUIRED') {
+        const course = courses.find(c => c._id === enrollingId);
+        if (course) { setBuyingCourse(course); return; }
+      }
+      setEnrollError(err.response?.data?.message ?? 'Failed to enroll');
       setTimeout(() => setEnrollError(''), 4000);
     },
   });
@@ -498,6 +510,28 @@ function StudentCatalog() {
             />
           ))}
         </div>
+      )}
+
+      {buyingCourse && (
+        <CheckoutModal
+          itemLabel={buyingCourse.title}
+          price={buyingCourse.price ?? 0}
+          initiateUrl={`/payments/courses/${buyingCourse._id}/initiate`}
+          confirmUrlBase="/payments"
+          successMessage="You are now enrolled. Enjoy the course!"
+          onSuccess={() => {
+            qc.invalidateQueries({ queryKey: ['my-enrollments'] });
+            qc.invalidateQueries({ queryKey: ['courses'] });
+          }}
+          onClose={(completed) => {
+            const courseId = buyingCourse._id;
+            setBuyingCourse(null);
+            // Only a completed purchase actually grants access — a cancelled
+            // checkout or a manual payment left pending review must not send
+            // the student into /learn since nothing was granted yet.
+            if (completed) router.push(`/courses/${courseId}/learn`);
+          }}
+        />
       )}
     </div>
   );
