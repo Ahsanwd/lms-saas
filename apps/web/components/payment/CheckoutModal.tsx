@@ -115,7 +115,11 @@ export interface CheckoutModalProps {
   successMessage?: string;
   initialStep?: 'method' | 'done';
   onSuccess: () => void;
-  onClose: () => void;
+  /** `completed` is true only when closed from the real success screen — the
+   * student is actually enrolled. It's false for every other dismissal
+   * (cancelled, or a manual payment still awaiting admin review) — hosts
+   * must not treat those as "go view the content" since nothing was granted. */
+  onClose: (completed: boolean) => void;
 }
 
 export function CheckoutModal({
@@ -202,7 +206,7 @@ export function CheckoutModal({
               <p className="text-lg font-semibold text-gray-900">{successTitle}</p>
               <p className="text-sm text-gray-500 text-center">{successMessage}</p>
             </div>
-            <Button className="w-full" onClick={onClose}>Done</Button>
+            <Button className="w-full" onClick={() => onClose(true)}>Done</Button>
           </>
         )}
 
@@ -211,7 +215,7 @@ export function CheckoutModal({
           <>
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900">Choose Payment Method</h2>
-              <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+              <button onClick={() => onClose(false)} className="text-gray-400 hover:text-gray-600">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
                 </svg>
@@ -295,7 +299,7 @@ export function CheckoutModal({
                 </svg>
               </button>
               <h2 className="text-lg font-semibold text-gray-900 flex-1">Card Payment</h2>
-              <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+              <button onClick={() => onClose(false)} className="text-gray-400 hover:text-gray-600">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
                 </svg>
@@ -332,7 +336,7 @@ export function CheckoutModal({
                 </svg>
               </button>
               <h2 className="text-lg font-semibold text-gray-900 flex-1">Bank / Wallet Transfer</h2>
-              <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+              <button onClick={() => onClose(false)} className="text-gray-400 hover:text-gray-600">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
                 </svg>
@@ -388,7 +392,7 @@ export function CheckoutModal({
               <p className="text-lg font-semibold text-gray-900">Payment submitted — pending review</p>
               <p className="text-sm text-gray-500 text-center">We'll verify your payment and enroll you shortly. You'll get an email once it's approved.</p>
             </div>
-            <Button className="w-full" onClick={onClose}>Close</Button>
+            <Button className="w-full" onClick={() => onClose(false)}>Close</Button>
           </>
         )}
 

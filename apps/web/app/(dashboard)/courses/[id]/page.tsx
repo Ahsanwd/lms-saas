@@ -4503,7 +4503,14 @@ function StudentView() {
         qc.invalidateQueries({ queryKey: ['my-enrollments'] });
         qc.invalidateQueries({ queryKey: ['course-progress', courseId] });
       }}
-      onClose={() => { setShowPayment(false); router.push(`/courses/${courseId}/learn`); }}
+      onClose={(completed) => {
+        setShowPayment(false);
+        // Only a real completed purchase means the student is actually
+        // enrolled — a manual payment "pending review" close (or any
+        // cancelled checkout) must NOT send them into the learn page, since
+        // they don't have access yet.
+        if (completed) router.push(`/courses/${courseId}/learn`);
+      }}
     />
   );
 

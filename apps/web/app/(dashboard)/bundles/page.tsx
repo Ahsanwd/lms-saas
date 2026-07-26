@@ -377,7 +377,7 @@ function BundleCatalog() {
           validateCoupon={(code) => api.post('/coupons/validate-bundle', { code, bundleId: buyingBundle._id }).then(r => r.data.data)}
           successMessage="You now have access to every course in this bundle. Enjoy!"
           onSuccess={() => qc.invalidateQueries({ queryKey: ['my-enrollments'] })}
-          onClose={() => setBuyingBundle(null)}
+          onClose={() => setBuyingBundle(null)} // never navigates on close, so completed vs cancelled doesn't matter here
         />
       )}
     </div>
