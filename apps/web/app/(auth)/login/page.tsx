@@ -209,18 +209,24 @@ function LoginPage() {
         </Button>
       </form>
 
-      <p className="mt-6 text-center text-sm text-gray-500">
-        Don&apos;t have an account?{' '}
-        <Link href="/register" className="font-medium text-primary-600 hover:text-primary-700">
-          Sign up
-        </Link>
-      </p>
-      <p className="mt-2 text-center text-sm text-gray-400">
-        Starting a new organisation?{' '}
-        <Link href="/register-tenant" className="font-medium text-primary-600 hover:text-primary-700">
-          Create yours →
-        </Link>
-      </p>
+      {/* On a tenant subdomain, "Sign up" joins that school. On the root
+          domain there's no school to join — /register would just bounce
+          straight to /register-tenant, so show only that link there. */}
+      {isSubdomainHost ? (
+        <p className="mt-6 text-center text-sm text-gray-500">
+          Don&apos;t have an account?{' '}
+          <Link href="/register" className="font-medium text-primary-600 hover:text-primary-700">
+            Sign up
+          </Link>
+        </p>
+      ) : (
+        <p className="mt-6 text-center text-sm text-gray-400">
+          Starting a new organisation?{' '}
+          <Link href="/register-tenant" className="font-medium text-primary-600 hover:text-primary-700">
+            Create yours →
+          </Link>
+        </p>
+      )}
     </>
   );
 }
