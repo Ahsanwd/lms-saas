@@ -4605,8 +4605,11 @@ function StudentView() {
         </div>
       )}
 
-      {/* Price display */}
-      {isPaidUnenrolled && (
+      {/* Price display — classic layout already shows this (with the same
+          coupon strikethrough/savings badge) in its own dedicated sidebar
+          Price section right above this CTA, so skip it here to avoid
+          showing the price twice. */}
+      {isPaidUnenrolled && layout !== 'classic' && (
         <div className="flex items-baseline gap-2">
           <span className="text-2xl font-bold text-gray-900">
             ${displayPrice.toFixed(2)}
@@ -4837,9 +4840,12 @@ function StudentView() {
     </button>
   );
 
-  const curriculumContent = (sections ?? []).length > 0 ? (
+  // Curriculum without its own heading — used inside the classic layout's
+  // Course Content card, which already has an icon+lesson-count header of
+  // its own (this used to duplicate "Course Content" as plain text right
+  // below that header).
+  const curriculumBody = (sections ?? []).length > 0 ? (
     <div className="space-y-3">
-      <h2 className="text-base font-semibold text-gray-900">Course Content</h2>
       {(sections ?? []).map((section) => {
         const expanded = expandedSections.has(section._id);
         const lessons = section.lessons ?? [];
@@ -4938,6 +4944,13 @@ function StudentView() {
           </div>
         );
       })}
+    </div>
+  ) : null;
+
+  const curriculumContent = curriculumBody ? (
+    <div className="space-y-3">
+      <h2 className="text-base font-semibold text-gray-900">Course Content</h2>
+      {curriculumBody}
     </div>
   ) : null;
 
@@ -5246,7 +5259,7 @@ function StudentView() {
             )}
 
             {/* Curriculum */}
-            {(!isEnrolled || studentTab === 'overview') && curriculumContent && (
+            {(!isEnrolled || studentTab === 'overview') && curriculumBody && (
               <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
                 <div className="flex items-center gap-2.5 px-5 py-4 border-b border-gray-100 bg-gray-50">
                   <div className="w-7 h-7 rounded-lg bg-purple-50 flex items-center justify-center">
@@ -5258,7 +5271,7 @@ function StudentView() {
                   <span className="ml-auto text-xs text-gray-400">{course.totalLessons} lessons</span>
                 </div>
                 <div className="px-5 py-4">
-                  {curriculumContent}
+                  {curriculumBody}
                 </div>
               </div>
             )}

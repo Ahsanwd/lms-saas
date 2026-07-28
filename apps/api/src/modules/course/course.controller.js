@@ -566,10 +566,12 @@ async function cfStreamToken(req, res, next) {
     if (!lesson?.video?.url) return R.error(res, 'Lesson or video not found', 404);
     if (lesson.video.provider !== 'cloudflare') return R.error(res, 'Not a Cloudflare Stream video', 400);
 
-    // Students must be enrolled, unless this lesson is marked Free Preview
+    // Students must be enrolled (active or completed — finishing a course
+    // must not revoke access to rewatch it), unless this lesson is marked
+    // Free Preview
     if (req.user.role === 'student' && !lesson.isPreview) {
       const enrolled = await Enrollment.findOne({
-        tenantId, courseId: lesson.courseId, userId: req.user.sub, status: 'active',
+        tenantId, courseId: lesson.courseId, userId: req.user.sub, status: { $in: ['active', 'completed'] },
       }).lean();
       if (!enrolled) return R.error(res, 'Not enrolled in this course', 403);
       if (!(await assertStillHasPlaybackAccess(tenantId, lesson.courseId, req.user.sub, enrolled)))
@@ -607,10 +609,12 @@ async function audioToken(req, res, next) {
       return R.success(res, { signedUrl: lesson.audio.url, signed: false });
     }
 
-    // Students must be enrolled, unless this lesson is marked Free Preview
+    // Students must be enrolled (active or completed — finishing a course
+    // must not revoke access to rewatch it), unless this lesson is marked
+    // Free Preview
     if (req.user.role === 'student' && !lesson.isPreview) {
       const enrolled = await Enrollment.findOne({
-        tenantId, courseId, userId: req.user.sub, status: 'active',
+        tenantId, courseId, userId: req.user.sub, status: { $in: ['active', 'completed'] },
       }).lean();
       if (!enrolled) return R.error(res, 'Not enrolled in this course', 403);
       if (!(await assertStillHasPlaybackAccess(tenantId, courseId, req.user.sub, enrolled)))
@@ -641,10 +645,12 @@ async function videoToken(req, res, next) {
       return R.success(res, { signedUrl: lesson.video.url, signed: false });
     }
 
-    // Students must be enrolled, unless this lesson is marked Free Preview
+    // Students must be enrolled (active or completed — finishing a course
+    // must not revoke access to rewatch it), unless this lesson is marked
+    // Free Preview
     if (req.user.role === 'student' && !lesson.isPreview) {
       const enrolled = await Enrollment.findOne({
-        tenantId, courseId, userId: req.user.sub, status: 'active',
+        tenantId, courseId, userId: req.user.sub, status: { $in: ['active', 'completed'] },
       }).lean();
       if (!enrolled) return R.error(res, 'Not enrolled in this course', 403);
       if (!(await assertStillHasPlaybackAccess(tenantId, courseId, req.user.sub, enrolled)))

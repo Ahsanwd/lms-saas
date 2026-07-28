@@ -1191,7 +1191,12 @@ async function getLessonProgressForUser(tenantId, courseId, lessonId, userId) {
 
 async function markLessonComplete(tenantId, courseId, lessonId, userId, watchedDuration) {
   const enrollment = await enrollmentRepo.findByUserAndCourse(tenantId, userId, courseId);
-  if (!enrollment || enrollment.status !== 'active')
+  // 'completed' must stay allowed here, not just 'active' — otherwise a
+  // student who already finished the course once can never mark progress
+  // again, which permanently freezes CourseProgress.totalLessons/percentage
+  // at whatever the course's lesson count was back when they first hit
+  // 100%, even after new lessons are added to the course later.
+  if (!enrollment || !['active', 'completed'].includes(enrollment.status))
     throw new AppError('Not enrolled in this course', 403);
 
   const lesson = await lessonRepo.findById(tenantId, lessonId);
