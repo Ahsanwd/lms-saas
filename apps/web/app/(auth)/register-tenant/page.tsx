@@ -36,7 +36,7 @@ function pwStrength(p: string): { label: string; pct: number; color: string } {
 
 // ─── Step indicator ────────────────────────────────────────────────────────────
 
-const STEP_LABELS = ['About You', 'Your School', 'Invite Team', 'Done'];
+const STEP_LABELS = ['About You', 'Your Institute', 'Done'];
 
 function StepIndicator({ current }: { current: number }) {
   return (
@@ -74,10 +74,6 @@ function StepIndicator({ current }: { current: number }) {
   );
 }
 
-// ─── Invite row ────────────────────────────────────────────────────────────────
-
-interface InviteRow { email: string; role: 'instructor' | 'student'; }
-
 // ─── Page ──────────────────────────────────────────────────────────────────────
 
 export default function RegisterTenantPage() {
@@ -104,12 +100,7 @@ export default function RegisterTenantPage() {
   const [checkingSubdomain,  setCheckingSubdomain]  = useState(false);
   const userEditedSubdomain = useRef(false);
 
-  // ── Step 3: Invite ──
-  const [invites, setInvites] = useState<InviteRow[]>([{ email: '', role: 'instructor' }]);
-  const [inviteSending, setInviteSending] = useState(false);
-  const [inviteResults, setInviteResults] = useState<{ email: string; ok: boolean }[]>([]);
-
-  // ── Step 4: Result ──
+  // ── Step 3: Result ──
   const [result, setResult] = useState<{
     accessToken: string;
     user: any;
@@ -197,38 +188,6 @@ export default function RegisterTenantPage() {
     } finally {
       setLoading(false);
     }
-  }
-
-  async function handleSendInvites() {
-    const valid = invites.filter(r => r.email.trim() && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r.email.trim()));
-    if (!valid.length) { setStep(4); return; }
-
-    setInviteSending(true);
-    const results: { email: string; ok: boolean }[] = [];
-    await Promise.all(valid.map(async row => {
-      try {
-        await api.post('/users/invite', { email: row.email.trim().toLowerCase(), role: row.role });
-        results.push({ email: row.email, ok: true });
-      } catch {
-        results.push({ email: row.email, ok: false });
-      }
-    }));
-    setInviteResults(results);
-    setInviteSending(false);
-    setStep(4);
-  }
-
-  function addInviteRow() {
-    if (invites.length >= 5) return;
-    setInvites(prev => [...prev, { email: '', role: 'instructor' }]);
-  }
-
-  function updateInvite(i: number, field: keyof InviteRow, value: string) {
-    setInvites(prev => prev.map((r, idx) => idx === i ? { ...r, [field]: value } : r));
-  }
-
-  function removeInvite(i: number) {
-    setInvites(prev => prev.filter((_, idx) => idx !== i));
   }
 
   const pw = pwStrength(password);
@@ -410,83 +369,8 @@ export default function RegisterTenantPage() {
         </>
       )}
 
-      {/* ── Step 3: Invite teammates ─────────────────────────────────────── */}
-      {step === 3 && (
-        <>
-          <div className="mb-5">
-            <h2 className="text-xl font-semibold text-gray-900">Want to invite anyone? (optional)</h2>
-            <p className="text-sm text-gray-500 mt-1">
-              Add a teacher or a student now, or skip — you can always invite people later from your dashboard.
-            </p>
-          </div>
-
-          <div className="space-y-3">
-            {invites.map((row, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <input
-                  type="email"
-                  placeholder="colleague@email.com"
-                  value={row.email}
-                  onChange={e => updateInvite(i, 'email', e.target.value)}
-                  className="flex-1 px-3 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent min-w-0"
-                />
-                <select
-                  value={row.role}
-                  onChange={e => updateInvite(i, 'role', e.target.value)}
-                  className="px-2.5 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white flex-shrink-0"
-                >
-                  <option value="instructor">Instructor</option>
-                  <option value="student">Student</option>
-                </select>
-                {invites.length > 1 && (
-                  <button
-                    onClick={() => removeInvite(i)}
-                    className="w-8 h-8 flex items-center justify-center text-gray-300 hover:text-red-400 flex-shrink-0 transition-colors"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                )}
-              </div>
-            ))}
-
-            {invites.length < 5 && (
-              <button
-                onClick={addInviteRow}
-                className="flex items-center gap-1.5 text-xs font-medium text-primary-600 hover:text-primary-700 transition-colors"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                Add another
-              </button>
-            )}
-          </div>
-
-          <div className="flex gap-3 mt-6">
-            <Button
-              variant="outline"
-              className="flex-1"
-              onClick={() => setStep(4)}
-              disabled={inviteSending}
-            >
-              Skip
-            </Button>
-            <Button
-              className="flex-1"
-              onClick={handleSendInvites}
-              loading={inviteSending}
-              disabled={inviteSending}
-            >
-              Send Invites →
-            </Button>
-          </div>
-        </>
-      )}
-
-      {/* ── Step 4: Done ─────────────────────────────────────────────────── */}
-      {step === 4 && result && (
+      {/* ── Step 3: Done ─────────────────────────────────────────────────── */}
+      {step === 3 && result && (
         <div className="text-center space-y-5">
           {/* Success icon */}
           <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto">
@@ -528,24 +412,6 @@ export default function RegisterTenantPage() {
               </button>
             </div>
           </div>
-
-          {/* Invite results */}
-          {inviteResults.length > 0 && (
-            <div className="text-left">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Invitations</p>
-              <div className="space-y-1.5">
-                {inviteResults.map(r => (
-                  <div key={r.email} className="flex items-center gap-2 text-sm">
-                    <span className={r.ok ? 'text-emerald-500' : 'text-red-400'}>
-                      {r.ok ? '✓' : '✗'}
-                    </span>
-                    <span className={r.ok ? 'text-gray-700' : 'text-gray-400'}>{r.email}</span>
-                    {!r.ok && <span className="text-xs text-red-400">(failed — try again from Users)</span>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* What's ready */}
           <div className="text-left space-y-2 text-sm text-gray-600">
