@@ -60,7 +60,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           ) : (
             <>
               <span className="text-3xl font-extrabold text-primary-600 tracking-tight">Coursel</span>
-              <p className="text-sm text-gray-400 mt-1">Launch your online school in minutes</p>
+              <p className="text-sm text-gray-400 mt-1">Launch your online institute in minutes</p>
             </>
           )}
         </div>
