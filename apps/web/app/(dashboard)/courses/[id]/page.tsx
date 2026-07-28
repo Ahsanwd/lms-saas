@@ -4085,6 +4085,24 @@ function InstructorView() {
     staleTime: 30000,
   });
 
+  // Same query key as CurriculumTab — shares its cache instead of double-
+  // fetching. course.totalLessons only counts *published* lessons (correct
+  // for students, whose progress % depends on it), but that means the
+  // header below showed "0 lessons" while the instructor was still looking
+  // at a freshly-added draft lesson in the Curriculum tab right underneath
+  // it — confusing, since the section row's own count includes drafts.
+  // authoredLessons counts every lesson regardless of publish status, only
+  // for this header display.
+  const { data: sectionsForCount } = useQuery({
+    queryKey: ['sections', courseId],
+    queryFn: async () => {
+      const { data } = await api.get(`/courses/${courseId}/sections`);
+      return data.data.sections as Array<{ lessons?: unknown[] }>;
+    },
+    staleTime: 30000,
+  });
+  const authoredLessons = sectionsForCount?.reduce((sum, s) => sum + (s.lessons?.length ?? 0), 0);
+
   const publishMutation = useMutation({
     mutationFn: () => api.patch(`/courses/${courseId}/publish`),
     onSuccess: () => {
@@ -4160,7 +4178,7 @@ function InstructorView() {
           </div>
           <p className="text-sm text-gray-500">
             {course.totalSections} section{course.totalSections !== 1 ? 's' : ''} ·{' '}
-            {course.totalLessons} lesson{course.totalLessons !== 1 ? 's' : ''} ·{' '}
+            {authoredLessons ?? course.totalLessons} lesson{(authoredLessons ?? course.totalLessons) !== 1 ? 's' : ''} ·{' '}
             {fmtDuration(course.totalDurationSeconds)}
           </p>
         </div>

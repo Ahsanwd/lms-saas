@@ -86,7 +86,21 @@ api.interceptors.response.use(
   async (error: AxiosError) => {
     const original = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
-    const isAuthRoute = original.url?.includes('/auth/');
+    // Only routes that don't use (or can't meaningfully use) a Bearer token
+    // are excluded from the silent-refresh-and-retry below — /auth/refresh
+    // itself (avoid an infinite loop) plus the unauthenticated auth flows.
+    // A blanket "/auth/" prefix match used to also catch /auth/me and other
+    // legitimately authenticated /auth/* endpoints (logout-all, 2fa/setup,
+    // audit-logs), denying them the same refresh-then-retry resilience every
+    // other endpoint gets — a transient 401 there (e.g. on the very next
+    // request after a hard page reload) skipped straight to a full logout
+    // instead of silently refreshing, a real reproducible bug.
+    const NO_REFRESH_RETRY_PATHS = [
+      '/auth/login', '/auth/register', '/auth/register-tenant', '/auth/refresh',
+      '/auth/logout', '/auth/forgot-password', '/auth/reset-password',
+      '/auth/verify-email', '/auth/resend-verification', '/auth/2fa/verify',
+    ];
+    const isAuthRoute = NO_REFRESH_RETRY_PATHS.some((p) => original.url?.includes(p));
     if (error.response?.status === 401 && !original._retry && !isAuthRoute) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
