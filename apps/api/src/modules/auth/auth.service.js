@@ -468,6 +468,27 @@ async function checkSubdomain(subdomain) {
   return { available: !tenant, tenantName: tenant?.name ?? null };
 }
 
+// ─── Resolve org(s) for an email on the root-domain login screen ─────────────
+// The same email can exist under several tenants (email uniqueness is scoped
+// to tenantId, not global), so the frontend can't just ask for a password —
+// it needs to know which org(s) to check it against first.
+async function resolveLoginTenants(email) {
+  const normalizedEmail = email.trim().toLowerCase();
+  const users = await userRepo.findAllByEmail(normalizedEmail);
+  if (!users.length) return { matches: [] };
+
+  const matches = [];
+  for (const u of users) {
+    if (!u.tenantId) {
+      matches.push({ tenantId: null, subdomain: null, name: 'Platform Admin' });
+      continue;
+    }
+    const tenant = await tenantRepo.findById(u.tenantId);
+    if (tenant) matches.push({ tenantId: tenant._id, subdomain: tenant.subdomain, name: tenant.name });
+  }
+  return { matches };
+}
+
 // ─── Google OAuth ─────────────────────────────────────────────────────────────
 
 function getGoogleAuthUrl({ subdomain }) {
@@ -695,6 +716,7 @@ module.exports = {
   logout,
   logoutAll,
   checkSubdomain,
+  resolveLoginTenants,
   // Google OAuth
   getGoogleAuthUrl,
   loginWithGoogle,

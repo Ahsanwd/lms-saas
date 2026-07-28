@@ -10,6 +10,8 @@ import { useAuthStore } from '@/stores/auth.store';
 import { Button, Alert } from '@/components/ui';
 import { AxiosError } from 'axios';
 
+interface OrgMatch { tenantId: string | null; subdomain: string | null; name: string; }
+
 function LoginPage() {
   const router      = useRouter();
   const searchParams = useSearchParams();
@@ -21,13 +23,23 @@ function LoginPage() {
   const [totpCode,  setTotpCode]     = useState('');
   const [tempToken, setTempToken]    = useState('');
 
-  const [step,      setStep]    = useState<'login' | '2fa'>('login');
+  // 'email'/'org-picker' only happen on the root domain, where the same
+  // email can belong to more than one org (email is unique per-tenant, not
+  // globally) — see resolveLoginTenants on the backend.
+  const [step,      setStep]    = useState<'email' | 'org-picker' | 'password' | '2fa'>('email');
   const [loading,   setLoading] = useState(false);
+  const [resolving, setResolving] = useState(false);
   const [error,     setError]   = useState('');
   const [success,   setSuccess] = useState('');
+  const [orgName,   setOrgName] = useState('');
+  const [matches,   setMatches] = useState<OrgMatch[]>([]);
 
   // True when the user is on a tenant subdomain (e.g. pedofoy.coursel.space)
   const [isSubdomainHost, setIsSubdomainHost] = useState(false);
+  // True once we already know which org to check the password against —
+  // either from the hostname or a ?tenant= link — so the email-lookup step
+  // can be skipped entirely.
+  const [orgKnown, setOrgKnown] = useState(false);
 
   useEffect(() => {
     const host = window.location.hostname;
@@ -46,10 +58,55 @@ function LoginPage() {
     const tenant = tenantParam || hostSubdomain || tenantCookie;
     if (tenant) setSubdomainVal(tenant);
 
+    if (onSubdomain || tenantParam) {
+      setOrgKnown(true);
+      setStep('password');
+    }
+
     if (searchParams.get('registered') === '1') {
       setSuccess('Account created! You can now sign in.');
     }
   }, [searchParams]);
+
+  async function onEmailSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    setResolving(true);
+    try {
+      const { data } = await api.get('/auth/resolve-login-tenants', { params: { email } });
+      const found = data.data.matches as OrgMatch[];
+      if (!found.length) {
+        setError("We couldn't find an account with that email.");
+        return;
+      }
+      if (found.length === 1) {
+        setSubdomainVal(found[0].subdomain || '');
+        setOrgName(found[0].name);
+        setStep('password');
+        return;
+      }
+      setMatches(found);
+      setStep('org-picker');
+    } catch (err) {
+      const e = err as AxiosError<{ message: string }>;
+      setError(e.response?.data?.message ?? 'Something went wrong. Please try again.');
+    } finally {
+      setResolving(false);
+    }
+  }
+
+  function selectOrg(m: OrgMatch) {
+    setSubdomainVal(m.subdomain || '');
+    setOrgName(m.name);
+    setError('');
+    setStep('password');
+  }
+
+  function backToEmail() {
+    setStep('email');
+    setPassword('');
+    setError('');
+  }
 
   async function onLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -139,7 +196,7 @@ function LoginPage() {
           <Button type="submit" className="w-full" loading={loading}>
             Verify & Sign in
           </Button>
-          <button type="button" onClick={() => { setStep('login'); setError(''); setTotpCode(''); }}
+          <button type="button" onClick={() => { setStep('password'); setError(''); setTotpCode(''); }}
             className="w-full text-sm text-gray-500 hover:text-gray-700 text-center">
             ← Back to login
           </button>
@@ -148,48 +205,134 @@ function LoginPage() {
     );
   }
 
-  // ── Login step ────────────────────────────────────────────────────────────────
+  // ── Email step (root domain only — find which org(s) this email belongs to) ───
+  if (step === 'email') {
+    return (
+      <>
+        <div className="mb-6">
+          <h2 className="text-xl font-semibold text-gray-900">Welcome back</h2>
+          <p className="text-sm text-gray-500 mt-1">Enter your email to find your school</p>
+        </div>
+
+        {success && <Alert variant="success" className="mb-4">{success}</Alert>}
+        {error && <Alert variant="error" className="mb-4">{error}</Alert>}
+
+        <form onSubmit={onEmailSubmit} className="space-y-4">
+          <div>
+            <label className={labelCls}>Email address</label>
+            <input
+              type="email"
+              autoComplete="email"
+              autoFocus
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              className={inputCls}
+              required
+            />
+          </div>
+
+          <Button type="submit" className="w-full" loading={resolving}>
+            Continue →
+          </Button>
+        </form>
+
+        <p className="mt-6 text-center text-sm text-gray-400">
+          Starting a new organisation?{' '}
+          <Link href="/register-tenant" className="font-medium text-primary-600 hover:text-primary-700">
+            Create yours →
+          </Link>
+        </p>
+      </>
+    );
+  }
+
+  // ── Org picker (email matched more than one org) ──────────────────────────────
+  if (step === 'org-picker') {
+    return (
+      <>
+        <div className="mb-6">
+          <h2 className="text-xl font-semibold text-gray-900">Which organisation?</h2>
+          <p className="text-sm text-gray-500 mt-1">This email is used at more than one place — pick yours</p>
+        </div>
+
+        {error && <Alert variant="error" className="mb-4">{error}</Alert>}
+
+        <div className="space-y-2">
+          {matches.map((m, i) => (
+            <button
+              key={m.tenantId ?? `platform-${i}`}
+              type="button"
+              onClick={() => selectOrg(m)}
+              className="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl border border-gray-200 hover:border-primary-400 hover:bg-primary-50 transition-colors text-left"
+            >
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-gray-900 truncate">{m.name}</p>
+                {m.subdomain && <p className="text-xs text-gray-400 truncate">{m.subdomain}.coursel.space</p>}
+              </div>
+              <svg className="w-4 h-4 text-gray-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          ))}
+        </div>
+
+        <button type="button" onClick={backToEmail}
+          className="mt-4 w-full text-sm text-gray-500 hover:text-gray-700 text-center">
+          ← Use a different email
+        </button>
+      </>
+    );
+  }
+
+  // ── Password step ─────────────────────────────────────────────────────────────
   return (
     <>
       <div className="mb-6">
         <h2 className="text-xl font-semibold text-gray-900">Welcome back</h2>
-        <p className="text-sm text-gray-500 mt-1">Sign in to your account</p>
+        <p className="text-sm text-gray-500 mt-1">
+          {orgKnown ? 'Sign in to your account' : orgName ? `Signing in to ${orgName}` : 'Sign in to your account'}
+        </p>
       </div>
 
       {success && <Alert variant="success" className="mb-4">{success}</Alert>}
       {error && <Alert variant="error" className="mb-4">{error}</Alert>}
 
       <form onSubmit={onLogin} className="space-y-4">
-        {/* Hide subdomain input when already on a tenant subdomain URL */}
-        {!isSubdomainHost && (
+        {!orgKnown && (
           <div>
-            <label className={labelCls}>Organisation subdomain</label>
+            <label className={labelCls}>Email</label>
+            <div className="flex items-center justify-between gap-2 px-3 py-2.5 border border-gray-200 rounded-xl bg-gray-50">
+              <span className="text-sm text-gray-700 truncate">{email}</span>
+              <button type="button" onClick={backToEmail}
+                className="text-xs font-medium text-primary-600 hover:text-primary-700 flex-shrink-0">
+                Change
+              </button>
+            </div>
+          </div>
+        )}
+
+        {orgKnown && (
+          <div>
+            <label className={labelCls}>Email address</label>
             <input
-              type="text"
-              value={subdomain}
-              onChange={e => setSubdomainVal(e.target.value)}
-              placeholder="e.g. demo  (leave blank for super admin)"
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="you@example.com"
               className={inputCls}
+              required
             />
           </div>
         )}
-        <div>
-          <label className={labelCls}>Email address</label>
-          <input
-            type="email"
-            autoComplete="email"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            placeholder="you@example.com"
-            className={inputCls}
-            required
-          />
-        </div>
+
         <div>
           <label className={labelCls}>Password</label>
           <input
             type="password"
             autoComplete="current-password"
+            autoFocus={!orgKnown}
             value={password}
             onChange={e => setPassword(e.target.value)}
             placeholder="••••••••"

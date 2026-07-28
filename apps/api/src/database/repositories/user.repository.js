@@ -38,6 +38,12 @@ class UserRepository {
     return User.findByIdAndUpdate(id, { loginAttempts: 0, lockUntil: null });
   }
 
+  // Cross-tenant lookup — used only to resolve which org(s) an email belongs
+  // to on the root-domain login screen, before a tenantId is known.
+  findAllByEmail(email) {
+    return User.find({ email, deletedAt: null }).select('tenantId');
+  }
+
   findByGoogleId(tenantId, googleId) {
     return User.findOne({ tenantId, googleId, deletedAt: null }).select('+googleId');
   }

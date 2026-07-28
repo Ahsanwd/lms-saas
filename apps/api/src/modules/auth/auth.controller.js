@@ -193,6 +193,15 @@ async function checkSubdomain(req, res, next) {
   } catch (err) { next(err); }
 }
 
+async function resolveLoginTenants(req, res, next) {
+  try {
+    const { email } = req.query;
+    if (!email) return R.error(res, 'email is required', 400);
+    const result = await authService.resolveLoginTenants(email);
+    R.success(res, result);
+  } catch (err) { next(err); }
+}
+
 // ─── Password Policy ──────────────────────────────────────────────────────────
 async function getPasswordPolicy(req, res, next) {
   try {
@@ -301,7 +310,7 @@ module.exports = {
   verifyEmail, resendVerification,
   forgotPassword, resetPassword,
   refresh, logout, logoutAll, me,
-  checkSubdomain, getPasswordPolicy,
+  checkSubdomain, resolveLoginTenants, getPasswordPolicy,
   googleAuthUrl, googleCallback,
   setup2FA, enable2FA, disable2FA, verify2FA,
   getAuthLogs,
