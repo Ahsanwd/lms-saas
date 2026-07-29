@@ -106,6 +106,17 @@ async function upgradePlan(tenantId, { planId, billingCycle, couponCode }) {
   // taxAmount rounded to 2 decimal places: e.g. $99 × 20% = $19.80
   const taxAmount = taxRate > 0 ? Math.round(discountedTotal * taxRate) / 100 : 0;
   const total     = discountedTotal + taxAmount;
+
+  // Paid upgrades require Stripe to collect payment before activation. Without
+  // this guard, a paid plan silently activated for free and the invoice was
+  // marked "paid" with no money ever collected — Stripe is unconfigured in
+  // this deployment (Lemon Squeezy is the live processor for checkout instead),
+  // so `total > 0 && stripe` below never fired and every upgrade fell through
+  // to the free/immediate-activation branch regardless of price.
+  const stripe = getStripe();
+  if (total > 0 && !stripe)
+    throw new AppError('Paid plan upgrades are not available right now. Please contact support.', 503);
+
   const now = new Date();
   const periodEnd = new Date(now);
   if (cycle === 'yearly') periodEnd.setFullYear(periodEnd.getFullYear() + 1);
@@ -135,7 +146,6 @@ async function upgradePlan(tenantId, { planId, billingCycle, couponCode }) {
 
   // If payment is required, create a Stripe PaymentIntent and return the clientSecret.
   // The subscription activation is deferred to confirmSubscriptionPayment().
-  const stripe = getStripe();
   if (total > 0 && stripe) {
     // Ensure this tenant has a Stripe Customer (created once, reused across payments)
     let customerId = sub?.stripeCustomerId || null;

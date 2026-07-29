@@ -64,13 +64,16 @@ function generateInvoicePdf(invoice) {
     doc.moveTo(50, divY2).lineTo(545, divY2).strokeColor('#e5e7eb').stroke();
     doc.moveDown(0.5);
 
+    const lineTitle = `${planName} plan (${invoice.billingCycle})`;
     doc.fontSize(10).font('Helvetica').fillColor('#000000')
-      .text(`${planName} plan (${invoice.billingCycle})`, colLeft, doc.y);
+      .text(lineTitle, colLeft, doc.y);
 
     const descY = doc.y - doc.currentLineHeight();
     doc.text(fmt(invoice.subtotal), colRight, descY, { width: colW, align: 'right' });
 
-    if (invoice.description) {
+    // upgradePlan()/reactivatePlan() set description to this exact same text,
+    // so most invoices would otherwise show it twice in a row.
+    if (invoice.description && invoice.description.trim().toLowerCase() !== lineTitle.toLowerCase()) {
       doc.fontSize(9).fillColor('#6b7280').text(invoice.description, colLeft);
     }
     doc.fillColor('#000000');
