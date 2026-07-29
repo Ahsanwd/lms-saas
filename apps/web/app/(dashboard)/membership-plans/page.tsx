@@ -20,6 +20,40 @@ interface FailedRenewal {
   billingCycle: string;
 }
 
+interface Subscription {
+  _id: string;
+  userId: { _id: string; firstName: string; lastName: string; email: string } | null;
+  planId: { _id: string; name: string } | null;
+  status: 'pending' | 'trial' | 'active' | 'past_due' | 'cancelled' | 'expired';
+  billingCycle: 'monthly' | 'yearly';
+  currentPeriodEnd: string;
+  autoRenew: boolean;
+  createdAt: string;
+}
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+const SUB_STATUS_TABS: { value: string; label: string }[] = [
+  { value: '',          label: 'All' },
+  { value: 'active',    label: 'Active' },
+  { value: 'trial',     label: 'Trial' },
+  { value: 'past_due',  label: 'Past Due' },
+  { value: 'cancelled', label: 'Cancelled' },
+  { value: 'expired',   label: 'Expired' },
+  { value: 'pending',   label: 'Pending' },
+];
+
+const SUB_STATUS_BADGE: Record<string, 'success' | 'warning' | 'danger' | 'default'> = {
+  active:    'success',
+  trial:     'success',
+  past_due:  'warning',
+  cancelled: 'default',
+  expired:   'danger',
+  pending:   'default',
+};
+
 interface MembershipPlan {
   _id: string;
   name: string;
@@ -249,6 +283,106 @@ function PlanModal({
           </Button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── Subscribers Panel ─────────────────────────────────────────────────────────
+function SubscribersPanel() {
+  const [statusFilter, setStatusFilter] = useState('');
+  const [page, setPage]                 = useState(1);
+  const limit = 20;
+
+  const { data, isLoading } = useQuery<{ subscriptions: Subscription[]; total: number }>({
+    queryKey: ['membership-subscriptions', statusFilter, page],
+    queryFn: async () => {
+      const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+      if (statusFilter) params.set('status', statusFilter);
+      const { data } = await api.get(`/membership/subscriptions?${params}`);
+      return data.data;
+    },
+  });
+
+  const items = data?.subscriptions ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = Math.ceil(total / limit);
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+      <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-3">
+        <h2 className="text-sm font-bold text-gray-900">Subscribers</h2>
+        <div className="flex gap-1 flex-wrap">
+          {SUB_STATUS_TABS.map(tab => (
+            <button
+              key={tab.value}
+              onClick={() => { setStatusFilter(tab.value); setPage(1); }}
+              className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
+                statusFilter === tab.value
+                  ? 'bg-primary-100 text-primary-700'
+                  : 'text-gray-500 hover:bg-gray-100'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="flex justify-center py-8"><Spinner /></div>
+      ) : items.length === 0 ? (
+        <div className="py-10 text-center text-sm text-gray-400">No subscribers found.</div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+                <th className="text-left px-5 py-3 font-semibold">Student</th>
+                <th className="text-left px-5 py-3 font-semibold">Plan</th>
+                <th className="text-left px-5 py-3 font-semibold">Status</th>
+                <th className="text-left px-5 py-3 font-semibold">Cycle</th>
+                <th className="text-left px-5 py-3 font-semibold">Period End</th>
+                <th className="text-left px-5 py-3 font-semibold">Auto-Renew</th>
+                <th className="text-left px-5 py-3 font-semibold">Started</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {items.map(sub => (
+                <tr key={sub._id} className="hover:bg-gray-50">
+                  <td className="px-5 py-3">
+                    <p className="font-medium text-gray-900">
+                      {sub.userId ? `${sub.userId.firstName} ${sub.userId.lastName}` : '—'}
+                    </p>
+                    <p className="text-xs text-gray-400">{sub.userId?.email ?? ''}</p>
+                  </td>
+                  <td className="px-5 py-3 text-gray-700">{sub.planId?.name ?? '—'}</td>
+                  <td className="px-5 py-3">
+                    <Badge variant={SUB_STATUS_BADGE[sub.status] ?? 'default'}>{sub.status}</Badge>
+                  </td>
+                  <td className="px-5 py-3 text-gray-700 capitalize">{sub.billingCycle}</td>
+                  <td className="px-5 py-3 text-gray-700">{formatDate(sub.currentPeriodEnd)}</td>
+                  <td className="px-5 py-3 text-gray-700">{sub.autoRenew ? 'Yes' : 'No'}</td>
+                  <td className="px-5 py-3 text-gray-500">{formatDate(sub.createdAt)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between">
+          <p className="text-sm text-gray-500">Page {page} of {totalPages} · {total} total</p>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
+              Previous
+            </Button>
+            <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -489,6 +623,7 @@ export default function MembershipPlansPage() {
       )}
 
       {/* Failed renewals — shown only when there are past-due subscriptions */}
+      <SubscribersPanel />
       <FailedRenewalsPanel />
 
       {/* Create / Edit modal */}
