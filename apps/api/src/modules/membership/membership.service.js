@@ -146,9 +146,13 @@ async function initiateSubscription(tenantId, userId, { planId, billingCycle = '
   if (!plan) throw new AppError('Membership plan not found', 404);
   if (!plan.isActive) throw new AppError('This plan is no longer available', 400);
 
-  // Check for existing active subscription
+  // Block a new subscription only while a prior one still grants access
+  // (active/trial, cancelled-but-not-yet-expired, or within its grace period)
+  // — a cancelled subscription whose period has actually ended must not
+  // permanently lock the student out of ever subscribing again.
   const existing = await subRepo.findByUser(tenantId, userId);
-  if (existing) throw new AppError('You already have an active membership. Cancel it before subscribing to a new plan.', 409);
+  if (existing && subscriptionStillGrantsAccess(existing))
+    throw new AppError('You already have an active membership. Cancel it before subscribing to a new plan.', 409);
 
   const price = planPrice(plan, billingCycle);
 
@@ -260,25 +264,29 @@ async function cancelSubscription(tenantId, userId, { reason = '' } = {}) {
   });
 }
 
+// Single source of truth for "does this subscription record still grant
+// access right now" — used both to gate course access and to decide whether
+// an existing record should block a brand-new subscription. Keeping this in
+// one place avoids the two call sites drifting out of sync (subRepo.findByUser
+// surfaces active/trial/past_due/cancelled records; each status needs the
+// same period/grace-period reasoning wherever it's checked).
+function subscriptionStillGrantsAccess(sub, now = new Date()) {
+  if (sub.status === 'active' || sub.status === 'trial' || sub.status === 'cancelled') {
+    return now <= sub.currentPeriodEnd;
+  }
+  if (sub.status === 'past_due') {
+    return !!sub.gracePeriodEndsAt && now <= sub.gracePeriodEndsAt;
+  }
+  return false;
+}
+
 // Check if a student's membership covers a given course.
 // Also grants access during the 3-day grace period after failed renewal.
 async function checkCourseAccess(tenantId, userId, courseId) {
   const sub = await subRepo.findByUser(tenantId, userId);
   if (!sub) return { hasAccess: false };
 
-  const now = new Date();
-
-  // Active or trial — check period hasn't passed
-  if (sub.status === 'active' || sub.status === 'trial') {
-    if (now > sub.currentPeriodEnd) return { hasAccess: false };
-  } else if (sub.status === 'past_due') {
-    // Allow access during grace period only
-    if (!sub.gracePeriodEndsAt || now > sub.gracePeriodEndsAt) {
-      return { hasAccess: false };
-    }
-  } else {
-    return { hasAccess: false };
-  }
+  if (!subscriptionStillGrantsAccess(sub)) return { hasAccess: false };
 
   const plan = sub.planId;
   if (!plan) return { hasAccess: false };

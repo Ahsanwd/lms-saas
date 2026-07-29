@@ -2,10 +2,13 @@ const MembershipSubscription = require('../models/MembershipSubscription.model')
 
 class MembershipSubscriptionRepository {
   findByUser(tenantId, userId) {
-    // Includes past_due so checkCourseAccess can evaluate the grace period
+    // Includes past_due so checkCourseAccess can evaluate the grace period,
+    // and cancelled so a student who cancelled keeps seeing (and using) their
+    // subscription until currentPeriodEnd, matching the "you'll keep access
+    // until <date>" promise shown at cancel time.
     return MembershipSubscription.findOne({
       tenantId, userId,
-      status: { $in: ['active', 'trial', 'past_due'] },
+      status: { $in: ['active', 'trial', 'past_due', 'cancelled'] },
     }).populate({ path: 'planId', populate: { path: 'courses', select: 'title' } });
   }
 
