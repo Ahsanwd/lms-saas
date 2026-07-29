@@ -45,7 +45,10 @@ async function listAssignments(tenantId, user, query) {
     if (courseId) {
       filter.courseId = courseId;
     } else {
-      const enrollments = await enrollmentRepo.findByUser(tenantId, user.sub, { status: 'active' });
+      // 'completed' must stay included here — finishing a course must not
+      // make its assignments (and any grades already recorded on them)
+      // silently disappear from the student's own assignments list.
+      const enrollments = await enrollmentRepo.findByUser(tenantId, user.sub, { status: { $in: ['active', 'completed'] } });
       const courseIds = enrollments.map((e) => e.courseId);
       filter.courseId = { $in: courseIds };
     }
@@ -501,8 +504,12 @@ async function getNotSubmitted(tenantId, assignmentId, user) {
 
   const courseId = assignment.courseId._id ?? assignment.courseId;
 
-  // All active enrollments for this course (findByCourse returns [docs, count])
-  const [allStudents] = await enrollmentRepo.findByCourse(tenantId, courseId, { status: 'active' }, { limit: 1000 });
+  // All enrolled students for this course, active or completed — course
+  // completion is driven purely by lesson-watch percentage, decoupled from
+  // whether this specific assignment was ever submitted, so a student who
+  // finished the course's lessons can still genuinely be missing this
+  // submission and belongs on the instructor's reminder list.
+  const [allStudents] = await enrollmentRepo.findByCourse(tenantId, courseId, { status: { $in: ['active', 'completed'] } }, { limit: 1000 });
 
   // All submissions for this assignment
   const [submissions] = await submissionRepo.findAll(tenantId, assignmentId, {}, { limit: 1000 });
