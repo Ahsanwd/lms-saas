@@ -20,7 +20,12 @@ function resolveRange({ from, to, months, days }) {
   }
   const since = new Date(until);
   if (months) since.setMonth(since.getMonth() - Number(months));
-  else if (days) since.setDate(since.getDate() - Number(days));
+  // getEngagementReport's dayCount is an inclusive count of both endpoints
+  // (until - since, +1) — subtracting the full `days` here made a `days=7`
+  // request span 8 calendar days (today plus 7 full days back) instead of 7.
+  // Subtracting one fewer day makes the inclusive count come out to exactly
+  // `days`, e.g. days=1 correctly means "just today".
+  else if (days) since.setDate(since.getDate() - (Number(days) - 1));
   else since.setMonth(since.getMonth() - 12);
   return { since, until };
 }
@@ -65,12 +70,19 @@ async function getStudentReport(tenantId, { search = '', page = 1, limit = 20 } 
         completed: { $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] } },
       }},
     ]),
+    // $sum, not $avg — CourseProgress only has a document for courses the
+    // student actually opened, so $avg silently excluded every enrolled-but-
+    // never-started course from the denominator instead of counting it as
+    // 0%. A student enrolled in 4 courses with progress in just 1 (at 100%)
+    // showed "100% avg completion" — the exact opposite of an accurate
+    // signal. Summing here and dividing by enr.total below (all enrollments,
+    // including dropped) gives the true per-student average.
     CourseProgress.aggregate([
       { $match: { tenantId: tid, userId: { $in: studentIds } } },
       { $group: {
-        _id:            '$userId',
-        avgCompletion:  { $avg: '$percentage' },
-        lastActivityAt: { $max: '$lastAccessedAt' },
+        _id:             '$userId',
+        totalPercentage: { $sum: '$percentage' },
+        lastActivityAt:  { $max: '$lastAccessedAt' },
       }},
     ]),
   ]);
@@ -81,12 +93,12 @@ async function getStudentReport(tenantId, { search = '', page = 1, limit = 20 } 
   const result = students.map(s => {
     const id   = s._id.toString();
     const enr  = enrollMap[id]   ?? { total: 0, completed: 0 };
-    const prog = progressMap[id] ?? { avgCompletion: 0, lastActivityAt: null };
+    const prog = progressMap[id] ?? { totalPercentage: 0, lastActivityAt: null };
     return {
       ...s,
       enrollmentCount: enr.total,
       completedCount:  enr.completed,
-      avgCompletion:   Math.round(prog.avgCompletion ?? 0),
+      avgCompletion:   enr.total > 0 ? Math.round((prog.totalPercentage ?? 0) / enr.total) : 0,
       lastActivityAt:  prog.lastActivityAt,
     };
   });
