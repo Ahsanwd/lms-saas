@@ -14,7 +14,7 @@ class EnrollmentRepository {
     const skip = (Number(page) - 1) * Number(limit);
     return Promise.all([
       Enrollment.find({ tenantId, courseId, ...filter })
-        .populate('userId', 'name email avatar')
+        .populate('userId', 'firstName lastName email avatar')
         .skip(skip)
         .limit(Number(limit)),
       Enrollment.countDocuments({ tenantId, courseId, ...filter }),

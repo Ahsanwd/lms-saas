@@ -3058,6 +3058,8 @@ function StudentsTab({ courseId, enrollmentCount }: { courseId: string; enrollme
   const [removingId, setRemovingId]           = useState<string | null>(null);
   const [extendingId, setExtendingId]         = useState<string | null>(null);
   const [extendDays, setExtendDays]           = useState('30');
+  const [revokingCertId, setRevokingCertId]   = useState<string | null>(null);
+  const [revokeReason, setRevokeReason]       = useState('');
   const [csvResult, setCsvResult]             = useState<{ enrolled: string[]; skipped: string[]; notFound: string[] } | null>(null);
   const [showCsvModal, setShowCsvModal]       = useState(false);
   // Shown when the looked-up email has no matching user yet — lets the admin
@@ -3078,6 +3080,9 @@ function StudentsTab({ courseId, enrollmentCount }: { courseId: string; enrollme
           enrolledAt: string;
           expiresAt: string | null;
           status: string;
+          certificateIssued: boolean;
+          certificateRevoked: boolean;
+          certificateId: string | null;
         }>;
         total: number;
       };
@@ -3142,6 +3147,20 @@ function StudentsTab({ courseId, enrollmentCount }: { courseId: string; enrollme
     onError: (err: AxiosError<{ message: string }>) => {
       setRemovingId(null);
       setEnrollMsg(err.response?.data?.message ?? 'Failed to remove student');
+    },
+  });
+
+  const revokeCertMutation = useMutation({
+    mutationFn: ({ userId, reason }: { userId: string; reason: string }) =>
+      api.delete(`/courses/${courseId}/students/${userId}/certificate/revoke`, { data: { reason } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['course-students', courseId] });
+      setRevokingCertId(null);
+      setRevokeReason('');
+    },
+    onError: (err: AxiosError<{ message: string }>) => {
+      setRevokingCertId(null);
+      setEnrollMsg(err.response?.data?.message ?? 'Failed to revoke certificate');
     },
   });
 
@@ -3389,11 +3408,50 @@ function StudentsTab({ courseId, enrollmentCount }: { courseId: string; enrollme
                       )}
                     </td>
                     <td className="px-4 py-4">
-                      <Badge variant={enrollment.status === 'completed' ? 'success' : enrollment.status === 'expired' ? 'danger' : 'default'}>
-                        {enrollment.status}
-                      </Badge>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <Badge variant={enrollment.status === 'completed' ? 'success' : enrollment.status === 'expired' ? 'danger' : 'default'}>
+                          {enrollment.status}
+                        </Badge>
+                        {enrollment.certificateIssued && (
+                          enrollment.certificateRevoked ? (
+                            <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-red-100 text-red-700">
+                              Cert revoked
+                            </span>
+                          ) : (
+                            <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-amber-100 text-amber-700">
+                              🏆 Certified
+                            </span>
+                          )
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-4 text-right">
+                      <div className="flex items-center justify-end gap-3">
+                      {enrollment.certificateIssued && !enrollment.certificateRevoked && (
+                        revokingCertId === enrollment._id ? (
+                          <div className="flex items-center justify-end gap-1.5 text-xs">
+                            <input
+                              type="text" placeholder="Reason (optional)"
+                              value={revokeReason}
+                              onChange={e => setRevokeReason(e.target.value)}
+                              className="w-32 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-400"
+                            />
+                            <button
+                              onClick={() => revokeCertMutation.mutate({ userId: u._id, reason: revokeReason })}
+                              disabled={revokeCertMutation.isPending}
+                              className="text-red-600 font-medium hover:text-red-700">
+                              {revokeCertMutation.isPending ? '…' : 'Confirm'}
+                            </button>
+                            <button onClick={() => { setRevokingCertId(null); setRevokeReason(''); }}
+                              className="text-gray-500 hover:text-gray-700">Cancel</button>
+                          </div>
+                        ) : (
+                          <button onClick={() => setRevokingCertId(enrollment._id)}
+                            className="text-xs text-gray-400 hover:text-red-600 transition-colors">
+                            Revoke Cert
+                          </button>
+                        )
+                      )}
                       {enrollment.status === 'active' && (
                         removingId === enrollment._id ? (
                           <div className="flex items-center justify-end gap-2 text-xs">
@@ -3410,6 +3468,7 @@ function StudentsTab({ courseId, enrollmentCount }: { courseId: string; enrollme
                           </button>
                         )
                       )}
+                      </div>
                     </td>
                   </tr>
                 );
