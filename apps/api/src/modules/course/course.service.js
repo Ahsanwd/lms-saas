@@ -1156,13 +1156,14 @@ async function getMyCertificates(tenantId, userId) {
     certificateIssued: true,
   });
   return enrollments.map(e => ({
-    courseId:      e.courseId?._id ?? e.courseId,
-    courseTitle:   e.courseId?.title ?? '',
-    thumbnail:     e.courseId?.thumbnail ?? null,
-    level:         e.courseId?.level ?? null,
-    completedAt:   e.completedAt,
-    issuedAt:      e.certificateIssuedAt ?? e.completedAt,
-    certificateId: e.certificateId,
+    courseId:           e.courseId?._id ?? e.courseId,
+    courseTitle:        e.courseId?.title ?? '',
+    thumbnail:          e.courseId?.thumbnail ?? null,
+    level:              e.courseId?.level ?? null,
+    completedAt:        e.completedAt,
+    issuedAt:           e.certificateIssuedAt ?? e.completedAt,
+    certificateId:      e.certificateId,
+    certificateRevoked: e.certificateRevoked ?? false,
   }));
 }
 
@@ -1325,6 +1326,9 @@ async function verifyCertificate(certificateId) {
     return {
       valid: false,
       revoked: true,
+      certificateId,
+      studentName: `${enrollment.userId.firstName} ${enrollment.userId.lastName}`,
+      courseTitle: enrollment.courseId?.title ?? 'Unknown Course',
       revokedAt: enrollment.certificateRevokedAt,
       revokeReason: enrollment.certificateRevokeReason,
       message: 'This certificate has been revoked',

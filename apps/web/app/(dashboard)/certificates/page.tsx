@@ -13,6 +13,7 @@ interface MyCertificate {
   completedAt: string;
   issuedAt: string;
   certificateId: string;
+  certificateRevoked: boolean;
 }
 
 function formatDate(iso: string) {
@@ -81,10 +82,16 @@ export default function MyCertificatesPage() {
                   </div>
                 )}
                 {/* Certificate badge overlay */}
-                <div className="absolute top-3 right-3 w-9 h-9 bg-white rounded-full shadow flex items-center justify-center">
-                  <svg className="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
-                  </svg>
+                <div className={`absolute top-3 right-3 w-9 h-9 bg-white rounded-full shadow flex items-center justify-center ${cert.certificateRevoked ? 'text-red-600' : 'text-primary-600'}`}>
+                  {cert.certificateRevoked ? (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+                    </svg>
+                  )}
                 </div>
               </div>
 
@@ -94,6 +101,11 @@ export default function MyCertificatesPage() {
                   {cert.courseTitle}
                 </p>
                 <div className="flex items-center gap-2 flex-wrap">
+                  {cert.certificateRevoked && (
+                    <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-red-100 text-red-700">
+                      Revoked
+                    </span>
+                  )}
                   {cert.level && (
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${LEVEL_BADGE[cert.level] ?? 'bg-gray-100 text-gray-600'}`}>
                       {cert.level}
