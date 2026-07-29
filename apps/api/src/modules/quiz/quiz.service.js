@@ -562,6 +562,21 @@ async function gradeEssayAnswers(tenantId, quizId, attemptId, grades, user) {
     gradedBy: user.sub,
   });
 
+  // Update quiz analytics counters — mirrors submitAttempt's own update.
+  // Without this, a quiz with any manual-grading questions kept
+  // averageScore frozen at whatever the auto-graded-only portion scored
+  // at submission time (0 for a pure essay/short-answer quiz) forever,
+  // even though the attempt's own final score was correct — the quiz-level
+  // stat (shown on the instructor/student dashboards and Analytics page)
+  // just never got recalculated once manual grading actually completed.
+  const allAttempts = await quizAttemptRepo.getQuizStats(tenantId, quiz._id);
+  if (allAttempts[0]) {
+    await quizRepo.updateById(tenantId, quizId, {
+      attemptCount: allAttempts[0].totalAttempts,
+      averageScore: Math.round(allAttempts[0].avgScore),
+    });
+  }
+
   // Issue certificate on manual grading completion if configured
   if (passed && quiz.settings.triggerCertificate && attempt.courseId) {
     try {
