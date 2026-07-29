@@ -24,7 +24,7 @@ async function checkWriteAccess(tenantId, lessonId, user) {
       tenantId, user.sub, lesson.courseId.toString()
     );
     if (!enrollment || !['active', 'completed'].includes(enrollment.status))
-      throw new AppError('You must be enrolled to post in discussions', 403);
+      throw new AppError('You must be enrolled to access this lesson\'s discussions', 403);
   }
   return lesson;
 }
@@ -39,8 +39,13 @@ function formatPost(post, userId) {
 }
 
 // ── List all top-level posts + their replies for a lesson ─────────────────────
+// Reads were only gated by checkLesson() (lesson exists + discussionEnabled),
+// unlike the parallel forum module, which requires enrollment for both reads
+// and writes via checkAccess(). That let any authenticated tenant user read
+// a lesson's Q&A without ever being enrolled in the course. Reusing
+// checkWriteAccess() here brings reads in line with forum's behavior.
 async function list(tenantId, lessonId, user) {
-  await checkLesson(tenantId, lessonId);
+  await checkWriteAccess(tenantId, lessonId, user);
 
   const topLevel = await discussionRepo.findTopLevel(tenantId, lessonId);
   if (!topLevel.length) return { discussions: [] };
