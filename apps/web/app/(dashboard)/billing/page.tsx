@@ -895,14 +895,23 @@ function PlanCard({ plan, currentPlan }: { plan: Plan; currentPlan?: Plan }) {
       </div>
 
       <ul className="space-y-2 mb-5 flex-1">
-        {[
-          `${limitLabel(plan.limits.students)} students`,
-          `${limitLabel(plan.limits.instructors)} instructors`,
-          `${limitLabel(plan.limits.courses)} courses`,
-          `${plan.limits.storageGB} GB storage`,
-          ...plan.features,
-        ].map(item => (
-          <li key={item} className="flex items-center gap-2 text-xs text-gray-600">
+        {(() => {
+          const limitLines = [
+            `${limitLabel(plan.limits.students)} students`,
+            `${limitLabel(plan.limits.instructors)} instructors`,
+            `${limitLabel(plan.limits.courses)} courses`,
+            `${plan.limits.storageGB} GB storage`,
+          ];
+          const seen = new Set(limitLines.map(l => l.toLowerCase()));
+          const extraFeatures = plan.features.filter(f => {
+            const key = f.toLowerCase();
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+          return [...limitLines, ...extraFeatures];
+        })().map((item, i) => (
+          <li key={i} className="flex items-center gap-2 text-xs text-gray-600">
             <svg className="w-3.5 h-3.5 text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
             </svg>
