@@ -206,9 +206,14 @@ async function updateCourse(tenantId, courseId, data, user) {
   if (course.status === 'archived') throw new AppError('Cannot edit archived course', 400);
 
   const update = { updatedBy: user.sub };
+  // enrollmentType/accessCode/waitlistEnabled were never in this whitelist —
+  // the schema and the enroll()/enrollmentRequest logic that reads them
+  // were fully built, but no endpoint (create or update) could ever set
+  // them, so 'approval'- and 'access_code'-gated enrollment (and the
+  // waitlist) were unreachable from every course a tenant_admin created.
   const fields = ['title', 'description', 'shortDescription', 'level', 'language', 'tags',
     'price', 'requirements', 'objectives', 'capacity', 'certificateEnabled', 'allowPreview', 'passingScore',
-    'ctaLabel', 'displayLayout'];
+    'ctaLabel', 'displayLayout', 'enrollmentType', 'accessCode', 'waitlistEnabled'];
 
   for (const f of fields) {
     if (data[f] !== undefined) update[f] = data[f];

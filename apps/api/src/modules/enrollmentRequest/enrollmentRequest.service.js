@@ -10,16 +10,29 @@ async function submitRequest(tenantId, courseId, userId, { message = '' } = {}) 
   if (course.enrollmentType !== 'approval')
     throw new AppError('This course does not require approval', 400);
 
-  const alreadyEnrolled = await Enrollment.findOne({ tenantId, courseId, userId, status: 'active' });
-  if (alreadyEnrolled) throw new AppError('You are already enrolled in this course', 400);
+  // 'completed' must block a fresh request the same as 'active' — this only
+  // checked 'active', so a student who'd already finished the course could
+  // submit a brand-new pending request for it, landing in the admin's
+  // review queue for a course there was nothing left to approve.
+  const alreadyEnrolled = await Enrollment.findOne({ tenantId, courseId, userId, status: { $in: ['active', 'completed'] } });
+  if (alreadyEnrolled)
+    throw new AppError(
+      alreadyEnrolled.status === 'completed' ? 'You have already completed this course' : 'You are already enrolled in this course',
+      400
+    );
 
   const existing = await EnrollmentRequest.findOne({ tenantId, courseId, userId });
   if (existing) {
     if (existing.status === 'pending') throw new AppError('You already have a pending request', 400);
     if (existing.status === 'approved') {
-      // Check the enrollment still exists and is active — if it was removed, allow re-submit
-      const activeEnrollment = await Enrollment.findOne({ tenantId, courseId, userId, status: 'active' });
-      if (activeEnrollment) throw new AppError('You are already enrolled in this course', 400);
+      // Same fix — check for an active OR completed enrollment before
+      // allowing re-submit; only 'active' was checked here too.
+      const liveEnrollment = await Enrollment.findOne({ tenantId, courseId, userId, status: { $in: ['active', 'completed'] } });
+      if (liveEnrollment)
+        throw new AppError(
+          liveEnrollment.status === 'completed' ? 'You have already completed this course' : 'You are already enrolled in this course',
+          400
+        );
       // Enrollment was removed — fall through to re-submit
     }
     // Rejected or approved-but-unenrolled — allow re-submit
