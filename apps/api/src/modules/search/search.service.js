@@ -4,7 +4,7 @@ const User        = require('../../database/models/User.model');
 const Quiz        = require('../../database/models/Quiz.model');
 const Assignment  = require('../../database/models/Assignment.model');
 
-async function globalSearch(tenantId, { q = '', type = 'all', limit = 10 } = {}) {
+async function globalSearch(tenantId, { q = '', type = 'all', limit = 10 } = {}, role = null) {
   if (!q || q.trim().length < 2) return { courses: [], users: [], quizzes: [], assignments: [] };
 
   const tid   = new mongoose.Types.ObjectId(tenantId);
@@ -13,7 +13,14 @@ async function globalSearch(tenantId, { q = '', type = 'all', limit = 10 } = {})
 
   const all              = !type || type === 'all';
   const searchCourses    = all || type === 'courses';
-  const searchUsers      = all || type === 'users';
+  // User search had no role check at all, so any student could enumerate
+  // every other student's/instructor's name and email tenant-wide with a
+  // 2-character query. Restricted to instructor/tenant_admin — they
+  // already hold user:read broadly (config/permissions.js), matching a
+  // real need to look students up; a student has no equivalent reason to
+  // browse a directory of everyone else in the tenant.
+  const canSearchUsers   = role === 'instructor' || role === 'tenant_admin';
+  const searchUsers      = (all || type === 'users') && canSearchUsers;
   const searchQuizzes    = all || type === 'quizzes';
   const searchAssignments = all || type === 'assignments';
 
