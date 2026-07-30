@@ -9,6 +9,17 @@ async function joinWaitlist(tenantId, courseId, userId) {
   if (!course) throw new AppError('Course not found', 404, 'NOT_FOUND');
   if (!course.waitlistEnabled) throw new AppError('Waitlist is not enabled for this course', 400, 'WAITLIST_DISABLED');
 
+  // Joining is only meaningful once the course is actually full — this check
+  // was missing entirely (contradicting the route's own API docs, which
+  // already document "only allowed ... and is at capacity"), so anyone could
+  // join the waitlist for a course with open seats instead of just enrolling
+  // directly via enroll(), which has this same capacity check. An unlimited-
+  // capacity course (capacity: 0) can never be "full", so it must never
+  // allow joining the waitlist at all — not skip the check.
+  if (course.capacity <= 0) throw new AppError('This course has no enrollment limit — enroll directly instead of joining the waitlist', 400, 'SEATS_AVAILABLE');
+  const activeCount = await Enrollment.countDocuments({ tenantId, courseId, status: 'active' });
+  if (activeCount < course.capacity) throw new AppError('This course has open seats — enroll directly instead of joining the waitlist', 400, 'SEATS_AVAILABLE');
+
   // Not already actively enrolled (dropped/expired enrollments don't block waitlist)
   const alreadyEnrolled = await Enrollment.findOne({ tenantId, courseId, userId, status: 'active' });
   if (alreadyEnrolled) throw new AppError('You are already enrolled in this course', 400, 'ALREADY_ENROLLED');
@@ -76,8 +87,18 @@ async function promoteNext(tenantId, courseId) {
   const course = await Course.findOne({ _id: courseId, tenantId });
   if (!course || !course.waitlistEnabled) return null;
 
-  // Check if there's still capacity
-  if (course.capacity > 0 && course.enrollmentCount >= course.capacity) return null;
+  // Check if there's still capacity — against a live count, not the cached
+  // course.enrollmentCount. Confirmed live that this counter can drift from
+  // the real number of active enrollments (a pre-existing inconsistency
+  // found in real data during this same test session), which silently
+  // stopped promotion from ever firing even after a seat had genuinely
+  // opened up — the exact "auto-enroll the top of the queue" promise this
+  // function exists to keep. enroll() already does this correctly via a
+  // live count; this brings promoteNext in line with it.
+  if (course.capacity > 0) {
+    const activeCount = await Enrollment.countDocuments({ tenantId, courseId, status: 'active' });
+    if (activeCount >= course.capacity) return null;
+  }
 
   const next = await Waitlist.findOne({ tenantId, courseId, status: 'waiting' })
     .sort({ position: 1 });
