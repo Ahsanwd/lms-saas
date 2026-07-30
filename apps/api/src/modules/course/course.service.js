@@ -1063,7 +1063,14 @@ async function adminEnrollUser(tenantId, courseId, targetUserId, actingUser) {
 
   const existing = await enrollmentRepo.findByUserAndCourse(tenantId, targetUserId, courseId);
   if (existing) {
-    if (existing.status === 'active') throw new AppError('User is already enrolled', 409);
+    // 'completed' must be treated the same as 'active' here — this used to
+    // only guard 'active', so re-enrolling someone who'd already finished
+    // the course (and could hold an issued certificate) silently reset
+    // status back to 'active' and wiped completedAt, with no restart
+    // intended by the caller. Confirmed live: a real completed enrollment
+    // with an issued certificate got reverted to active/completedAt:null
+    // via this exact path, called from courseApplication's approve flow.
+    if (['active', 'completed'].includes(existing.status)) throw new AppError('User is already enrolled', 409);
     return enrollmentRepo.updateByUserAndCourse(tenantId, targetUserId, courseId, {
       status: 'active', enrolledAt: new Date(), droppedAt: null, completedAt: null,
       expiresAt: calcExpiresAt(course.accessDurationDays),
@@ -1107,7 +1114,10 @@ async function bulkEnrollCsv(tenantId, courseId, csvText, actingUser) {
     if (!user) { results.notFound.push(email); continue; }
 
     const existing = await Enrollment.findOne({ tenantId, courseId, userId: user._id });
-    if (existing?.status === 'active') { results.skipped.push(email); continue; }
+    // Same fix as adminEnrollUser() above — 'completed' must skip here too,
+    // or CSV-enrolling a name that already finished the course silently
+    // reverts them to active/completedAt:null.
+    if (existing && ['active', 'completed'].includes(existing.status)) { results.skipped.push(email); continue; }
 
     if (existing) {
       await enrollmentRepo.updateByUserAndCourse(tenantId, user._id.toString(), courseId, {

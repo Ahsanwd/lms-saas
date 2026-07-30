@@ -134,10 +134,15 @@ async function bulkEnroll(tenantId, cohortId, userIds) {
     // Enrollment record
     const existing = await Enrollment.findOne({ tenantId, courseId: course._id, userId });
     if (existing) {
-      if (existing.status === 'active') {
+      // 'completed' skips the same as 'active' — this only checked 'active'
+      // before, so bulk-adding a student who'd already finished the course
+      // to a cohort silently reset their enrollment back to active (and
+      // stale-dated completedAt), the same bug confirmed live via
+      // course.service.js's adminEnrollUser (same reactivation pattern).
+      if (['active', 'completed'].includes(existing.status)) {
         results.skipped.push({ userId, reason: 'Already enrolled' });
       } else {
-        await Enrollment.updateOne({ _id: existing._id }, { status: 'active', enrolledAt: new Date(), droppedAt: null, expiresAt });
+        await Enrollment.updateOne({ _id: existing._id }, { status: 'active', enrolledAt: new Date(), droppedAt: null, completedAt: null, expiresAt });
         results.enrolled.push(userId);
       }
     } else {

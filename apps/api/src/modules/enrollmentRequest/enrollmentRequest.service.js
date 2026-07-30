@@ -78,7 +78,11 @@ async function approveRequest(tenantId, requestId, actingUserId, { reviewNote = 
       pricePaid: 0, discountAmount: 0, couponCode: null,
     });
     await Course.updateOne({ _id: req.courseId, tenantId }, { $inc: { enrollmentCount: 1 } });
-  } else if (existing.status !== 'active') {
+  } else if (!['active', 'completed'].includes(existing.status)) {
+    // 'completed' must be excluded here too — this only excluded 'active',
+    // so approving a request for someone who'd already finished the course
+    // silently reactivated them (same bug confirmed live via
+    // course.service.js's adminEnrollUser).
     await Enrollment.updateOne({ _id: existing._id }, {
       status: 'active', enrolledAt: new Date(), droppedAt: null,
     });

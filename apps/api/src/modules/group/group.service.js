@@ -83,7 +83,11 @@ async function _enrollUsersInCourse(tenantId, course, userIds) {
 
   for (const userId of userIds) {
     const existing = await Enrollment.findOne({ tenantId, courseId: course._id, userId });
-    if (existing?.status === 'active') { results.skipped.push(userId.toString()); continue; }
+    // 'completed' skips the same as 'active' — this only checked 'active',
+    // so adding a student who'd already finished the course to a group
+    // silently reactivated them (same bug confirmed live via
+    // course.service.js's adminEnrollUser).
+    if (existing && ['active', 'completed'].includes(existing.status)) { results.skipped.push(userId.toString()); continue; }
 
     if (existing) {
       await Enrollment.updateOne({ _id: existing._id }, {
