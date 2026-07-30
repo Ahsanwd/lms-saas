@@ -211,9 +211,13 @@ async function updateCourse(tenantId, courseId, data, user) {
   // were fully built, but no endpoint (create or update) could ever set
   // them, so 'approval'- and 'access_code'-gated enrollment (and the
   // waitlist) were unreachable from every course a tenant_admin created.
+  // trialEnabled/trialDurationDays have the exact same gap — trial.service.js
+  // fully implements start/upgrade/status, but nothing could ever turn a
+  // course's trial on, found while testing the payment module's trial flow.
   const fields = ['title', 'description', 'shortDescription', 'level', 'language', 'tags',
     'price', 'requirements', 'objectives', 'capacity', 'certificateEnabled', 'allowPreview', 'passingScore',
-    'ctaLabel', 'displayLayout', 'enrollmentType', 'accessCode', 'waitlistEnabled'];
+    'ctaLabel', 'displayLayout', 'enrollmentType', 'accessCode', 'waitlistEnabled',
+    'trialEnabled', 'trialDurationDays'];
 
   for (const f of fields) {
     if (data[f] !== undefined) update[f] = data[f];

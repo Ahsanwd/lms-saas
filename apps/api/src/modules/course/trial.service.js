@@ -10,6 +10,14 @@ async function startTrial(tenantId, courseId, userId) {
 
   const existing = await Enrollment.findOne({ tenantId, courseId, userId });
   if (existing) {
+    // 'completed' was never checked here — same reactivation bug found
+    // repeatedly elsewhere this session (course.service.js's adminEnrollUser/
+    // bulkEnrollCsv, cohort/group bulk-enroll, enrollmentRequest). Without
+    // this, a student who already finished (and possibly holds a
+    // certificate for) a course could call startTrial and silently flip
+    // their completed enrollment back to active/isTrial:true.
+    if (existing.status === 'completed')
+      throw new AppError('You have already completed this course', 400);
     if (existing.status === 'active' && !existing.isTrial)
       throw new AppError('You are already enrolled in this course', 400);
     if (existing.isTrial && existing.status === 'active')
