@@ -7,8 +7,24 @@ const AppError   = require('../../utils/AppError');
 const config     = require('../../config');
 const { UPLOAD_ROOT } = require('../../services/storage/storage.service');
 
-// Dedicated symmetric secret for short-lived file tokens (separate from RS256 auth tokens)
-const FILE_SECRET = process.env.FILE_TOKEN_SECRET || 'lms-file-token-secret-change-in-prod';
+// Dedicated symmetric secret for short-lived file tokens (separate from RS256 auth tokens).
+// This used to fall back to a hardcoded literal ('lms-file-token-secret-
+// change-in-prod') whenever FILE_TOKEN_SECRET wasn't set -- confirmed live
+// that this env var was never configured anywhere (not in .env, not
+// referenced by any deployment config), meaning every deployment ran
+// verifyFileToken() against a secret visible in the source code itself.
+// Confirmed exploitable: forged a token with that literal string, no
+// Bearer auth, no real enrollment, and it passed verifyFileToken() cleanly
+// (only failed downstream on a local-disk-vs-R2 storage mismatch specific
+// to this dev environment) -- serveFile has no other access control, so in
+// an S3/R2-backed environment this would have streamed back the real
+// protected file to a completely anonymous attacker for any lessonId/
+// tenantId they could guess. Now fails loudly at startup instead of ever
+// running with a known-insecure default.
+const FILE_SECRET = process.env.FILE_TOKEN_SECRET;
+if (!FILE_SECRET) {
+  throw new Error('FILE_TOKEN_SECRET must be set — refusing to start with an insecure default for signed file-access tokens.');
+}
 
 function signFileToken(lessonId, userId, tenantId) {
   return jwt.sign(
