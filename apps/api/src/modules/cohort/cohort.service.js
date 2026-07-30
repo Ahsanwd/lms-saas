@@ -110,8 +110,20 @@ async function bulkEnroll(tenantId, cohortId, userIds) {
   const course = cohort.courseId;
 
   if (cohort.maxSize > 0) {
+    // Only userIds NOT already a member count toward the limit — this used
+    // to add the raw submitted array length regardless of overlap, so
+    // re-submitting an unchanged (already-enrolled) batch, or any batch that
+    // mixed a few new adds with already-enrolled members, could spuriously
+    // report COHORT_FULL even though the true number of net-new members was
+    // well within capacity. Confirmed live: re-posting the exact same
+    // already-enrolled userIds against a maxSize:2 cohort at 2/2 threw
+    // COHORT_FULL despite adding nobody.
+    const existingMemberIds = await CohortMember.distinct('userId', { tenantId, cohortId, userId: { $in: userIds } });
+    const existingSet = new Set(existingMemberIds.map(id => id.toString()));
+    const newUserCount = userIds.filter(id => !existingSet.has(id.toString())).length;
+
     const currentCount = await CohortMember.countDocuments({ tenantId, cohortId, status: { $in: ['enrolled', 'graduated'] } });
-    if (currentCount + userIds.length > cohort.maxSize)
+    if (currentCount + newUserCount > cohort.maxSize)
       throw new AppError(`Cohort capacity (${cohort.maxSize}) would be exceeded`, 400, 'COHORT_FULL');
   }
 
