@@ -203,7 +203,19 @@ async function updatePage(tenantId, id, data) {
   if (data.instituteType !== undefined) update.instituteType = data.instituteType;
   if (data.sections !== undefined) {
     validateSections(data.sections);
-    update.sections = data.sections;
+    // The schema requires sections[].order, but this was passed straight
+    // through from the client with no server-side check or default. A
+    // save that omits it (or that a client-side bug/omission lets through)
+    // writes fine here — findByIdAndUpdate doesn't run full validation —
+    // but then explodes with "Path `order` is required" on literally the
+    // next .save()-based operation to touch the document, which deletePage
+    // hits via the soft-delete plugin. Confirmed live: updated a page's
+    // sections without order, then deleting that same page 500'd with
+    // exactly that validation error. Normalizing to array index here,
+    // the same way reorderPages() already derives navOrder from position
+    // rather than trusting client input, makes the field always present
+    // and internally consistent regardless of what the client sends.
+    update.sections = data.sections.map((section, index) => ({ ...section, order: index }));
   }
 
   if (!Object.keys(update).length) throw new AppError('No valid fields provided', 400);

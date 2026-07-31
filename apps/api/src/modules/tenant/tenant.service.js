@@ -134,8 +134,20 @@ async function getEmailSettings(tenantId) {
 }
 
 // ─── Save Email Settings ──────────────────────────────────────────────────────
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 async function saveEmailSettings(tenantId, body) {
   const { fromName, fromEmail, replyTo } = body;
+
+  // Had no format validation at all — fromEmail becomes the literal SMTP
+  // "From:" header for every email this tenant sends (email.service.js's
+  // resolveFrom()), so any garbage string here would break outbound email
+  // delivery tenant-wide with no clear error pointing back to this field.
+  // Confirmed live: 'not-an-email-at-all' saved without complaint.
+  if (fromEmail && !EMAIL_RE.test(fromEmail))
+    throw new AppError('From email must be a valid email address', 400);
+  if (replyTo && !EMAIL_RE.test(replyTo))
+    throw new AppError('Reply-to email must be a valid email address', 400);
 
   await Tenant.findByIdAndUpdate(tenantId, {
     $set: {
