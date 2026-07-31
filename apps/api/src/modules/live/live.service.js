@@ -251,8 +251,12 @@ async function getAttendanceReport(tenantId, lessonId, user) {
   const records = await attendanceRepo.listByLesson(tenantId, lessonId);
 
   // Enrolled student count for the course
-  const enrollments = await enrollmentRepo.findByCourse(tenantId, lesson.courseId.toString());
-  const totalEnrolled = (enrollments ?? []).filter(e => e.status === 'active').length;
+  const [enrollments] = await enrollmentRepo.findByCourse(
+    tenantId, lesson.courseId.toString(),
+    { status: { $in: ['active', 'completed'] } },
+    { limit: 100000 },
+  );
+  const totalEnrolled = enrollments.length;
 
   const attendedCount = records.filter(r => ['attended', 'partial'].includes(r.status)).length;
 
