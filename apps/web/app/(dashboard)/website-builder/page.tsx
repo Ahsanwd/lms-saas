@@ -1210,15 +1210,8 @@ function PageEditorScreen({ pageId, onBack }: { pageId: string; onBack: () => vo
                         <textarea className={`${textareaCls} font-mono text-xs`} rows={4} value={customData.js}
                           onChange={(e) => setSectionFieldAt<CustomCodeData>(idx, 'js', e.target.value)} placeholder="console.log('hello');" />
                       </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                          Height <span className="text-gray-400 font-normal">(px)</span>
-                        </label>
-                        <input type="number" min={50} max={4000} className={inputCls} value={customData.heightPx}
-                          onChange={(e) => setSectionFieldAt<CustomCodeData>(idx, 'heightPx', Math.max(50, Number(e.target.value) || 400))} />
-                      </div>
                       <p className="text-xs text-gray-400">
-                        Runs in a sandboxed frame — it can't access your site's cookies, login sessions, or other tenants' data.
+                        Height adjusts automatically to fit your content. Runs in a sandboxed frame — it can't access your site's cookies, login sessions, or other tenants' data.
                       </p>
                     </>
                     );
@@ -1542,15 +1535,8 @@ function HeaderEditorScreen({ onBack }: { onBack: () => void }) {
                   <textarea className={`${textareaCls} font-mono text-xs`} rows={3} value={form.customCode.js}
                     onChange={(e) => set('customCode', { ...form.customCode!, js: e.target.value })} placeholder="console.log('hello');" />
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    Height <span className="text-gray-400 font-normal">(px)</span>
-                  </label>
-                  <input type="number" min={20} max={2000} className={inputCls} value={form.customCode.heightPx}
-                    onChange={(e) => set('customCode', { ...form.customCode!, heightPx: Math.max(20, Number(e.target.value) || 80) })} />
-                </div>
                 <p className="text-xs text-gray-400">
-                  Runs in a sandboxed frame — it can't access your site's cookies, login sessions, or other tenants' data.
+                  Height adjusts automatically to fit your content. Runs in a sandboxed frame — it can't access your site's cookies, login sessions, or other tenants' data.
                 </p>
               </>
             )}
@@ -1784,15 +1770,8 @@ function FooterEditorScreen({ onBack }: { onBack: () => void }) {
                   <textarea className={`${textareaCls} font-mono text-xs`} rows={3} value={form.customCode.js}
                     onChange={(e) => set('customCode', { ...form.customCode!, js: e.target.value })} placeholder="console.log('hello');" />
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    Height <span className="text-gray-400 font-normal">(px)</span>
-                  </label>
-                  <input type="number" min={20} max={2000} className={inputCls} value={form.customCode.heightPx}
-                    onChange={(e) => set('customCode', { ...form.customCode!, heightPx: Math.max(20, Number(e.target.value) || 150) })} />
-                </div>
                 <p className="text-xs text-gray-400">
-                  Runs in a sandboxed frame — it can't access your site's cookies, login sessions, or other tenants' data.
+                  Height adjusts automatically to fit your content. Runs in a sandboxed frame — it can't access your site's cookies, login sessions, or other tenants' data.
                 </p>
               </>
             )}

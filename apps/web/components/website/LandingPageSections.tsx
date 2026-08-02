@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import axios from 'axios';
 import { executeRecaptcha } from '@/lib/recaptcha';
@@ -1081,18 +1081,43 @@ export function ContactSection({ contact }: { contact: WebsiteContent['contact']
 // tenant's own visitors from that tenant's own content (same trust model as
 // CodePen/Webflow custom-code blocks — a Trust & Safety concern, not a
 // technical one). isEnabled is a support/ops kill-switch for abuse reports.
+//
+// Height is measured from the iframe's own content instead of a manual px
+// field — a small script appended to the sandboxed doc reports
+// document.documentElement.scrollHeight via postMessage (the only channel
+// available without allow-same-origin, which must never be added here) on
+// load, on any ResizeObserver-detected change, and once more after a short
+// delay to catch late-loading images/fonts. data.heightPx (still present on
+// older saved sections, no longer editable in the builder) is only used as
+// the initial paint estimate before the first real measurement arrives.
+const CUSTOM_CODE_RESIZE_SCRIPT = `(function(){function report(){try{parent.postMessage({__customCodeHeight:document.documentElement.scrollHeight},'*');}catch(e){}}if(window.ResizeObserver){new ResizeObserver(report).observe(document.body);}window.addEventListener('load',report);report();setTimeout(report,150);})();`;
+
 export function CustomCodeSection({ data }: { data: CustomCodeData }) {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [height, setHeight] = useState(data.heightPx || 400);
+
+  useEffect(() => {
+    function onMessage(e: MessageEvent) {
+      if (e.source !== iframeRef.current?.contentWindow) return;
+      const measured = e.data?.__customCodeHeight;
+      if (typeof measured === 'number' && measured > 0) setHeight(measured);
+    }
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, []);
+
   if (data.isEnabled === false) return null;
   if (!data.html && !data.css && !data.js) return null;
 
-  const srcDoc = `<!doctype html><html><head><meta charset="utf-8" /><style>body{margin:0;}${data.css || ''}</style></head><body>${data.html || ''}<script>${data.js || ''}<\/script></body></html>`;
+  const srcDoc = `<!doctype html><html><head><meta charset="utf-8" /><style>body{margin:0;}${data.css || ''}</style></head><body>${data.html || ''}<script>${data.js || ''}<\/script><script>${CUSTOM_CODE_RESIZE_SCRIPT}<\/script></body></html>`;
 
   return (
     <iframe
+      ref={iframeRef}
       srcDoc={srcDoc}
       sandbox="allow-scripts"
       referrerPolicy="no-referrer"
-      style={{ width: '100%', height: `${data.heightPx || 400}px`, border: 'none', display: 'block' }}
+      style={{ width: '100%', height: `${height}px`, border: 'none', display: 'block', transition: 'height 0.15s ease' }}
       title="Custom section"
     />
   );
