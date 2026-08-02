@@ -228,7 +228,7 @@ export default function CreateAssignmentPage() {
   }
 
   return (
-    <div className="p-4 sm:p-6 max-w-3xl mx-auto space-y-5">
+    <div className="p-4 sm:p-6 max-w-3xl mx-auto space-y-5 w-full">
       <div>
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Create Assignment</h1>
         <p className="text-sm text-gray-500 mt-0.5">Fill in the details below to create a new assignment.</p>

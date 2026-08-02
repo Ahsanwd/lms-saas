@@ -5034,7 +5034,7 @@ function StudentView() {
   // ── Hero layout ──────────────────────────────────────────────────────────────
   if (layout === 'hero') {
     return (
-      <div className="max-w-3xl mx-auto space-y-6">
+      <div className="max-w-3xl mx-auto space-y-6 w-full">
         {paymentModal}
         {backButton}
         {enrollError && <Alert variant="error">{enrollError}</Alert>}
@@ -5111,7 +5111,7 @@ function StudentView() {
   // ── Minimal layout ───────────────────────────────────────────────────────────
   if (layout === 'minimal') {
     return (
-      <div className="max-w-3xl mx-auto space-y-6">
+      <div className="max-w-3xl mx-auto space-y-6 w-full">
         {paymentModal}
         {backButton}
         {enrollError && <Alert variant="error">{enrollError}</Alert>}

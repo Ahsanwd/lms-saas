@@ -580,7 +580,7 @@ export default function AnnouncementsPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className="max-w-3xl mx-auto w-full">
       {/* Header */}
       <div className="px-6 pt-8 pb-6 flex items-start justify-between gap-4">
         <div>
