@@ -131,10 +131,26 @@ async function deleteQuestion(tenantId, id, user) {
 async function listQuizzes(tenantId, user, query) {
   const { courseId, lessonId, status, page, limit } = query;
   const filter = {};
-  if (user.role === 'student') filter.status = 'published';
-  if (courseId) filter.courseId = courseId;
+
+  if (user.role === 'student') {
+    // Students only ever see published quizzes for courses they're actually
+    // enrolled in — previously this filter was missing entirely, so any
+    // published quiz tenant-wide showed up in a student's quiz list
+    // regardless of enrollment. Mirrors listAssignments()'s same pattern.
+    filter.status = 'published';
+    if (courseId) {
+      filter.courseId = courseId;
+    } else {
+      const enrollments = await enrollmentRepo.findByUser(tenantId, user.sub, { status: { $in: ['active', 'completed'] } });
+      const courseIds = enrollments.map((e) => e.courseId);
+      filter.courseId = { $in: courseIds };
+    }
+  } else {
+    if (courseId) filter.courseId = courseId;
+    if (status) filter.status = status;
+  }
+
   if (lessonId) filter.lessonId = lessonId;
-  if (status && user.role !== 'student') filter.status = status;
   if (user.role === 'instructor') filter.instructorId = user.sub;
 
   const [quizzes, total] = await quizRepo.findAll(tenantId, filter, { page, limit });
@@ -146,6 +162,17 @@ async function getQuiz(tenantId, id, user) {
   if (!quiz) throw new AppError('Quiz not found', 404);
   if (quiz.status !== 'published' && !canManageQuiz(quiz, user))
     throw new AppError('Quiz not found', 404);
+
+  // Same enrollment gate startAttempt() already enforces — without it, a
+  // student could view a course-attached quiz's full question list (title,
+  // instructions, question count) for a course they were never enrolled in,
+  // just by knowing/guessing its id, even though actually attempting it was
+  // already correctly blocked.
+  if (user.role === 'student' && quiz.courseId) {
+    const enrollment = await enrollmentRepo.findByUserAndCourse(tenantId, user.sub, quiz.courseId);
+    if (!enrollment || !['active', 'completed'].includes(enrollment.status))
+      throw new AppError('Quiz not found', 404);
+  }
 
   // Hide correct answers from students by default. showCorrectAnswers only
   // reveals them for REVIEW, after the student has actually finished an
