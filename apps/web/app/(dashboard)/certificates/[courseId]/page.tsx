@@ -317,7 +317,7 @@ export default function CertificatePage() {
                 <p className="text-[9px] text-gray-400 uppercase tracking-widest font-semibold mb-1">Certificate ID</p>
                 <p className="text-xs font-mono font-bold text-gray-700 tracking-wider">{data.certificateId}</p>
                 <p className="text-[9px] text-gray-400 mt-1">
-                  Verify at: <span className="text-gray-500">lms/verify/{data.certificateId}</span>
+                  Verify at: <span className="text-gray-500">{verifyUrl.replace(/^https?:\/\//, '')}</span>
                 </p>
               </div>
               <div className="flex flex-col items-center gap-1">
