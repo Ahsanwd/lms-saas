@@ -106,7 +106,7 @@ export default function ForumAdminPage() {
   const flagged = filtered.filter(t => (t.flagCount ?? 0) > 0).length;
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-5">
+    <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-5">
 
       {/* ── Header ── */}
       <div className="flex items-start justify-between gap-4 flex-wrap">

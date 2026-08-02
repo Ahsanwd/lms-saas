@@ -394,7 +394,7 @@ export default function ThreadDetailPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
+    <div className="w-full max-w-4xl mx-auto px-4 py-6 space-y-6">
 
       {/* In-app notification banner */}
       {notification && (

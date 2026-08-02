@@ -57,7 +57,7 @@ export default function CourseForumPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-5">
+    <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-5">
 
       {/* ── Page Header ── */}
       <div>
