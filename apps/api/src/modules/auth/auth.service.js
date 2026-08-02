@@ -159,8 +159,14 @@ async function registerTenant({ firstName, lastName, email, password, tenantName
   const existingUser = await userRepo.findByEmail(tenant._id, email);
   if (existingUser) throw new AppError('Email already registered', 409, 'EMAIL_EXISTS');
 
-  const requireVerification = config.app.requireEmailVerification && tenant.settings?.requireEmailVerification !== false;
-
+  // Tenant admin signup never requires email verification. This flow always
+  // issued accessToken/refreshToken below regardless of `requireVerification`
+  // (so the new admin landed straight in the dashboard either way) — but when
+  // that flag was true, status was still set to 'unverified' and never
+  // flipped to 'active' since they were never forced through the verify-email
+  // link. Every subsequent login then hit login()'s `status === 'unverified'`
+  // check and permanently locked them out. Removing the gate entirely here
+  // fixes both the immediate signup UX and that lockout.
   const user = await userRepo.create({
     tenantId: tenant._id,
     firstName: firstName.trim(),
@@ -168,18 +174,10 @@ async function registerTenant({ firstName, lastName, email, password, tenantName
     email: email.toLowerCase().trim(),
     passwordHash: password,
     role: 'tenant_admin',
-    status: requireVerification ? 'unverified' : 'active',
+    status: 'active',
   });
 
   const { branding } = await tenantRepo.getBranding(tenant._id);
-
-  if (requireVerification) {
-    const rawToken = user.generateVerificationToken();
-    await user.save();
-    const verifyUrl = `${tenantBaseUrl(subdomain)}/verify-email?token=${rawToken}`;
-    const template = verifyEmailTemplate({ name: user.firstName, verifyUrl, tenantName, branding });
-    await queueEmail({ to: user.email, tenantId: tenant._id.toString(), ...template }).catch(() => {});
-  }
 
   // Welcome email — always sent regardless of verification requirement
   queueEmail({
