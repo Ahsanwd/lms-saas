@@ -64,6 +64,7 @@ export interface Testimonial {
   role: string;
   quote: string;
   avatarUrl: string | null;
+  rating?: number; // 1-5, optional — renders a star row when set
 }
 
 export interface TeamMember {
@@ -77,8 +78,8 @@ export interface TeamMember {
 export interface WebsiteContent {
   instituteType: 'school' | 'academy' | 'college' | 'university' | null;
   isPublished: boolean;
-  hero: { headline: string; subheadline: string; ctaText: string; ctaLink: string; backgroundImageUrl: string | null };
-  about: { heading: string; body: string; imageUrl: string | null; ctaText: string; ctaLink: string };
+  hero: { headline: string; subheadline: string; ctaText: string; ctaLink: string; backgroundImageUrl: string | null; eyebrow?: string; badgeText?: string };
+  about: { heading: string; body: string; imageUrl: string | null; ctaText: string; ctaLink: string; eyebrow?: string };
   coursesSection: {
     heading: string;
     subheading: string;
@@ -86,9 +87,10 @@ export interface WebsiteContent {
     categoryId: string | null;
     courseIds: string[];
     layout: 'grid' | 'slider';
+    eyebrow?: string;
   };
   testimonials: Testimonial[];
-  cta: { heading: string; subtext: string; buttonText: string; buttonLink: string };
+  cta: { heading: string; subtext: string; buttonText: string; buttonLink: string; eyebrow?: string };
   contact: { email: string; phone: string; address: string };
 }
 
@@ -113,6 +115,28 @@ const LEVEL_LABEL: Record<string, string> = {
 function MaybeLink({ href, disabled, className, children, onClick, style }: { href: string; disabled?: boolean; className: string; children: React.ReactNode; onClick?: () => void; style?: React.CSSProperties }) {
   if (disabled) return <span className={className} onClick={onClick} style={style}>{children}</span>;
   return <Link href={href} className={className} onClick={onClick} style={style}>{children}</Link>;
+}
+
+// Small bold uppercase label shown above a section heading — the recurring
+// "eyebrow" motif used across every redesigned section below. Renders
+// nothing when empty so older saved content (with no eyebrow set) looks
+// exactly as before.
+function SectionEyebrow({ text, align = 'center' }: { text?: string; align?: 'center' | 'left' }) {
+  if (!text) return null;
+  return (
+    <p className={`text-xs font-bold tracking-widest uppercase text-primary-600 mb-3 ${align === 'center' ? 'text-center' : 'text-left'}`}>
+      {text}
+    </p>
+  );
+}
+
+// Short gradient accent bar under a section heading — the other half of the
+// eyebrow+underline motif. Purely decorative, always renders (unlike the
+// eyebrow, which depends on tenant-entered text).
+function HeadingAccent({ align = 'center' }: { align?: 'center' | 'left' }) {
+  return (
+    <div className={`w-14 h-1.5 rounded-full bg-gradient-to-r from-primary-500 to-secondary-500 mt-3 mb-1 ${align === 'center' ? 'mx-auto' : ''}`} />
+  );
 }
 
 // ─── Nav Bar ──────────────────────────────────────────────────────────────────
@@ -394,44 +418,73 @@ export function LandingNavBar({
 // ─── Hero ─────────────────────────────────────────────────────────────────────
 
 export function HeroSection({ hero, displayName, linksDisabled, heightClass = 'min-h-screen' }: { hero: WebsiteContent['hero']; displayName: string; linksDisabled?: boolean; heightClass?: string }) {
-  const hasBg = !!hero.backgroundImageUrl;
-  const bgStyle = hasBg
-    ? { backgroundImage: `url(${hero.backgroundImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }
-    : undefined;
+  const hasImage = !!hero.backgroundImageUrl;
   return (
     <section
       id="home"
-      className={
-        hasBg
-          ? `${heightClass} flex flex-col items-center justify-center px-6 text-center relative scroll-mt-16`
-          : `${heightClass} flex flex-col items-center justify-center px-6 text-center bg-gradient-to-b from-primary-50 via-white to-white scroll-mt-16`
-      }
-      style={bgStyle}
+      className={`${heightClass} flex items-center px-6 sm:px-10 lg:px-16 py-16 relative bg-gradient-to-b from-primary-50 via-white to-white scroll-mt-16`}
     >
-      {hasBg && <div className="absolute inset-0 bg-black/50" />}
-      <div className={hasBg ? 'max-w-3xl mx-auto relative' : 'max-w-3xl mx-auto'}>
-        <h1 className={hasBg ? 'text-5xl sm:text-6xl font-extrabold leading-tight mb-6 text-white' : 'text-5xl sm:text-6xl font-extrabold text-gray-900 leading-tight mb-6'}>
-          {hero.headline || <>Learn with <span className="text-primary-600 capitalize">{displayName}</span></>}
-        </h1>
-        <p className={hasBg ? 'text-lg sm:text-xl mb-10 max-w-xl mx-auto text-gray-100' : 'text-lg sm:text-xl text-gray-500 mb-10 max-w-xl mx-auto'}>
-          {hero.subheadline || 'Browse our courses below and start learning today. Sign up for free to enroll.'}
-        </p>
-        {linksDisabled ? (
-          <span className="inline-block bg-primary-600 text-white text-base font-semibold px-9 py-4 rounded-xl shadow-lg shadow-primary-200 cursor-pointer">
-            {hero.ctaText || 'Create free account'}
-          </span>
-        ) : (
-          <Link
-            href={hero.ctaLink || '/register'}
-            className="inline-block bg-primary-600 text-white text-base font-semibold px-9 py-4 rounded-xl hover:bg-primary-700 transition-colors shadow-lg shadow-primary-200"
-          >
-            {hero.ctaText || 'Create free account'}
-          </Link>
-        )}
+      <div className="max-w-6xl mx-auto w-full grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+        {/* Left: text */}
+        <div className="text-center lg:text-left">
+          {hero.eyebrow && (
+            <p className="text-xs font-bold tracking-widest uppercase text-primary-600 mb-4">{hero.eyebrow}</p>
+          )}
+          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-gray-900 leading-tight mb-2">
+            {hero.headline || <>Learn with <span className="text-primary-600 capitalize">{displayName}</span></>}
+          </h1>
+          <div className="w-16 h-1.5 rounded-full bg-gradient-to-r from-primary-500 to-secondary-500 mb-6 mx-auto lg:mx-0" />
+          <p className="text-lg sm:text-xl text-gray-500 mb-10 max-w-xl mx-auto lg:mx-0">
+            {hero.subheadline || 'Browse our courses below and start learning today. Sign up for free to enroll.'}
+          </p>
+          {linksDisabled ? (
+            <span className="inline-block bg-primary-600 text-white text-base font-semibold px-9 py-4 rounded-xl shadow-lg shadow-primary-200 cursor-pointer">
+              {hero.ctaText || 'Create free account'}
+            </span>
+          ) : (
+            <Link
+              href={hero.ctaLink || '/register'}
+              className="inline-block bg-primary-600 text-white text-base font-semibold px-9 py-4 rounded-xl hover:bg-primary-700 transition-colors shadow-lg shadow-primary-200"
+            >
+              {hero.ctaText || 'Create free account'}
+            </Link>
+          )}
+        </div>
+
+        {/* Right: uploaded image, or a self-contained decorative treatment
+            when none is set (no external stock imagery — everything here is
+            CSS/SVG) */}
+        <div className="relative hidden lg:block">
+          {hasImage ? (
+            <div className="relative rounded-3xl overflow-hidden shadow-2xl aspect-[4/5]">
+              <img src={hero.backgroundImageUrl!} alt="" className="w-full h-full object-cover" />
+            </div>
+          ) : (
+            <div className="relative aspect-[4/5] rounded-3xl bg-gradient-to-br from-primary-100 via-primary-50 to-secondary-100 overflow-hidden">
+              <div
+                className="absolute inset-0 opacity-60"
+                style={{ backgroundImage: 'radial-gradient(rgba(255,255,255,0.9) 1.5px, transparent 1.5px)', backgroundSize: '24px 24px' }}
+              />
+              <div className="absolute -top-10 -right-10 w-56 h-56 rounded-full bg-secondary-200/60 blur-3xl" />
+              <div className="absolute -bottom-10 -left-10 w-64 h-64 rounded-full bg-primary-200/60 blur-3xl" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <svg className="w-24 h-24 text-primary-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                </svg>
+              </div>
+            </div>
+          )}
+          {/* Floating stat/quote badge, EduMall-style */}
+          {hero.badgeText && (
+            <div className="absolute -bottom-6 left-8 bg-white rounded-2xl shadow-xl px-5 py-3.5 border border-gray-100 flex items-center gap-2 max-w-[85%]">
+              <span className="text-sm font-semibold text-gray-800">{hero.badgeText}</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Scroll cue */}
-      <div className={hasBg ? 'absolute bottom-8 left-1/2 -translate-x-1/2 text-white/80 animate-bounce' : 'absolute bottom-8 left-1/2 -translate-x-1/2 text-gray-300 animate-bounce'}>
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-gray-300 animate-bounce">
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
         </svg>
@@ -460,6 +513,7 @@ export function AboutSection({ about, linksDisabled }: { about: WebsiteContent['
           </div>
         )}
         <div>
+          <SectionEyebrow text={about.eyebrow} align="left" />
           {about.heading && <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-5 leading-tight">{about.heading}</h2>}
           {about.body && <p className="text-gray-600 text-lg leading-relaxed whitespace-pre-line mb-8">{about.body}</p>}
           {about.ctaText && (
@@ -652,10 +706,12 @@ export function CoursesGrid({
     <section id="courses" className="py-14 px-6 bg-white scroll-mt-16">
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-8">
-          <h2 className="text-2xl font-bold text-gray-900">
+          <SectionEyebrow text={coursesSection.eyebrow} />
+          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
             {coursesSection.heading || (loading ? 'Loading courses…' : shown.length > 0 ? `All Courses (${shown.length})` : 'No courses yet')}
           </h2>
-          {coursesSection.subheading && <p className="text-gray-500 mt-2 max-w-lg mx-auto">{coursesSection.subheading}</p>}
+          <HeadingAccent />
+          {coursesSection.subheading && <p className="text-gray-500 mt-3 max-w-lg mx-auto">{coursesSection.subheading}</p>}
         </div>
 
         {loading ? (
@@ -959,16 +1015,34 @@ export function MembershipPlansSection({
 
 // ─── Testimonials ─────────────────────────────────────────────────────────────
 
+function StarRating({ rating }: { rating: number }) {
+  return (
+    <div className="flex items-center gap-0.5 mb-3">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <svg key={i} className={`w-4 h-4 ${i < rating ? 'text-amber-400' : 'text-gray-200'}`} fill="currentColor" viewBox="0 0 20 20">
+          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.957a1 1 0 00.95.69h4.162c.969 0 1.371 1.24.588 1.81l-3.367 2.447a1 1 0 00-.363 1.118l1.287 3.957c.3.921-.755 1.688-1.538 1.118l-3.367-2.447a1 1 0 00-1.176 0l-3.367 2.447c-.783.57-1.838-.197-1.538-1.118l1.287-3.957a1 1 0 00-.363-1.118L2.98 9.384c-.783-.57-.38-1.81.588-1.81h4.163a1 1 0 00.95-.69l1.286-3.957z" />
+        </svg>
+      ))}
+    </div>
+  );
+}
+
 export function TestimonialsSection({ testimonials }: { testimonials: Testimonial[] }) {
   if (!testimonials || testimonials.length === 0) return null;
   return (
-    <section id="testimonials" className="py-14 px-6 bg-gray-50 scroll-mt-16">
+    <section id="testimonials" className="py-16 px-6 bg-gray-50 scroll-mt-16">
       <div className="max-w-6xl mx-auto">
-        <h2 className="text-2xl font-bold text-gray-900 text-center mb-10">What our students say</h2>
+        <div className="text-center mb-10">
+          <SectionEyebrow text="Testimonials" />
+          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">What our students say</h2>
+          <HeadingAccent />
+        </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {testimonials.map((t, i) => (
-            <div key={i} className="bg-white rounded-2xl border border-gray-200 p-6">
-              <p className="text-gray-600 text-sm leading-relaxed mb-4">&ldquo;{t.quote}&rdquo;</p>
+            <div key={i} className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm hover:shadow-md hover:border-primary-200 transition-all">
+              <span className="block font-serif text-5xl leading-none text-primary-200 mb-1">&ldquo;</span>
+              {typeof t.rating === 'number' && t.rating > 0 && <StarRating rating={t.rating} />}
+              <p className="text-gray-600 text-sm leading-relaxed mb-5">{t.quote}</p>
               <div className="flex items-center gap-3">
                 {t.avatarUrl ? (
                   <img src={t.avatarUrl} alt={t.name} className="w-9 h-9 rounded-full object-cover" />
@@ -1032,17 +1106,24 @@ export function TeamSection({ team }: { team: TeamMember[] }) {
 export function CTASection({ cta, linksDisabled }: { cta: WebsiteContent['cta']; linksDisabled?: boolean }) {
   if (!cta.heading && !cta.subtext) return null;
   return (
-    <section className="py-16 px-6 bg-primary-600 text-center">
-      <div className="max-w-xl mx-auto">
-        {cta.heading && <h2 className="text-2xl font-bold text-white mb-3">{cta.heading}</h2>}
-        {cta.subtext && <p className="text-primary-100 mb-6">{cta.subtext}</p>}
+    <section className="relative overflow-hidden py-20 px-6 text-center bg-gradient-to-br from-primary-600 to-primary-700">
+      <div
+        className="absolute inset-0 opacity-[0.15]"
+        style={{ backgroundImage: 'radial-gradient(#fff 1.5px, transparent 1.5px)', backgroundSize: '26px 26px' }}
+      />
+      <div className="absolute -top-16 -right-16 w-72 h-72 rounded-full bg-secondary-400/20 blur-3xl" />
+      <div className="absolute -bottom-16 -left-16 w-72 h-72 rounded-full bg-white/10 blur-3xl" />
+      <div className="max-w-xl mx-auto relative">
+        {cta.eyebrow && <p className="text-xs font-bold tracking-widest uppercase text-primary-100 mb-4">{cta.eyebrow}</p>}
+        {cta.heading && <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4 leading-tight">{cta.heading}</h2>}
+        {cta.subtext && <p className="text-primary-100 text-lg mb-8">{cta.subtext}</p>}
         {(cta.buttonText || linksDisabled) && (
           linksDisabled ? (
-            <span className="inline-block bg-white text-primary-700 text-sm font-semibold px-7 py-3 rounded-xl cursor-pointer">
+            <span className="inline-block bg-white text-primary-700 text-base font-semibold px-8 py-3.5 rounded-xl shadow-lg cursor-pointer">
               {cta.buttonText || 'Get Started'}
             </span>
           ) : (
-            <Link href={cta.buttonLink || '/register'} className="inline-block bg-white text-primary-700 text-sm font-semibold px-7 py-3 rounded-xl hover:bg-primary-50 transition-colors">
+            <Link href={cta.buttonLink || '/register'} className="inline-block bg-white text-primary-700 text-base font-semibold px-8 py-3.5 rounded-xl shadow-lg hover:bg-primary-50 transition-colors">
               {cta.buttonText || 'Get Started'}
             </Link>
           )
@@ -1054,16 +1135,38 @@ export function CTASection({ cta, linksDisabled }: { cta: WebsiteContent['cta'];
 
 // ─── Contact ──────────────────────────────────────────────────────────────────
 
+const CONTACT_ICON_PATHS: Record<'email' | 'phone' | 'address', string> = {
+  email: 'M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z',
+  phone: 'M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z',
+  address: 'M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0zM15 11a3 3 0 11-6 0 3 3 0 016 0z',
+};
+
+function ContactInfoCard({ type, label, value }: { type: 'email' | 'phone' | 'address'; label: string; value: string }) {
+  return (
+    <div className="flex flex-col items-center text-center p-6 rounded-2xl border border-gray-200 bg-gray-50">
+      <div className="w-12 h-12 rounded-xl bg-primary-100 text-primary-600 flex items-center justify-center mb-4">
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d={CONTACT_ICON_PATHS[type]} />
+        </svg>
+      </div>
+      <p className="text-xs font-bold tracking-widest uppercase text-gray-400 mb-1.5">{label}</p>
+      <p className="text-sm text-gray-700 break-words">{value}</p>
+    </div>
+  );
+}
+
 export function ContactSection({ contact }: { contact: WebsiteContent['contact'] }) {
   if (!contact.email && !contact.phone && !contact.address) return null;
   return (
-    <section id="contact" className="py-14 px-6 bg-white border-t border-gray-100 scroll-mt-16">
-      <div className="max-w-3xl mx-auto text-center">
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">Get in touch</h2>
-        <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-sm text-gray-600">
-          {contact.email && <span className="flex items-center gap-2">✉️ {contact.email}</span>}
-          {contact.phone && <span className="flex items-center gap-2">📞 {contact.phone}</span>}
-          {contact.address && <span className="flex items-center gap-2">📍 {contact.address}</span>}
+    <section id="contact" className="py-16 px-6 bg-white border-t border-gray-100 scroll-mt-16">
+      <div className="max-w-4xl mx-auto text-center">
+        <SectionEyebrow text="Get In Touch" />
+        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">We&apos;d love to hear from you</h2>
+        <HeadingAccent />
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 mt-10">
+          {contact.email && <ContactInfoCard type="email" label="Email" value={contact.email} />}
+          {contact.phone && <ContactInfoCard type="phone" label="Phone" value={contact.phone} />}
+          {contact.address && <ContactInfoCard type="address" label="Address" value={contact.address} />}
         </div>
       </div>
     </section>

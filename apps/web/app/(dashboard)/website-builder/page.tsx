@@ -42,12 +42,12 @@ import {
 type InstituteType = 'school' | 'academy' | 'college' | 'university';
 
 const DEFAULT_SECTION_DATA: Record<SectionType, unknown> = {
-  hero: { headline: '', subheadline: '', ctaText: '', ctaLink: '', backgroundImageUrl: null },
-  about: { heading: '', body: '', imageUrl: null, ctaText: '', ctaLink: '' },
-  coursesSection: { heading: '', subheading: '', displayMode: 'all', categoryId: null, courseIds: [], layout: 'grid' },
+  hero: { headline: '', subheadline: '', ctaText: '', ctaLink: '', backgroundImageUrl: null, eyebrow: '', badgeText: '' },
+  about: { heading: '', body: '', imageUrl: null, ctaText: '', ctaLink: '', eyebrow: '' },
+  coursesSection: { heading: '', subheading: '', displayMode: 'all', categoryId: null, courseIds: [], layout: 'grid', eyebrow: '' },
   testimonials: [] as Testimonial[],
   team: [] as TeamMember[],
-  cta: { heading: '', subtext: '', buttonText: '', buttonLink: '' },
+  cta: { heading: '', subtext: '', buttonText: '', buttonLink: '', eyebrow: '' },
   contact: { email: '', phone: '', address: '' },
   custom: { html: '', css: '', js: '', heightPx: 400, isEnabled: true } as CustomCodeData,
   contactForm: { heading: 'Get in touch', subheading: '', fields: { name: true, phone: false, subject: true }, recipientEmail: null } as ContactFormData,
@@ -855,6 +855,10 @@ function PageEditorScreen({ pageId, onBack }: { pageId: string; onBack: () => vo
                     return (
                     <>
                       <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Eyebrow <span className="text-gray-400 font-normal">(optional)</span></label>
+                        <input className={inputCls} value={heroData.eyebrow ?? ''} onChange={(e) => setSectionFieldAt<WebsiteContent['hero']>(idx, 'eyebrow', e.target.value)} placeholder="Keep Learning" />
+                      </div>
+                      <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">Headline</label>
                         <input className={inputCls} value={heroData.headline} onChange={(e) => setSectionFieldAt<WebsiteContent['hero']>(idx, 'headline', e.target.value)} placeholder="Your headline" />
                       </div>
@@ -873,7 +877,11 @@ function PageEditorScreen({ pageId, onBack }: { pageId: string; onBack: () => vo
                         </div>
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Background Image</label>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Floating Badge Text <span className="text-gray-400 font-normal">(optional, e.g. a stat or quick quote)</span></label>
+                        <input className={inputCls} value={heroData.badgeText ?? ''} onChange={(e) => setSectionFieldAt<WebsiteContent['hero']>(idx, 'badgeText', e.target.value)} placeholder="⭐ 4.9 · 500+ students" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Side Image <span className="text-gray-400 font-normal">(optional — shows a decorative graphic instead if left empty)</span></label>
                         <div className="flex items-center gap-2 flex-wrap">
                           {heroData.backgroundImageUrl && <img src={heroData.backgroundImageUrl} alt="hero bg" className="h-8 w-12 rounded border border-gray-200 object-cover" />}
                           <button onClick={() => heroImgRef.current?.click()} className="text-xs px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-600 transition-colors">
@@ -892,6 +900,10 @@ function PageEditorScreen({ pageId, onBack }: { pageId: string; onBack: () => vo
                     const aboutData = section.data as WebsiteContent['about'];
                     return (
                     <>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Eyebrow <span className="text-gray-400 font-normal">(optional)</span></label>
+                        <input className={inputCls} value={aboutData.eyebrow ?? ''} onChange={(e) => setSectionFieldAt<WebsiteContent['about']>(idx, 'eyebrow', e.target.value)} placeholder="Who We Are" />
+                      </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">Heading</label>
                         <input className={inputCls} value={aboutData.heading} onChange={(e) => setSectionFieldAt<WebsiteContent['about']>(idx, 'heading', e.target.value)} placeholder="About Us" />
@@ -930,6 +942,10 @@ function PageEditorScreen({ pageId, onBack }: { pageId: string; onBack: () => vo
                     const coursesSectionData = section.data as WebsiteContent['coursesSection'];
                     return (
                     <>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Eyebrow <span className="text-gray-400 font-normal">(optional)</span></label>
+                        <input className={inputCls} value={coursesSectionData.eyebrow ?? ''} onChange={(e) => setSectionFieldAt<WebsiteContent['coursesSection']>(idx, 'eyebrow', e.target.value)} placeholder="Explore" />
+                      </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">Heading</label>
                         <input className={inputCls} value={coursesSectionData.heading} onChange={(e) => setSectionFieldAt<WebsiteContent['coursesSection']>(idx, 'heading', e.target.value)} placeholder="Our Courses" />
@@ -1132,11 +1148,23 @@ function PageEditorScreen({ pageId, onBack }: { pageId: string; onBack: () => vo
                           <input className={inputCls} value={t.name} onChange={(e) => setSectionWholeAt(idx, testimonialsData.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} placeholder="Name" />
                           <input className={inputCls} value={t.role} onChange={(e) => setSectionWholeAt(idx, testimonialsData.map((x, j) => j === i ? { ...x, role: e.target.value } : x))} placeholder="Role (e.g. Student)" />
                           <textarea className={textareaCls} rows={2} value={t.quote} onChange={(e) => setSectionWholeAt(idx, testimonialsData.map((x, j) => j === i ? { ...x, quote: e.target.value } : x))} placeholder="Quote" />
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs text-gray-500 mr-1">Rating:</span>
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <button key={star} type="button"
+                                onClick={() => setSectionWholeAt(idx, testimonialsData.map((x, j) => j === i ? { ...x, rating: (x.rating ?? 0) === star ? 0 : star } : x))}
+                                className="p-0.5" title={`${star} star${star > 1 ? 's' : ''}`}>
+                                <svg className={`w-4 h-4 ${(t.rating ?? 0) >= star ? 'text-amber-400' : 'text-gray-200'}`} fill="currentColor" viewBox="0 0 20 20">
+                                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.957a1 1 0 00.95.69h4.162c.969 0 1.371 1.24.588 1.81l-3.367 2.447a1 1 0 00-.363 1.118l1.287 3.957c.3.921-.755 1.688-1.538 1.118l-3.367-2.447a1 1 0 00-1.176 0l-3.367 2.447c-.783.57-1.838-.197-1.538-1.118l1.287-3.957a1 1 0 00-.363-1.118L2.98 9.384c-.783-.57-.38-1.81.588-1.81h4.163a1 1 0 00.95-.69l1.286-3.957z" />
+                                </svg>
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       ))}
                       {testimonialsData.length === 0 && <p className="text-xs text-gray-400">No testimonials yet — add up to 6.</p>}
                       {testimonialsData.length < 6 && (
-                        <button onClick={() => setSectionWholeAt(idx, [...testimonialsData, { name: '', role: '', quote: '', avatarUrl: null }])}
+                        <button onClick={() => setSectionWholeAt(idx, [...testimonialsData, { name: '', role: '', quote: '', avatarUrl: null, rating: 0 }])}
                           className="w-full flex items-center justify-center gap-1.5 text-xs font-medium text-primary-600 border-2 border-dashed border-primary-200 rounded-lg py-2 hover:border-primary-400 hover:bg-primary-50 transition-colors">
                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -1207,6 +1235,10 @@ function PageEditorScreen({ pageId, onBack }: { pageId: string; onBack: () => vo
                     const ctaData = section.data as WebsiteContent['cta'];
                     return (
                     <>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Eyebrow <span className="text-gray-400 font-normal">(optional)</span></label>
+                        <input className={inputCls} value={ctaData.eyebrow ?? ''} onChange={(e) => setSectionFieldAt<WebsiteContent['cta']>(idx, 'eyebrow', e.target.value)} placeholder="Join Us" />
+                      </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">Heading</label>
                         <input className={inputCls} value={ctaData.heading} onChange={(e) => setSectionFieldAt<WebsiteContent['cta']>(idx, 'heading', e.target.value)} placeholder="Ready to get started?" />
