@@ -11,10 +11,14 @@ function listDesigns() {
   return websiteDesignRepo.findAll();
 }
 
+function getDesignById(id) {
+  return websiteDesignRepo.findById(id);
+}
+
 // Replaces a tenant's entire public website (header, footer, every page)
-// with the given design's content. Used by registerTenant() at signup today;
-// a future tenant_admin-facing "switch design" flow (behind its own
-// confirmation popup) will call this same function.
+// with the given design's content. Used by registerTenant() at signup, and
+// by the tenant_admin-facing "apply design" endpoint (behind its own
+// confirmation popup on the frontend).
 async function applyDesignToTenant(tenantId, design) {
   // Validate every page's sections up front, before touching anything —
   // reuses tenantPageService.validateSections (already exported) instead of
@@ -53,5 +57,6 @@ async function applyDesignToTenant(tenantId, design) {
 module.exports = {
   getDefaultDesign,
   listDesigns,
+  getDesignById,
   applyDesignToTenant,
 };

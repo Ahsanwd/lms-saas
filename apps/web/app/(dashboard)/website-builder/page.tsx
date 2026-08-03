@@ -14,6 +14,7 @@ import {
   SectionIcon,
 } from '@/lib/websiteBuilderSections';
 import { AxiosError } from 'axios';
+import { toast } from 'sonner';
 import {
   PageSectionsRenderer,
   LandingNavBar,
@@ -176,7 +177,7 @@ const textareaCls = `${inputCls} resize-none`;
 // ═══════════════════════════════════════════════════════════════════════════
 // Pages List screen
 // ═══════════════════════════════════════════════════════════════════════════
-function PagesListScreen({ onEditPage, onEditChrome }: { onEditPage: (id: string) => void; onEditChrome: (chrome: 'header' | 'footer') => void }) {
+function PagesListScreen({ onEditPage, onEditChrome, onOpenDesignLibrary }: { onEditPage: (id: string) => void; onEditChrome: (chrome: 'header' | 'footer') => void; onOpenDesignLibrary: () => void }) {
   const router = useRouter();
   const qc = useQueryClient();
   const [newTitle, setNewTitle] = useState('');
@@ -247,7 +248,7 @@ function PagesListScreen({ onEditPage, onEditChrome }: { onEditPage: (id: string
         <div className="max-w-2xl mx-auto">
           <div className="mb-8">
             <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Site-wide</h2>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <button onClick={() => onEditChrome('header')}
                 className="flex items-center gap-3 p-4 bg-white border border-gray-200 rounded-xl hover:border-primary-300 hover:shadow-sm transition-all text-left">
                 <div className="w-9 h-9 rounded-lg bg-primary-50 text-primary-600 flex items-center justify-center flex-shrink-0">
@@ -270,6 +271,18 @@ function PagesListScreen({ onEditPage, onEditChrome }: { onEditPage: (id: string
                 <div>
                   <p className="text-sm font-semibold text-gray-900">Footer</p>
                   <p className="text-[11px] text-gray-400">Colors, social links, copyright</p>
+                </div>
+              </button>
+              <button onClick={onOpenDesignLibrary}
+                className="flex items-center gap-3 p-4 bg-white border border-gray-200 rounded-xl hover:border-primary-300 hover:shadow-sm transition-all text-left">
+                <div className="w-9 h-9 rounded-lg bg-primary-50 text-primary-600 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.486" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">Website Design</p>
+                  <p className="text-[11px] text-gray-400">Browse and apply a ready-made design</p>
                 </div>
               </button>
             </div>
@@ -350,6 +363,113 @@ function PagesListScreen({ onEditPage, onEditChrome }: { onEditPage: (id: string
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+interface WebsiteDesignSummary {
+  _id: string;
+  name: string;
+  description: string | null;
+  isDefault: boolean;
+  header?: { backgroundColor?: string };
+}
+
+// Browse the shared design library and apply one to this tenant — a one-way
+// replace (header, footer, every page), same semantics as
+// applyDesignToTenant() on the backend, gated behind a confirmation modal
+// since there's no undo. There's no "currently applied design" tracked
+// anywhere — this is a catalog of starting points to apply, not a
+// persistent theme selection.
+function DesignLibraryScreen({ onBack }: { onBack: () => void }) {
+  const qc = useQueryClient();
+  const [confirmingDesign, setConfirmingDesign] = useState<WebsiteDesignSummary | null>(null);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['website-designs'],
+    queryFn: async () => {
+      const { data } = await api.get('/website-designs');
+      return (data.data?.designs ?? []) as WebsiteDesignSummary[];
+    },
+  });
+  const designs = data ?? [];
+
+  const applyDesignMutation = useMutation({
+    mutationFn: (designId: string) => api.post(`/website-designs/${designId}/apply`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['tenant-pages'] });
+      qc.invalidateQueries({ queryKey: ['header-footer'] });
+      toast.success('Website replaced successfully');
+      setConfirmingDesign(null);
+    },
+    onError: (e: AxiosError<{ message: string }>) => toast.error(e.response?.data?.message ?? 'Failed to apply design'),
+  });
+
+  return (
+    <div className="flex flex-col h-screen bg-gray-50">
+      <div className="flex-shrink-0 h-16 bg-white border-b border-gray-200 flex items-center px-4 gap-3">
+        <button onClick={onBack} className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors" title="Back to Pages">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+        <p className="text-sm font-semibold text-gray-900">Website Builder — Website Design</p>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-6 py-8">
+        <div className="max-w-2xl mx-auto">
+          <div className="mb-6">
+            <h1 className="text-xl font-bold text-gray-900">Website Design Library</h1>
+            <p className="text-sm text-gray-500 mt-0.5">
+              Applying a design replaces your header, footer, and every page — you can keep editing afterward like normal.
+            </p>
+          </div>
+
+          {isLoading ? (
+            <div className="flex justify-center py-16"><Spinner size="lg" /></div>
+          ) : (
+            <div className="space-y-3">
+              {designs.map((design) => (
+                <div key={design._id} className="flex items-center gap-4 p-4 bg-white border border-gray-200 rounded-xl">
+                  <div
+                    className="w-10 h-10 rounded-lg flex-shrink-0 border border-gray-200"
+                    style={{ backgroundColor: design.header?.backgroundColor || '#e5e7eb' }}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-gray-900">{design.name}</span>
+                      {design.isDefault && (
+                        <span className="text-[10px] font-bold text-primary-600 bg-primary-50 px-1.5 py-0.5 rounded uppercase">Default</span>
+                      )}
+                    </div>
+                    {design.description && <p className="text-xs text-gray-400 mt-0.5">{design.description}</p>}
+                  </div>
+                  <Button size="sm" onClick={() => setConfirmingDesign(design)}>Apply</Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {confirmingDesign && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
+            <h3 className="text-base font-bold text-gray-900">Replace your entire website with "{confirmingDesign.name}"?</h3>
+            <p className="text-sm text-gray-500">
+              This will replace your header, footer, and every page on your public site. This cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1" onClick={() => setConfirmingDesign(null)}>Cancel</Button>
+              <Button variant="danger" className="flex-1"
+                loading={applyDesignMutation.isPending}
+                onClick={() => applyDesignMutation.mutate(confirmingDesign._id)}>
+                Replace Website
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1803,6 +1923,7 @@ function FooterEditorScreen({ onBack }: { onBack: () => void }) {
 export default function WebsiteBuilderPage() {
   const [editingPageId, setEditingPageId] = useState<string | null>(null);
   const [editingChrome, setEditingChrome] = useState<'header' | 'footer' | null>(null);
+  const [showDesignLibrary, setShowDesignLibrary] = useState(false);
 
   if (editingPageId) {
     return <PageEditorScreen pageId={editingPageId} onBack={() => setEditingPageId(null)} />;
@@ -1813,5 +1934,14 @@ export default function WebsiteBuilderPage() {
   if (editingChrome === 'footer') {
     return <FooterEditorScreen onBack={() => setEditingChrome(null)} />;
   }
-  return <PagesListScreen onEditPage={setEditingPageId} onEditChrome={setEditingChrome} />;
+  if (showDesignLibrary) {
+    return <DesignLibraryScreen onBack={() => setShowDesignLibrary(false)} />;
+  }
+  return (
+    <PagesListScreen
+      onEditPage={setEditingPageId}
+      onEditChrome={setEditingChrome}
+      onOpenDesignLibrary={() => setShowDesignLibrary(true)}
+    />
+  );
 }

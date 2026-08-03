@@ -33,6 +33,7 @@ router.use('/billing', require('../modules/billing/billing.routes'));
 router.use('/tenant/pages', require('../modules/tenantPage/tenantPage.routes'));
 router.use('/tenant/contact-submissions', require('../modules/contactSubmission/contactSubmission.routes'));
 router.use('/tenant',  require('../modules/tenant/tenant.routes'));
+router.use('/website-designs', require('../modules/websiteDesign/websiteDesign.routes'));
 
 // Same rationale as /tenant/contact-submissions above — a public application
 // form (and the admin's ability to review it) shouldn't be blocked by a
