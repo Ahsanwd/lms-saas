@@ -263,4 +263,7 @@ module.exports = {
   validateSections,
   // exported for the one-time migration backfill script only
   sectionsFromWebsiteContent,
+  // exported so websiteDesign seed/authoring scripts validate page slugs
+  // against the exact same reserved list assertSlugAvailable uses here
+  RESERVED_SLUGS,
 };

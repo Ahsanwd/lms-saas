@@ -54,6 +54,21 @@ class TenantPageRepository {
     if (!page) return null;
     return page.softDelete(userId);
   }
+
+  // Used only by websiteDesign.service.js's applyDesignToTenant — a real
+  // delete, not softDelete(). The {tenantId, slug} unique index isn't partial
+  // on deletedAt, so a soft-deleted page still occupies its slug and would
+  // collide with the new design's page of the same name. Applying a design
+  // is already an explicit, user-confirmed destructive replace.
+  hardDeleteAllForTenant(tenantId) {
+    return TenantPage.deleteMany({ tenantId });
+  }
+
+  // Used only by websiteDesign.service.js's applyDesignToTenant, right after
+  // hardDeleteAllForTenant — inserts a design's pages for a tenant in one call.
+  bulkCreate(pages) {
+    return TenantPage.insertMany(pages);
+  }
 }
 
 module.exports = new TenantPageRepository();

@@ -6,6 +6,7 @@ const userRepo = require('../../database/repositories/user.repository');
 const sessionRepo = require('../../database/repositories/session.repository');
 const tenantRepo = require('../../database/repositories/tenant.repository');
 const tenantPageRepo = require('../../database/repositories/tenantPage.repository');
+const websiteDesignService = require('../websiteDesign/websiteDesign.service');
 const auditLogRepo = require('../../database/repositories/authAuditLog.repository');
 const Plan = require('../../database/models/Plan.model');
 const { signAccessToken, signRefreshToken, verifyRefreshToken, signTempToken, verifyTempToken } = require('../../utils/jwt');
@@ -152,9 +153,24 @@ async function registerTenant({ firstName, lastName, email, password, tenantName
     status: 'active',
   });
 
-  // Every tenant gets a Home page provisioned synchronously at signup
-  // (multi-page Website Builder) — not created lazily on first visit.
-  await tenantPageRepo.upsertHomePage(tenant._id, { title: 'Home' });
+  // Every tenant gets a real, populated website provisioned synchronously at
+  // signup (multi-page Website Builder) — not created lazily on first visit,
+  // and not just an empty Home page. Applies the library's default design
+  // (header + footer + Home/About/Contact pages, all pre-filled and fully
+  // editable afterward); falls back to a single empty Home page if no
+  // default design has been seeded yet (e.g. first deploy before the seed
+  // script runs) or if applying it fails for any reason — website
+  // provisioning must never block account creation itself.
+  try {
+    const defaultDesign = await websiteDesignService.getDefaultDesign();
+    if (defaultDesign) {
+      await websiteDesignService.applyDesignToTenant(tenant._id, defaultDesign);
+    } else {
+      await tenantPageRepo.upsertHomePage(tenant._id, { title: 'Home' });
+    }
+  } catch {
+    await tenantPageRepo.upsertHomePage(tenant._id, { title: 'Home' }).catch(() => {});
+  }
 
   const existingUser = await userRepo.findByEmail(tenant._id, email);
   if (existingUser) throw new AppError('Email already registered', 409, 'EMAIL_EXISTS');
