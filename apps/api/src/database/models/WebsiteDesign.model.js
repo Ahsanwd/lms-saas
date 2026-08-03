@@ -31,6 +31,11 @@ const websiteDesignSchema = new mongoose.Schema(
         slug: { type: String, required: true, match: /^[a-z0-9-]+$/ },
         title: { type: String, required: true },
         isHomePage: { type: Boolean, default: false },
+        // A design's whole point is to make a tenant's site look alive
+        // immediately — default true, unlike TenantPage's own isPublished
+        // (default false there, since a manually-created page starts as a
+        // draft the tenant is still working on).
+        isPublished: { type: Boolean, default: true },
         navOrder: { type: Number, default: 0 },
         instituteType: { type: String, default: null },
         sections: [

@@ -35,6 +35,7 @@ async function applyDesignToTenant(tenantId, design) {
       slug: page.slug,
       title: page.title,
       isHomePage: page.isHomePage,
+      isPublished: page.isPublished,
       navOrder: page.navOrder,
       instituteType: page.instituteType,
       sections: page.sections,

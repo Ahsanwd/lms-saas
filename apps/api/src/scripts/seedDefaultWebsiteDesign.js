@@ -16,6 +16,7 @@ const pages = [
     slug: 'home',
     title: 'Home',
     isHomePage: true,
+    isPublished: true,
     navOrder: 0,
     instituteType: null,
     sections: [
@@ -78,6 +79,7 @@ const pages = [
     slug: 'about',
     title: 'About',
     isHomePage: false,
+    isPublished: true,
     navOrder: 1,
     instituteType: null,
     sections: [
@@ -98,6 +100,7 @@ const pages = [
     slug: 'contact',
     title: 'Contact',
     isHomePage: false,
+    isPublished: true,
     navOrder: 2,
     instituteType: null,
     sections: [
