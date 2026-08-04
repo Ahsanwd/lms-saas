@@ -302,34 +302,58 @@ function TenantLandingPage({ subdomain }: { subdomain: string }) {
 
 const features = [
   {
+    icon: '🎨',
+    title: 'Stunning Website Builder',
+    desc: 'Launch with a beautifully designed site from our template library, then customize every page yourself — no code required.',
+    gradient: 'from-violet-500 to-indigo-500',
+  },
+  {
     icon: '🎓',
-    title: 'Course Builder',
-    desc: 'Create structured courses with videos, quizzes, assignments, and drip scheduling — all in one place.',
+    title: 'Powerful Course Builder',
+    desc: 'Structure courses with sections, video/quiz/assignment lessons, and drip scheduling — all in one place.',
+    gradient: 'from-blue-500 to-sky-500',
   },
   {
-    icon: '💳',
-    title: 'Built-in Payments',
-    desc: 'Accept course payments via Stripe. Set your own prices, run coupons, and issue refunds.',
-  },
-  {
-    icon: '📊',
-    title: 'Analytics & Reports',
-    desc: 'Track student progress, revenue trends, and instructor earnings with beautiful visual dashboards.',
+    icon: '📝',
+    title: 'Advanced Quizzes & Assignments',
+    desc: '9 question types, auto-graded or manual with rubrics, timers, randomization, and a full question bank.',
+    gradient: 'from-rose-500 to-pink-500',
   },
   {
     icon: '🏆',
-    title: 'Certificates',
-    desc: 'Issue branded certificates automatically when students pass a course or quiz.',
+    title: 'Branded Certificates',
+    desc: 'Auto-issued the moment a student passes — design your own certificate with a live preview builder.',
+    gradient: 'from-amber-500 to-yellow-500',
+  },
+  {
+    icon: '📹',
+    title: 'Live Classes',
+    desc: 'Real-time video classrooms built in — attendance tracking, recordings, no third-party Zoom setup needed.',
+    gradient: 'from-red-500 to-rose-500',
   },
   {
     icon: '💬',
-    title: 'Live & Community',
-    desc: 'Host live video classes right inside your school, run discussion forums, and message students in real-time chat.',
+    title: 'Community & Chat',
+    desc: 'Discussion forums with moderation, real-time student-instructor chat, and cohort/group learning.',
+    gradient: 'from-teal-500 to-emerald-500',
   },
   {
-    icon: '🔒',
-    title: 'Multi-Tenant & Secure',
-    desc: 'Every school gets its own subdomain, custom branding, and fully isolated data.',
+    icon: '💰',
+    title: 'Flexible Monetization',
+    desc: 'Course bundles, coupons, and recurring memberships — connect your own payment gateway and keep 100% of revenue.',
+    gradient: 'from-green-500 to-lime-500',
+  },
+  {
+    icon: '🌐',
+    title: 'Your Own Branded Domain',
+    desc: 'Every school gets its own subdomain and custom domain support, with fully isolated, secure data.',
+    gradient: 'from-cyan-500 to-sky-500',
+  },
+  {
+    icon: '📊',
+    title: 'Real-Time Analytics',
+    desc: 'Revenue trends, student engagement, and instructor earnings — all in clear, visual dashboards.',
+    gradient: 'from-purple-500 to-fuchsia-500',
   },
 ];
 
@@ -458,19 +482,26 @@ function PlatformLandingPage() {
       </section>
 
       {/* ── Features ─────────────────────────────────────────── */}
-      <section id="features" className="py-20 px-6 bg-white">
+      <section id="features" className="py-20 px-6 bg-gray-50">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-14">
-            <h2 className="text-3xl font-bold text-gray-900 mb-3">Everything you need to run your academy</h2>
-            <p className="text-gray-500 max-w-xl mx-auto">
+            <p className="text-xs font-bold tracking-widest uppercase text-indigo-600 mb-3">Everything Included</p>
+            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-3">Everything you need to run your academy</h2>
+            <div className="w-14 h-1.5 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 mx-auto mb-5" />
+            <p className="text-gray-500 max-w-xl mx-auto text-lg">
               No plugins, no patchwork. Coursel ships with all the tools your school needs out of the box.
             </p>
           </div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {features.map((f) => (
-              <div key={f.title} className="p-6 rounded-2xl border border-gray-100 hover:border-indigo-200 hover:shadow-md transition-all">
-                <div className="text-3xl mb-3">{f.icon}</div>
-                <h3 className="font-semibold text-gray-900 mb-2">{f.title}</h3>
+              <div
+                key={f.title}
+                className="group p-7 rounded-2xl bg-white border border-gray-100 hover:border-transparent hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
+              >
+                <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${f.gradient} flex items-center justify-center text-2xl mb-5 shadow-lg group-hover:scale-110 transition-transform duration-300`}>
+                  {f.icon}
+                </div>
+                <h3 className="font-bold text-gray-900 mb-2 text-lg">{f.title}</h3>
                 <p className="text-sm text-gray-500 leading-relaxed">{f.desc}</p>
               </div>
             ))}
