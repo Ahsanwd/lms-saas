@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { connectSocket } from '@/lib/socket';
 import { StatCard } from '@/components/dashboard/StatCard';
+import { GuideCallout } from '@/components/guides/GuideCallout';
 import { Spinner } from '@/components/ui';
 
 interface OnboardingChecklist {
@@ -178,6 +179,8 @@ export default function TenantAdminDashboardPage() {
 
       {/* Onboarding checklist */}
       {checklistData && <OnboardingChecklistCard checklist={checklistData} />}
+
+      <GuideCallout role="admin" />
 
       {/* Quick actions */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

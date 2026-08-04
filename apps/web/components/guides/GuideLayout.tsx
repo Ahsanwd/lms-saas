@@ -1,14 +1,6 @@
 import Link from 'next/link';
 
-export function LegalLayout({
-  title,
-  lastUpdated,
-  children,
-}: {
-  title: string;
-  lastUpdated: string;
-  children: React.ReactNode;
-}) {
+export function GuideLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-white text-gray-900">
       <nav className="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm">
@@ -22,13 +14,7 @@ export function LegalLayout({
         </div>
       </nav>
 
-      <main className="max-w-3xl mx-auto px-6 py-16">
-        <h1 className="text-3xl font-extrabold text-gray-900 mb-2">{title}</h1>
-        <p className="text-sm text-gray-400 mb-10">Last updated: {lastUpdated}</p>
-        <div className="space-y-8 text-gray-600 leading-relaxed [&_h2]:text-xl [&_h2]:font-bold [&_h2]:text-gray-900 [&_h2]:mb-3 [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:space-y-1 [&_a]:text-indigo-600 [&_a]:hover:underline">
-          {children}
-        </div>
-      </main>
+      <main className="max-w-6xl mx-auto px-6 py-14">{children}</main>
 
       <footer className="py-10 px-6 border-t border-gray-100 bg-white">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-400">

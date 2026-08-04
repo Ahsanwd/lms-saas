@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { useAuthStore } from '@/stores/auth.store';
 import { StatCard } from '@/components/dashboard/StatCard';
+import { GuideCallout } from '@/components/guides/GuideCallout';
 import { Badge, Spinner } from '@/components/ui';
 import { formatDate } from '@/lib/utils';
 
@@ -66,6 +67,8 @@ export default function InstructorDashboardPage() {
           </button>
         </div>
       </div>
+
+      <GuideCallout role="instructor" />
 
       {/* Quick actions */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

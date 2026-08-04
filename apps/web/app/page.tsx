@@ -461,6 +461,7 @@ function PlatformLandingPage() {
           <div className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-600">
             <a href="#features" className="hover:text-indigo-600 transition-colors">Features</a>
             <a href="#pricing" className="hover:text-indigo-600 transition-colors">Pricing</a>
+            <Link href="/guides" className="hover:text-indigo-600 transition-colors">Guides</Link>
             <a href="#contact" className="hover:text-indigo-600 transition-colors">Contact</a>
           </div>
           <div className="flex items-center gap-3">
@@ -657,6 +658,42 @@ function PlatformLandingPage() {
         </div>
       </section>
 
+      {/* ── Guides ───────────────────────────────────────────── */}
+      <section className="py-20 px-6 bg-white">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-12">
+            <p className="text-xs font-bold tracking-widest uppercase text-indigo-600 mb-3">Help & Guides</p>
+            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-3">Step-by-step guides for every role</h2>
+            <div className="w-14 h-1.5 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 mx-auto mb-5" />
+            <p className="text-gray-500 text-lg">Whether you run the school, teach, or learn — there's a complete guide for you.</p>
+          </div>
+
+          <div className="grid sm:grid-cols-3 gap-6">
+            {[
+              { role: 'admin', icon: '🏫', title: 'Admin Guide', desc: 'Set up your school, build courses, and manage everything.' },
+              { role: 'instructor', icon: '🎓', title: 'Instructor Guide', desc: 'Create courses, quizzes, assignments, and live classes.' },
+              { role: 'student', icon: '📖', title: 'Student Guide', desc: 'Enroll, learn at your own pace, and earn certificates.' },
+            ].map((g) => (
+              <Link
+                key={g.role}
+                href={`/guides/${g.role}`}
+                className="group flex flex-col items-center text-center p-7 rounded-2xl bg-gray-50 border border-gray-100 hover:border-indigo-200 hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
+              >
+                <span className="text-3xl mb-3">{g.icon}</span>
+                <h3 className="font-bold text-gray-900 mb-1.5 group-hover:text-indigo-600 transition-colors">{g.title}</h3>
+                <p className="text-sm text-gray-500 leading-relaxed">{g.desc}</p>
+              </Link>
+            ))}
+          </div>
+
+          <p className="text-center mt-8">
+            <Link href="/guides" className="text-sm font-semibold text-indigo-600 hover:text-indigo-700 transition-colors">
+              Browse all guides →
+            </Link>
+          </p>
+        </div>
+      </section>
+
       {/* ── Contact ──────────────────────────────────────────── */}
       <section id="contact" className="py-20 px-6 bg-white">
         <div className="max-w-5xl mx-auto">
@@ -768,6 +805,7 @@ function PlatformLandingPage() {
           <div className="flex flex-wrap justify-center gap-6">
             <Link href="/login" className="hover:text-gray-600 transition-colors">Sign in</Link>
             <Link href="/register-tenant" className="hover:text-gray-600 transition-colors">Get started</Link>
+            <Link href="/guides" className="hover:text-gray-600 transition-colors">Guides</Link>
             <Link href="/privacy" className="hover:text-gray-600 transition-colors">Privacy Policy</Link>
             <Link href="/terms" className="hover:text-gray-600 transition-colors">Terms of Service</Link>
             <Link href="/refund-policy" className="hover:text-gray-600 transition-colors">Refund Policy</Link>
