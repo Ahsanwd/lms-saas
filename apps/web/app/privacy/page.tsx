@@ -95,7 +95,7 @@ export default function PrivacyPolicyPage() {
         <h2>9. Contact Us</h2>
         <p>
           Questions about this Privacy Policy can be sent to{' '}
-          <a href="mailto:support@coursel.space">support@coursel.space</a>.
+          <a href="mailto:info@coursel.space">info@coursel.space</a>.
         </p>
       </section>
     </LegalLayout>

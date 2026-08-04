@@ -43,7 +43,7 @@ export default function RefundPolicyPage() {
       <section>
         <h2>3. How to Request a Refund</h2>
         <ul>
-          <li><strong>Subscription billing issue:</strong> email <a href="mailto:support@coursel.space">support@coursel.space</a> with your school's subdomain and billing details.</li>
+          <li><strong>Subscription billing issue:</strong> email <a href="mailto:info@coursel.space">info@coursel.space</a> with your school's subdomain and billing details.</li>
           <li><strong>Course purchase:</strong> submit a refund request from inside the course/payment page on your school's portal, or contact the school directly.</li>
         </ul>
       </section>

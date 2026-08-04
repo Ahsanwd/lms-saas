@@ -103,7 +103,7 @@ export default function TermsOfServicePage() {
         <h2>10. Contact Us</h2>
         <p>
           Questions about these Terms can be sent to{' '}
-          <a href="mailto:support@coursel.space">support@coursel.space</a>.
+          <a href="mailto:info@coursel.space">info@coursel.space</a>.
         </p>
       </section>
     </LegalLayout>
