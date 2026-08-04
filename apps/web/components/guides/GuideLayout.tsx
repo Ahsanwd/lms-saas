@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { BackToHomeLink } from './BackToHomeLink';
 
 export function GuideLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -8,9 +9,7 @@ export function GuideLayout({ children }: { children: React.ReactNode }) {
           <Link href="/" className="text-xl font-bold text-indigo-600 tracking-tight">
             Coursel
           </Link>
-          <Link href="/" className="text-sm font-medium text-gray-600 hover:text-indigo-600 transition-colors">
-            Back to home
-          </Link>
+          <BackToHomeLink />
         </div>
       </nav>
 
