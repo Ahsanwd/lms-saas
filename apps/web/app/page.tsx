@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import axios from 'axios';
 import { applyBrandColor, applySecondaryColor, applyFontFamily } from '@/lib/brandColor';
+import { loadRecaptchaScript, executeRecaptcha } from '@/lib/recaptcha';
 import { useTenantSubdomain } from '@/lib/useTenantSubdomain';
 import { resolveSectionCourses } from '@/lib/tenantPageFetch';
 import {
@@ -427,6 +428,26 @@ const plans = [
 
 function PlatformLandingPage() {
   const [yearly, setYearly] = useState(false);
+  const [contactForm, setContactForm] = useState({ name: '', email: '', phone: '', message: '', website: '' });
+  const [contactStatus, setContactStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+
+  useEffect(() => { loadRecaptchaScript(); }, []);
+
+  const setContactField = (field: keyof typeof contactForm, value: string) =>
+    setContactForm((prev) => ({ ...prev, [field]: value }));
+
+  async function handleContactSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setContactStatus('submitting');
+    try {
+      const recaptchaToken = await executeRecaptcha('platform_contact').catch(() => '');
+      await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/contact`, { ...contactForm, recaptchaToken });
+      setContactStatus('success');
+      setContactForm({ name: '', email: '', phone: '', message: '', website: '' });
+    } catch {
+      setContactStatus('error');
+    }
+  }
 
   return (
     <div className="min-h-screen bg-white text-gray-900">
@@ -440,6 +461,7 @@ function PlatformLandingPage() {
           <div className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-600">
             <a href="#features" className="hover:text-indigo-600 transition-colors">Features</a>
             <a href="#pricing" className="hover:text-indigo-600 transition-colors">Pricing</a>
+            <a href="#contact" className="hover:text-indigo-600 transition-colors">Contact</a>
           </div>
           <div className="flex items-center gap-3">
             <Link
@@ -632,6 +654,109 @@ function PlatformLandingPage() {
           <p className="text-center text-sm text-gray-400 mt-8">
             After your trial, choose a plan to continue. Payments are handled securely by Lemon Squeezy.
           </p>
+        </div>
+      </section>
+
+      {/* ── Contact ──────────────────────────────────────────── */}
+      <section id="contact" className="py-20 px-6 bg-white">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-14">
+            <p className="text-xs font-bold tracking-widest uppercase text-indigo-600 mb-3">Contact Us</p>
+            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-3">We'd love to hear from you</h2>
+            <div className="w-14 h-1.5 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 mx-auto mb-5" />
+            <p className="text-gray-500 text-lg">Questions about Coursel? Send us a message, or reach out directly on WhatsApp.</p>
+          </div>
+
+          <div className="grid md:grid-cols-5 gap-8 items-start">
+            {/* WhatsApp card */}
+            <div className="md:col-span-2 flex flex-col gap-4">
+              <a
+                href="https://wa.me/923054838799?text=Hi%2C%20I%27m%20interested%20in%20Coursel"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-4 p-6 rounded-2xl bg-green-50 border border-green-100 hover:border-green-300 hover:shadow-md transition-all"
+              >
+                <div className="w-12 h-12 rounded-xl bg-[#25D366] flex items-center justify-center flex-shrink-0 shadow-md shadow-green-900/10">
+                  <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
+                    <path d="M12.001 2C6.478 2 2 6.477 2 12c0 1.876.52 3.7 1.505 5.29L2 22l4.86-1.475A9.958 9.958 0 0012.001 22C17.524 22 22 17.523 22 12S17.524 2 12.001 2zm0 18.15a8.13 8.13 0 01-4.146-1.135l-.297-.176-3.096.94.949-3.02-.193-.309A8.13 8.13 0 013.85 12c0-4.5 3.65-8.15 8.151-8.15 4.5 0 8.149 3.65 8.149 8.15 0 4.501-3.649 8.15-8.149 8.15z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400 mb-0.5">Chat on WhatsApp</p>
+                  <p className="font-semibold text-gray-900">+92 305 4838799</p>
+                </div>
+              </a>
+              <p className="text-sm text-gray-400 px-1">We typically reply within a few hours during business days.</p>
+            </div>
+
+            {/* Contact form */}
+            <form
+              onSubmit={handleContactSubmit}
+              className="md:col-span-3 bg-gray-50 border border-gray-100 rounded-2xl p-6 sm:p-8 space-y-4"
+            >
+              {/* Honeypot — invisible to real visitors, catches basic bots that fill every field */}
+              <input
+                type="text"
+                name="website"
+                value={contactForm.website}
+                onChange={(e) => setContactField('website', e.target.value)}
+                tabIndex={-1}
+                autoComplete="off"
+                className="absolute w-px h-px opacity-0 -z-10 pointer-events-none"
+                aria-hidden="true"
+              />
+
+              <div className="grid sm:grid-cols-2 gap-4">
+                <input
+                  type="text"
+                  required
+                  placeholder="Your name"
+                  value={contactForm.name}
+                  onChange={(e) => setContactField('name', e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+                <input
+                  type="email"
+                  required
+                  placeholder="Your email"
+                  value={contactForm.email}
+                  onChange={(e) => setContactField('email', e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <input
+                type="tel"
+                placeholder="Phone (optional)"
+                value={contactForm.phone}
+                onChange={(e) => setContactField('phone', e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              <textarea
+                required
+                rows={4}
+                placeholder="How can we help?"
+                value={contactForm.message}
+                onChange={(e) => setContactField('message', e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+              />
+
+              <button
+                type="submit"
+                disabled={contactStatus === 'submitting'}
+                className="w-full bg-indigo-600 text-white text-sm font-semibold py-3.5 rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {contactStatus === 'submitting' ? 'Sending…' : 'Send Message'}
+              </button>
+
+              {contactStatus === 'success' && (
+                <p className="text-sm text-green-600 text-center">Thanks — your message has been sent. We'll get back to you soon.</p>
+              )}
+              {contactStatus === 'error' && (
+                <p className="text-sm text-red-600 text-center">Something went wrong. Please try again or reach us on WhatsApp.</p>
+              )}
+            </form>
+          </div>
         </div>
       </section>
 

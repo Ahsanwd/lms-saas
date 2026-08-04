@@ -17,6 +17,10 @@ router.get('/auth/check-subdomain',  checkSubdomain);
 // ── Public certificate verification (no tenant, no auth) ──────────────────────
 router.get('/verify-certificate/:certificateId', require('../modules/course/course.controller').verifyCertificate);
 
+// Platform's own marketing-site contact form (coursel.space root) — not
+// tied to any tenant, notifies the platform owner directly.
+router.use('/contact', require('../modules/platformContact/platformContact.routes'));
+
 // ── All routes below require tenant resolution ────────────────────────────────
 router.use(resolveTenant);
 
