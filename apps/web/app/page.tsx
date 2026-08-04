@@ -357,21 +357,36 @@ const features = [
   },
 ];
 
+// Every one of these ships on every plan, including Free — no feature is
+// gated behind a paid tier in this system. Plans differ purely on scale
+// (student/instructor/course caps, storage, video minutes) — see `plans`
+// below. Keeping this list honest matters: don't add a claim here (or to a
+// plan's own `features`) that isn't actually true in the running system.
+const includedInAllPlans = [
+  'Website Builder & Design Library',
+  'Live Classes',
+  'Quizzes & Assignments',
+  'Branded Certificates',
+  'Community Forum & Chat',
+  'Course Bundles & Coupons',
+  'Student Memberships',
+  'Your Own Payment Gateway',
+  'Custom Domain Support',
+];
+
 const plans = [
   {
     name: 'Free',
     slug: 'free',
     monthlyPrice: 0,
     yearlyPrice: 0,
-    description: '14-day trial to explore the platform before you commit.',
+    description: 'Explore the full platform for 14 days — no credit card required.',
     features: [
       'Up to 50 students',
       '3 instructors',
       '5 courses',
       '2 GB storage',
-      'Basic courses',
       'Email support',
-      '🔒 Cloudflare Stream video (Basic & Pro only)',
     ],
     highlighted: false,
   },
@@ -386,12 +401,8 @@ const plans = [
       '3 instructors',
       '10 courses',
       '10 GB storage',
-      'Course payments (Stripe)',
-      'Quizzes & Assignments',
-      'Email notifications',
-      'Community forum',
-      'Certificate builder',
-      'Cloudflare Stream video — 300 min library / 3,000 min watch-time per month',
+      'Built-in video hosting — 300 min library / 3,000 min watch-time',
+      'Email support',
     ],
     highlighted: false,
   },
@@ -406,13 +417,9 @@ const plans = [
       'Unlimited instructors',
       'Unlimited courses',
       '50 GB storage',
-      'Everything in Basic',
-      'Live learning',
+      'Built-in video hosting — 600 min library / 6,000 min watch-time',
       'Advanced analytics & CSV export',
-      'Student memberships',
-      'Custom domain support',
       'Priority support',
-      'Cloudflare Stream video — 600 min library / 6,000 min watch-time per month',
     ],
     highlighted: true,
   },
@@ -513,8 +520,10 @@ function PlatformLandingPage() {
       <section id="pricing" className="py-20 px-6 bg-gray-50">
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-900 mb-3">Simple, transparent pricing</h2>
-            <p className="text-gray-500 mb-8">Start with a 14-day free trial. No credit card required.</p>
+            <p className="text-xs font-bold tracking-widest uppercase text-indigo-600 mb-3">Pricing</p>
+            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-3">Simple, transparent pricing</h2>
+            <div className="w-14 h-1.5 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 mx-auto mb-5" />
+            <p className="text-gray-500 mb-8 text-lg">Start with a 14-day free trial. No credit card required.</p>
 
             {/* Billing toggle */}
             <div className="inline-flex items-center gap-3 bg-white border border-gray-200 rounded-full p-1">
@@ -537,6 +546,22 @@ function PlatformLandingPage() {
                   Save 17%
                 </span>
               </button>
+            </div>
+          </div>
+
+          {/* Every plan includes — no feature here is gated behind a paid
+              tier; plans differ purely on scale (below), never on features. */}
+          <div className="max-w-3xl mx-auto mb-12 p-6 rounded-2xl bg-white border border-gray-200">
+            <p className="text-xs font-bold tracking-widest uppercase text-gray-400 mb-4 text-center">Every plan includes</p>
+            <div className="flex flex-wrap justify-center gap-x-6 gap-y-3">
+              {includedInAllPlans.map((item) => (
+                <span key={item} className="flex items-center gap-1.5 text-sm text-gray-700">
+                  <svg className="w-4 h-4 text-indigo-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                  {item}
+                </span>
+              ))}
             </div>
           </div>
 
