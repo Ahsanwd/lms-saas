@@ -5,12 +5,28 @@ import { Providers } from './providers';
 
 const inter = Inter({ subsets: ['latin'] });
 
+const SITE_TITLE = 'Coursel — Launch Your Own Online Academy';
+const SITE_DESCRIPTION = 'Coursel is the all-in-one platform to launch your own branded online school — courses, quizzes, certificates, live classes, and payments, no coding required. Start free for 14 days.';
+
 export const metadata: Metadata = {
-  title:       'LMS Platform',
-  description: 'Multi-tenant Learning Management System',
+  metadataBase: new URL('https://coursel.space'),
+  title:       SITE_TITLE,
+  description: SITE_DESCRIPTION,
   manifest:    '/manifest.webmanifest',
-  appleWebApp: { capable: true, statusBarStyle: 'default', title: 'LMS Platform' },
+  appleWebApp: { capable: true, statusBarStyle: 'default', title: 'Coursel' },
   formatDetection: { telephone: false },
+  openGraph: {
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    url: 'https://coursel.space',
+    siteName: 'Coursel',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+  },
 };
 
 export const viewport: Viewport = {
