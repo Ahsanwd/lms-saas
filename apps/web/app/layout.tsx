@@ -15,6 +15,9 @@ export const metadata: Metadata = {
   manifest:    '/manifest.webmanifest',
   appleWebApp: { capable: true, statusBarStyle: 'default', title: 'Coursel' },
   formatDetection: { telephone: false },
+  verification: {
+    google: 'yQ_X6ICSxMNgRklsuV5ih-tp0rXOy2JOejjigCcf3es',
+  },
   openGraph: {
     title: SITE_TITLE,
     description: SITE_DESCRIPTION,
