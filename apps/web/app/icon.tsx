@@ -9,7 +9,7 @@ export default function Icon() {
   return new ImageResponse(
     <div
       style={{
-        background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+        background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
         width: '100%',
         height: '100%',
         display: 'flex',
@@ -23,7 +23,7 @@ export default function Icon() {
         letterSpacing: '-0.5px',
       }}
     >
-      L
+      C
     </div>,
     { ...size }
   );
