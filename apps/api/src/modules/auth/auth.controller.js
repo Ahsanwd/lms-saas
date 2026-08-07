@@ -41,7 +41,7 @@ async function registerTenant(req, res, next) {
 
 async function register(req, res, next) {
   try {
-    if (!req.tenant) return R.error(res, 'Tenant not found', 404);
+    if (!req.tenant) return R.error(res, 'Tenant not found', 404, { debugHeader: req.headers['x-tenant-subdomain'] ?? null, debugHost: req.hostname });
     const { firstName, lastName, email, password } = req.body;
     const passwordPolicy = req.tenant.settings?.passwordPolicy;
     validateRegister({ firstName, lastName, email, password }, passwordPolicy);
