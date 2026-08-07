@@ -1218,7 +1218,7 @@ export function CustomCodeSection({ data }: { data: CustomCodeData }) {
     <iframe
       ref={iframeRef}
       srcDoc={srcDoc}
-      sandbox="allow-scripts allow-top-navigation-by-user-activation allow-popups"
+      sandbox="allow-scripts allow-top-navigation-by-user-activation allow-popups allow-popups-to-escape-sandbox"
       referrerPolicy="no-referrer"
       style={{ width: '100%', height: `${height}px`, border: 'none', display: 'block', transition: 'height 0.15s ease' }}
       title="Custom section"
