@@ -83,6 +83,14 @@ const allowedOrigins = [
 app.use(cors({
   origin: (origin, cb) => {
     if (!origin) return cb(null, true);
+    // 'null' (the literal string) is what browsers send as Origin for
+    // requests from an opaque-origin context — e.g. the sandboxed iframe our
+    // own website-builder custom sections render in (sandbox="allow-scripts"
+    // with no allow-same-origin). Allowing it lets those sections call our
+    // own public, unauthenticated endpoints (contact/course-application
+    // submit); it does not weaken auth-protected routes, which still require
+    // a valid Bearer token regardless of origin.
+    if (origin === 'null') return cb(null, true);
     const allowed = allowedOrigins.some(o =>
       o instanceof RegExp ? o.test(origin) : o === origin
     );
