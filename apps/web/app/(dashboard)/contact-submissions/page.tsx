@@ -91,7 +91,7 @@ export default function ContactSubmissionsPage() {
                   </button>
                   {expanded === s._id && (
                     <div className="px-4 pb-4 pl-[4.5rem]">
-                      <p className="text-sm text-gray-700 whitespace-pre-wrap bg-gray-50 border border-gray-100 rounded-lg p-3">{s.message}</p>
+                      <p className="text-sm text-gray-700 whitespace-pre-wrap break-words bg-gray-50 border border-gray-100 rounded-lg p-3">{s.message}</p>
                     </div>
                   )}
                 </div>
