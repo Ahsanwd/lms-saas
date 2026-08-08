@@ -5,6 +5,7 @@ const Enrollment                  = require('../../database/models/Enrollment.mo
 const User                        = require('../../database/models/User.model');
 const AppError                    = require('../../utils/AppError');
 const { getTenantStripeClient, createOrGetCustomer } = require('../../services/stripe/stripe');
+const paypalService                = require('../../services/paypal/paypal');
 const tenantRepo                  = require('../../database/repositories/tenant.repository');
 const tenantService                = require('../tenant/tenant.service');
 
@@ -120,6 +121,64 @@ async function initiatePayment(tenantId, courseId, userId, { couponCode } = {}) 
     };
   }
 
+  // ── Wise: tenant's own account details, student uploads proof ────────────────
+  // Same review workflow as Manual (see uploadPaymentProof/approveManualPayment
+  // below, which accept both providers) — Wise has no usable one-off-checkout
+  // API to integrate against.
+  if (gateway.provider === 'wise') {
+    const payment = await CoursePayment.create({
+      tenantId, courseId, userId,
+      amount:        finalAmount,
+      currency,
+      discountAmount,
+      couponCode:    appliedCoupon,
+      provider:      'wise',
+      receiptNumber: receiptNumber(),
+      status:        'pending', // awaiting proof upload
+    });
+
+    return {
+      paymentId:    payment._id,
+      provider:     'wise',
+      amount:       finalAmount,
+      currency,
+      courseName:   course.title,
+      account:      gateway.account,
+      instructions: gateway.instructions,
+    };
+  }
+
+  // ── PayPal (tenant's own Business app) ────────────────────────────────────────
+  if (gateway.provider === 'paypal') {
+    const order = await paypalService.createOrder(
+      gateway.clientId, gateway.clientSecret, gateway.mode,
+      finalAmount, currency,
+      { paymentId: uuidv4() } // custom_id — the real CoursePayment _id isn't known until after create() below
+    );
+
+    const payment = await CoursePayment.create({
+      tenantId, courseId, userId,
+      amount:        finalAmount,
+      currency,
+      discountAmount,
+      couponCode:    appliedCoupon,
+      paypalOrderId: order.id,
+      provider:      'paypal',
+      receiptNumber: receiptNumber(),
+      status:        'pending',
+    });
+
+    return {
+      paymentId:      payment._id,
+      provider:       'paypal',
+      paypalOrderId:  order.id,
+      paypalClientId: gateway.clientId,
+      amount:         finalAmount,
+      currency,
+      courseName:     course.title,
+    };
+  }
+
   // ── Stripe (tenant's own key) or mock fallback ───────────────────────────────
   const stripeClient = gateway.provider === 'stripe' ? getTenantStripeClient(gateway.secretKey) : null;
 
@@ -175,6 +234,27 @@ async function confirmPaymentByIntentId(paymentIntentId) {
   const payment = await CoursePayment.findOne({ paymentIntentId, status: 'pending' });
   if (!payment) return null;
   return _confirmAndActivate(payment);
+}
+
+// ─── PayPal: capture the order after the student approves it client-side
+// (the JS SDK's onApprove callback) — this is PayPal's equivalent of
+// confirmPayment above, just a different provider-specific flow.
+async function capturePaypalOrder(tenantId, paymentId, userId) {
+  const payment = await CoursePayment.findOne({ _id: paymentId, tenantId, userId, provider: 'paypal', status: 'pending' });
+  if (!payment) throw new AppError('Payment not found or already processed', 404);
+
+  const gateway = await tenantService.getActiveGateway(tenantId);
+  if (gateway.provider !== 'paypal') throw new AppError('PayPal is not configured for this school', 400);
+
+  const captured = await paypalService.captureOrder(gateway.clientId, gateway.clientSecret, gateway.mode, payment.paypalOrderId);
+  const capture = captured?.purchase_units?.[0]?.payments?.captures?.[0];
+  if (captured.status !== 'COMPLETED' || !capture || capture.status !== 'COMPLETED')
+    throw new AppError('PayPal payment not completed', 402, 'PAYMENT_FAILED');
+
+  payment.paypalCaptureId = capture.id;
+  await payment.save();
+
+  return _activatePayment(payment);
 }
 
 // ─── Shared confirm — branches by provider, then activates enrollment ────────
@@ -248,7 +328,7 @@ async function _activatePayment(payment) {
 // the record goes back into the admin's review queue clean.
 async function uploadPaymentProof(tenantId, paymentId, userId, proofUrl) {
   const payment = await CoursePayment.findOne({
-    _id: paymentId, tenantId, userId, provider: 'manual', status: { $in: ['pending', 'rejected'] },
+    _id: paymentId, tenantId, userId, provider: { $in: ['manual', 'wise'] }, status: { $in: ['pending', 'rejected'] },
   });
   if (!payment) throw new AppError('Payment not found or not awaiting proof submission', 404);
 
@@ -264,7 +344,7 @@ async function uploadPaymentProof(tenantId, paymentId, userId, proofUrl) {
 
 // ─── Manual payment: admin approves — enrolls the student + notifies ─────────
 async function approveManualPayment(tenantId, paymentId, actingUser, { reviewNote = '' } = {}) {
-  const payment = await CoursePayment.findOne({ _id: paymentId, tenantId, provider: 'manual', status: 'awaiting_review' });
+  const payment = await CoursePayment.findOne({ _id: paymentId, tenantId, provider: { $in: ['manual', 'wise'] }, status: 'awaiting_review' });
   if (!payment) throw new AppError('Pending manual payment not found', 404);
 
   if (actingUser.role === 'instructor') {
@@ -292,7 +372,7 @@ async function approveManualPayment(tenantId, paymentId, actingUser, { reviewNot
 async function rejectManualPayment(tenantId, paymentId, actingUser, { reviewNote = '' } = {}) {
   if (!reviewNote?.trim()) throw new AppError('A reason is required when rejecting a payment', 400);
 
-  const payment = await CoursePayment.findOne({ _id: paymentId, tenantId, provider: 'manual', status: 'awaiting_review' });
+  const payment = await CoursePayment.findOne({ _id: paymentId, tenantId, provider: { $in: ['manual', 'wise'] }, status: 'awaiting_review' });
   if (!payment) throw new AppError('Pending manual payment not found', 404);
 
   if (actingUser.role === 'instructor') {
@@ -317,7 +397,7 @@ async function rejectManualPayment(tenantId, paymentId, actingUser, { reviewNote
 
 // ─── Manual payment: admin review queue ───────────────────────────────────────
 async function listPendingManualPayments(tenantId, actingUser, { status = 'awaiting_review', page = 1, limit = 20 } = {}) {
-  const filter = { tenantId, provider: 'manual' };
+  const filter = { tenantId, provider: { $in: ['manual', 'wise'] } };
   if (status) filter.status = status;
   if (actingUser.role === 'instructor') {
     filter.courseId = { $in: await Course.distinct('_id', { tenantId, instructorId: actingUser.sub }) };
@@ -354,7 +434,15 @@ async function refundPayment(tenantId, paymentId, actingUser, { reason = '', amo
   const isPartial   = refundCents !== null && refundCents < payment.amount;
 
   if (payment.provider === 'paypal') {
-    throw new AppError('This was a PayPal payment — PayPal is no longer integrated. Process the refund manually in the PayPal dashboard.', 400);
+    if (!payment.paypalCaptureId)
+      throw new AppError('This PayPal payment has no capture ID on record — refund manually in the PayPal dashboard.', 400);
+    const gateway = await tenantService.getActiveGateway(tenantId);
+    if (gateway.provider !== 'paypal')
+      throw new AppError('PayPal is not currently configured for this school — refund manually in the PayPal dashboard.', 400);
+    await paypalService.refundCapture(gateway.clientId, gateway.clientSecret, gateway.mode, payment.paypalCaptureId, refundCents, payment.currency);
+  } else if (payment.provider === 'wise') {
+    // No gateway to auto-refund, same precedent as Manual below.
+    throw new AppError('This was a manually verified Wise payment — there is no gateway to auto-refund. Unenroll the student and settle any refund with them directly.', 400);
   } else if (payment.provider === 'safepay') {
     // Legacy — Safepay is no longer integrated. No automated refund path was
     // ever confirmed working for it; admin reconciles manually.
@@ -579,7 +667,7 @@ async function generateReceiptPdf(tenantId, paymentId, userId, res) {
 }
 
 module.exports = {
-  initiatePayment, confirmPayment, confirmPaymentByIntentId,
+  initiatePayment, confirmPayment, confirmPaymentByIntentId, capturePaypalOrder,
   refundPayment, getMyPayments, getCoursePayments,
   getPaymentMethods, createSetupIntent, deletePaymentMethod,
   generateReceiptPdf,

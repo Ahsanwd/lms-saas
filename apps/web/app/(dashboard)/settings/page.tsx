@@ -224,12 +224,14 @@ interface ManualAccount {
 }
 
 interface PaymentGatewayData {
-  activeProvider: 'stripe' | 'safepay' | 'manual' | null;
+  activeProvider: 'stripe' | 'safepay' | 'manual' | 'paypal' | 'wise' | null;
   stripe: { hasSecretKey: boolean; publishableKey: string | null; verified: boolean; verifiedAt: string | null };
   // Legacy — Safepay is no longer a selectable gateway, this is only read to
   // show the "clear legacy setting" banner for a tenant that had it configured.
   safepay: { apiKey: string | null; hasSecretKey: boolean; environment: 'sandbox' | 'production'; verified: boolean; verifiedAt: string | null };
   manual: { accounts: ManualAccount[]; instructions: string | null };
+  paypal: { clientId: string | null; hasClientSecret: boolean; mode: 'sandbox' | 'live'; verified: boolean; verifiedAt: string | null };
+  wise: { accountHolderName: string | null; email: string | null; iban: string | null; swiftBic: string | null; accountNumber: string | null; instructions: string | null };
 }
 
 const MANUAL_ACCOUNT_TYPE_LABELS: Record<ManualAccount['type'], string> = {
@@ -242,7 +244,7 @@ function emptyManualAccount(): ManualAccount {
 
 function PaymentGatewaySection() {
   const qc = useQueryClient();
-  const [tab, setTab]       = useState<'none' | 'stripe' | 'manual'>('none');
+  const [tab, setTab]       = useState<'none' | 'stripe' | 'manual' | 'paypal' | 'wise'>('none');
   const [banner, setBanner] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
 
   const [stripeSecretKey, setStripeSecretKey]           = useState('');
@@ -251,6 +253,17 @@ function PaymentGatewaySection() {
   const [manualAccounts, setManualAccounts]         = useState<ManualAccount[]>([]);
   const [manualInstructions, setManualInstructions] = useState('');
 
+  const [paypalClientId, setPaypalClientId]         = useState('');
+  const [paypalClientSecret, setPaypalClientSecret] = useState('');
+  const [paypalMode, setPaypalMode]                 = useState<'sandbox' | 'live'>('sandbox');
+
+  const [wiseAccountHolderName, setWiseAccountHolderName] = useState('');
+  const [wiseEmail, setWiseEmail]                         = useState('');
+  const [wiseIban, setWiseIban]                           = useState('');
+  const [wiseSwiftBic, setWiseSwiftBic]                   = useState('');
+  const [wiseAccountNumber, setWiseAccountNumber]         = useState('');
+  const [wiseInstructions, setWiseInstructions]           = useState('');
+
   const { data, isLoading } = useQuery<PaymentGatewayData>({
     queryKey: ['payment-gateway'],
     queryFn: async () => { const { data } = await api.get('/tenant/payment-gateway'); return data.data; },
@@ -258,10 +271,18 @@ function PaymentGatewaySection() {
 
   useEffect(() => {
     if (!data) return;
-    setTab(data.activeProvider === 'stripe' || data.activeProvider === 'manual' ? data.activeProvider : 'none');
+    setTab(['stripe', 'manual', 'paypal', 'wise'].includes(data.activeProvider ?? '') ? (data.activeProvider as any) : 'none');
     setStripePublishableKey(data.stripe.publishableKey || '');
     setManualAccounts(data.manual.accounts?.length ? data.manual.accounts : []);
     setManualInstructions(data.manual.instructions || '');
+    setPaypalClientId(data.paypal.clientId || '');
+    setPaypalMode(data.paypal.mode || 'sandbox');
+    setWiseAccountHolderName(data.wise.accountHolderName || '');
+    setWiseEmail(data.wise.email || '');
+    setWiseIban(data.wise.iban || '');
+    setWiseSwiftBic(data.wise.swiftBic || '');
+    setWiseAccountNumber(data.wise.accountNumber || '');
+    setWiseInstructions(data.wise.instructions || '');
   }, [data]);
 
   const saveStripeMutation = useMutation({
@@ -289,8 +310,38 @@ function PaymentGatewaySection() {
     onError: (err: any) => setBanner({ type: 'error', msg: err.response?.data?.message ?? 'Failed to save payment details' }),
   });
 
+  const savePaypalMutation = useMutation({
+    mutationFn: () => api.put('/tenant/payment-gateway/paypal', {
+      clientId: paypalClientId,
+      clientSecret: paypalClientSecret || undefined,
+      mode: paypalMode,
+    }),
+    onSuccess: (res) => {
+      qc.setQueryData(['payment-gateway'], res.data.data);
+      setPaypalClientSecret('');
+      setBanner({ type: 'success', msg: 'PayPal connected — credentials verified.' });
+    },
+    onError: (err: any) => setBanner({ type: 'error', msg: err.response?.data?.message ?? 'Failed to save PayPal credentials' }),
+  });
+
+  const saveWiseMutation = useMutation({
+    mutationFn: () => api.put('/tenant/payment-gateway/wise', {
+      accountHolderName: wiseAccountHolderName,
+      email: wiseEmail || undefined,
+      iban: wiseIban || undefined,
+      swiftBic: wiseSwiftBic || undefined,
+      accountNumber: wiseAccountNumber || undefined,
+      instructions: wiseInstructions || undefined,
+    }),
+    onSuccess: (res) => {
+      qc.setQueryData(['payment-gateway'], res.data.data);
+      setBanner({ type: 'success', msg: 'Wise payment details saved.' });
+    },
+    onError: (err: any) => setBanner({ type: 'error', msg: err.response?.data?.message ?? 'Failed to save Wise details' }),
+  });
+
   const disconnectMutation = useMutation({
-    mutationFn: (provider: 'stripe' | 'safepay' | 'manual') => api.delete(`/tenant/payment-gateway/${provider}`),
+    mutationFn: (provider: 'stripe' | 'safepay' | 'manual' | 'paypal' | 'wise') => api.delete(`/tenant/payment-gateway/${provider}`),
     onSuccess: (res) => {
       qc.setQueryData(['payment-gateway'], res.data.data);
       setBanner({ type: 'success', msg: 'Gateway disconnected.' });
@@ -344,14 +395,17 @@ function PaymentGatewaySection() {
         <div className="flex items-center gap-2 text-sm text-gray-400 py-1"><Spinner size="sm" /> Loading…</div>
       ) : (
         <>
-          <div className="grid grid-cols-3 gap-2">
-            {(['none', 'stripe', 'manual'] as const).map(p => {
+          <div className="grid grid-cols-5 gap-2">
+            {(['none', 'stripe', 'manual', 'paypal', 'wise'] as const).map(p => {
               const isActive = p !== 'none' && data?.activeProvider === p;
+              const tabLabels: Record<typeof p, string> = {
+                none: 'None', stripe: 'Stripe', manual: 'Manual Payment', paypal: 'PayPal', wise: 'Wise',
+              };
               return (
                 <button key={p} type="button" onClick={() => setTab(p)}
                   className={cn('px-3 py-2.5 rounded-xl border text-sm font-semibold transition-colors',
                     tab === p ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-200 text-gray-500 hover:border-gray-300')}>
-                  {p === 'none' ? 'None' : p === 'stripe' ? 'Stripe' : 'Manual Payment'}
+                  {tabLabels[p]}
                   {isActive && <span className="ml-1.5 text-[10px] text-green-600">● active</span>}
                 </button>
               );
@@ -472,6 +526,117 @@ function PaymentGatewaySection() {
                 </Button>
                 {data?.activeProvider === 'manual' && (
                   <Button size="sm" variant="outline" onClick={() => disconnectMutation.mutate('manual')} loading={disconnectMutation.isPending}>
+                    Disconnect
+                  </Button>
+                )}
+              </div>
+              <p className="text-xs text-gray-400">Payments are collected outside the platform — you're responsible for verifying proof and refunding students directly if needed.</p>
+            </div>
+          )}
+
+          {tab === 'paypal' && (
+            <div className="space-y-4 bg-gray-50 rounded-xl border border-gray-200 p-4">
+              {data?.paypal.verified ? (
+                <div className="flex items-center gap-2 text-xs font-semibold text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                  Verified · last checked {data.paypal.verifiedAt ? new Date(data.paypal.verifiedAt).toLocaleDateString() : ''}
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  Not verified yet — paste your app credentials and Save
+                </div>
+              )}
+              <p className="text-xs text-gray-400 -mt-1">
+                Create an app at developer.paypal.com to get a Client ID and Secret for your PayPal Business account.
+              </p>
+              <div>
+                <label className={labelCls}>Mode</label>
+                <div className="flex gap-2">
+                  {(['sandbox', 'live'] as const).map(m => (
+                    <button key={m} type="button" onClick={() => setPaypalMode(m)}
+                      className={cn('px-3 py-1.5 rounded-lg border text-xs font-semibold capitalize transition-colors',
+                        paypalMode === m ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-200 text-gray-500 hover:border-gray-300')}>
+                      {m}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className={labelCls}>Client ID</label>
+                <input type="text" className={inputCls} value={paypalClientId}
+                  onChange={e => setPaypalClientId(e.target.value)} placeholder="AeA1QIZXiflr1_-r0..." />
+              </div>
+              <div>
+                <label className={labelCls}>
+                  Client Secret {data?.paypal.hasClientSecret && <span className="font-normal normal-case text-gray-400">(blank = keep existing)</span>}
+                </label>
+                <input type="password" className={inputCls} value={paypalClientSecret}
+                  onChange={e => setPaypalClientSecret(e.target.value)}
+                  placeholder={data?.paypal.hasClientSecret ? '••••••••••••••••' : 'EL...'} />
+              </div>
+              <div className="flex items-center gap-3">
+                <Button size="sm" loading={savePaypalMutation.isPending}
+                  disabled={!paypalClientId || (!paypalClientSecret && !data?.paypal.hasClientSecret)}
+                  onClick={() => { setBanner(null); savePaypalMutation.mutate(); }}>
+                  Save &amp; Verify
+                </Button>
+                {data?.activeProvider === 'paypal' && (
+                  <Button size="sm" variant="outline" onClick={() => disconnectMutation.mutate('paypal')} loading={disconnectMutation.isPending}>
+                    Disconnect
+                  </Button>
+                )}
+              </div>
+              <p className="text-xs text-gray-400">Student payments go directly to your PayPal account — the platform takes no cut.</p>
+            </div>
+          )}
+
+          {tab === 'wise' && (
+            <div className="space-y-4 bg-gray-50 rounded-xl border border-gray-200 p-4">
+              <p className="text-xs text-gray-400 -mt-1">
+                Students will see these account details at checkout, pay you directly via Wise, then upload a screenshot as proof. You review and approve each payment before the student is enrolled.
+              </p>
+              <div>
+                <label className={labelCls}>Account Holder Name</label>
+                <input type="text" className={inputCls} value={wiseAccountHolderName}
+                  onChange={e => setWiseAccountHolderName(e.target.value)} placeholder="Full name on the Wise account" />
+              </div>
+              <div>
+                <label className={labelCls}>Wise Email <span className="font-normal normal-case text-gray-400">(optional)</span></label>
+                <input type="email" className={inputCls} value={wiseEmail}
+                  onChange={e => setWiseEmail(e.target.value)} placeholder="you@example.com" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>IBAN <span className="font-normal normal-case text-gray-400">(optional)</span></label>
+                  <input type="text" className={inputCls} value={wiseIban}
+                    onChange={e => setWiseIban(e.target.value)} placeholder="GB00XXXX00000000000000" />
+                </div>
+                <div>
+                  <label className={labelCls}>SWIFT / BIC <span className="font-normal normal-case text-gray-400">(optional)</span></label>
+                  <input type="text" className={inputCls} value={wiseSwiftBic}
+                    onChange={e => setWiseSwiftBic(e.target.value)} placeholder="TRWIGB2LXXX" />
+                </div>
+              </div>
+              <div>
+                <label className={labelCls}>Account Number <span className="font-normal normal-case text-gray-400">(optional)</span></label>
+                <input type="text" className={inputCls} value={wiseAccountNumber}
+                  onChange={e => setWiseAccountNumber(e.target.value)} placeholder="00000000" />
+              </div>
+              <div>
+                <label className={labelCls}>Instructions for students <span className="font-normal normal-case text-gray-400">(optional)</span></label>
+                <textarea className={cn(inputCls, 'min-h-[80px]')} value={wiseInstructions}
+                  onChange={e => setWiseInstructions(e.target.value)}
+                  placeholder="e.g. Please include your name as the payment reference, and allow up to 24 hours for approval." />
+              </div>
+              <div className="flex items-center gap-3">
+                <Button size="sm" loading={saveWiseMutation.isPending}
+                  disabled={!wiseAccountHolderName || (!wiseEmail && !wiseIban && !wiseAccountNumber)}
+                  onClick={() => { setBanner(null); saveWiseMutation.mutate(); }}>
+                  Save
+                </Button>
+                {data?.activeProvider === 'wise' && (
+                  <Button size="sm" variant="outline" onClick={() => disconnectMutation.mutate('wise')} loading={disconnectMutation.isPending}>
                     Disconnect
                   </Button>
                 )}

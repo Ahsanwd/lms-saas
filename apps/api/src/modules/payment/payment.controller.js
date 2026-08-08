@@ -23,6 +23,15 @@ async function confirm(req, res, next) {
   } catch (err) { next(err); }
 }
 
+async function capturePaypal(req, res, next) {
+  try {
+    const result = await svc.capturePaypalOrder(
+      req.tenant.tenantId, req.params.paymentId, req.user.sub
+    );
+    R.success(res, result, 'Payment confirmed — enrollment created');
+  } catch (err) { next(err); }
+}
+
 async function refund(req, res, next) {
   try {
     const payment = await svc.refundPayment(
@@ -196,7 +205,7 @@ async function rejectManualBundle(req, res, next) {
 }
 
 module.exports = {
-  initiate, confirm, refund, myPayments, coursePayments,
+  initiate, confirm, capturePaypal, refund, myPayments, coursePayments,
   startTrial, upgradeTrial, trialStatus,
   listMethods, setupIntent, deleteMethod,
   initiateBundle, confirmBundle, refundBundle,

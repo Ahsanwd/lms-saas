@@ -3,6 +3,7 @@ const planRepo   = require('../../database/repositories/plan.repository');
 const AppError   = require('../../utils/AppError');
 const { encrypt, decrypt } = require('../../utils/crypto');
 const { getTenantStripeClient } = require('../../services/stripe/stripe');
+const paypalService = require('../../services/paypal/paypal');
 const Tenant = require('../../database/models/Tenant.model');
 
 // ─── Get Own Tenant ───────────────────────────────────────────────────────────
@@ -167,7 +168,7 @@ async function getPaymentGatewaySettings(tenantId) {
   // "Path collision". Selecting just the two normally-excluded leaf paths with '+' already
   // returns the rest of the (non select:false) paymentGateway fields by default.
   const tenant = await Tenant.findById(tenantId)
-    .select('+paymentGateway.stripe.secretKeyEncrypted +paymentGateway.safepay.secretKeyEncrypted')
+    .select('+paymentGateway.stripe.secretKeyEncrypted +paymentGateway.safepay.secretKeyEncrypted +paymentGateway.paypal.clientSecretEncrypted')
     .lean();
   if (!tenant) throw new AppError('Tenant not found', 404);
 
@@ -175,6 +176,8 @@ async function getPaymentGatewaySettings(tenantId) {
   const stripe  = pg.stripe  || {};
   const safepay = pg.safepay || {};
   const manual  = pg.manual  || {};
+  const paypal  = pg.paypal  || {};
+  const wise    = pg.wise    || {};
 
   return {
     activeProvider: pg.activeProvider || null,
@@ -197,6 +200,21 @@ async function getPaymentGatewaySettings(tenantId) {
     manual: {
       accounts:     manual.accounts || [],
       instructions: manual.instructions || null,
+    },
+    paypal: {
+      clientId:       paypal.clientId || null,
+      hasClientSecret: !!paypal.clientSecretEncrypted,
+      mode:           paypal.mode || 'sandbox',
+      verified:       paypal.verified || false,
+      verifiedAt:     paypal.verifiedAt || null,
+    },
+    wise: {
+      accountHolderName: wise.accountHolderName || null,
+      email:              wise.email || null,
+      iban:               wise.iban || null,
+      swiftBic:           wise.swiftBic || null,
+      accountNumber:      wise.accountNumber || null,
+      instructions:       wise.instructions || null,
     },
   };
 }
@@ -260,9 +278,62 @@ async function saveManualGateway(tenantId, { accounts, instructions }) {
   return getPaymentGatewaySettings(tenantId);
 }
 
+// ─── Save PayPal Gateway ───────────────────────────────────────────────────────
+// clientId + secret identify the tenant's own PayPal Business "app" (BYO,
+// like Stripe above) — verified by actually requesting an OAuth token before
+// saving, same "reject bad credentials up front" approach as Stripe.
+async function savePaypalGateway(tenantId, { clientId, clientSecret, mode }) {
+  if (!clientId?.trim()) throw new AppError('Client ID is required', 400);
+  const resolvedMode = mode === 'live' ? 'live' : 'sandbox';
+
+  const update = {
+    'paymentGateway.activeProvider': 'paypal',
+    'paymentGateway.paypal.clientId': clientId.trim(),
+    'paymentGateway.paypal.mode': resolvedMode,
+  };
+
+  // Only re-verify/re-encrypt if a new non-empty secret was submitted
+  if (clientSecret && clientSecret.trim()) {
+    try {
+      await paypalService.getAccessToken(clientId.trim(), clientSecret.trim(), resolvedMode);
+    } catch (err) {
+      throw new AppError(`PayPal credentials rejected: ${err.message}`, 422, 'PAYPAL_KEY_INVALID');
+    }
+    update['paymentGateway.paypal.clientSecretEncrypted'] = encrypt(clientSecret.trim());
+    update['paymentGateway.paypal.verified']   = true;
+    update['paymentGateway.paypal.verifiedAt'] = new Date();
+  }
+
+  await Tenant.findByIdAndUpdate(tenantId, { $set: update });
+  return getPaymentGatewaySettings(tenantId);
+}
+
+// ─── Save Wise Gateway ──────────────────────────────────────────────────────────
+// Same shape as Manual: tenant publishes their own Wise account details;
+// student pays externally and uploads a screenshot as proof. No secrets, no
+// live API to verify against (Wise has no usable one-off checkout API).
+async function saveWiseGateway(tenantId, { accountHolderName, email, iban, swiftBic, accountNumber, instructions }) {
+  if (!accountHolderName?.trim()) throw new AppError('Account holder name is required', 400);
+  if (!email?.trim() && !iban?.trim() && !accountNumber?.trim())
+    throw new AppError('Provide at least one way for students to send payment (email, IBAN, or account number)', 400);
+
+  await Tenant.findByIdAndUpdate(tenantId, {
+    $set: {
+      'paymentGateway.activeProvider':          'wise',
+      'paymentGateway.wise.accountHolderName':  accountHolderName.trim(),
+      'paymentGateway.wise.email':               email?.trim() || null,
+      'paymentGateway.wise.iban':                iban?.trim() || null,
+      'paymentGateway.wise.swiftBic':            swiftBic?.trim() || null,
+      'paymentGateway.wise.accountNumber':       accountNumber?.trim() || null,
+      'paymentGateway.wise.instructions':        instructions?.trim() || null,
+    },
+  });
+  return getPaymentGatewaySettings(tenantId);
+}
+
 // ─── Disconnect a Gateway ───────────────────────────────────────────────────────
 async function disconnectGateway(tenantId, provider) {
-  if (!['stripe', 'safepay', 'manual'].includes(provider)) throw new AppError('Invalid provider', 400);
+  if (!['stripe', 'safepay', 'manual', 'paypal', 'wise'].includes(provider)) throw new AppError('Invalid provider', 400);
 
   const tenant = await Tenant.findById(tenantId).select('paymentGateway.activeProvider').lean();
   if (!tenant) throw new AppError('Tenant not found', 404);
@@ -279,6 +350,22 @@ async function disconnectGateway(tenantId, provider) {
     update = {
       'paymentGateway.manual.accounts':     [],
       'paymentGateway.manual.instructions': null,
+    };
+  } else if (provider === 'paypal') {
+    update = {
+      'paymentGateway.paypal.clientId':              null,
+      'paymentGateway.paypal.clientSecretEncrypted': null,
+      'paymentGateway.paypal.verified':              false,
+      'paymentGateway.paypal.verifiedAt':            null,
+    };
+  } else if (provider === 'wise') {
+    update = {
+      'paymentGateway.wise.accountHolderName': null,
+      'paymentGateway.wise.email':              null,
+      'paymentGateway.wise.iban':               null,
+      'paymentGateway.wise.swiftBic':            null,
+      'paymentGateway.wise.accountNumber':      null,
+      'paymentGateway.wise.instructions':       null,
     };
   } else {
     update = {
@@ -302,7 +389,7 @@ async function disconnectGateway(tenantId, provider) {
 async function getActiveGateway(tenantId) {
   // Same projection-collision fix as getPaymentGatewaySettings above.
   const tenant = await Tenant.findById(tenantId)
-    .select('+paymentGateway.stripe.secretKeyEncrypted +paymentGateway.safepay.secretKeyEncrypted')
+    .select('+paymentGateway.stripe.secretKeyEncrypted +paymentGateway.safepay.secretKeyEncrypted +paymentGateway.paypal.clientSecretEncrypted')
     .lean();
   if (!tenant) return { provider: null };
 
@@ -313,6 +400,29 @@ async function getActiveGateway(tenantId) {
       provider:       'stripe',
       secretKey:      decrypt(pg.stripe.secretKeyEncrypted),
       publishableKey: pg.stripe.publishableKey || null,
+    };
+  }
+
+  if (pg.activeProvider === 'paypal' && pg.paypal?.clientId && pg.paypal?.clientSecretEncrypted) {
+    return {
+      provider:     'paypal',
+      clientId:     pg.paypal.clientId,
+      clientSecret: decrypt(pg.paypal.clientSecretEncrypted),
+      mode:         pg.paypal.mode || 'sandbox',
+    };
+  }
+
+  if (pg.activeProvider === 'wise' && (pg.wise?.email || pg.wise?.iban || pg.wise?.accountNumber)) {
+    return {
+      provider: 'wise',
+      account: {
+        accountHolderName: pg.wise.accountHolderName || null,
+        email:              pg.wise.email || null,
+        iban:               pg.wise.iban || null,
+        swiftBic:           pg.wise.swiftBic || null,
+        accountNumber:      pg.wise.accountNumber || null,
+      },
+      instructions: pg.wise.instructions || null,
     };
   }
 
@@ -498,6 +608,8 @@ module.exports = {
   getPaymentGatewaySettings,
   saveStripeGateway,
   saveManualGateway,
+  savePaypalGateway,
+  saveWiseGateway,
   disconnectGateway,
   getActiveGateway,
   getHeaderFooterSettings,

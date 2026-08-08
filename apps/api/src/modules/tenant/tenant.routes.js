@@ -46,6 +46,8 @@ router.put( '/email-settings',      requireRole('tenant_admin'), ctrl.saveEmailS
 router.get(   '/payment-gateway',           requireRole('tenant_admin'), ctrl.getPaymentGateway);
 router.put(   '/payment-gateway/stripe',    requireRole('tenant_admin'), ctrl.savePaymentGatewayStripe);
 router.put(   '/payment-gateway/manual',    requireRole('tenant_admin'), ctrl.savePaymentGatewayManual);
+router.put(   '/payment-gateway/paypal',    requireRole('tenant_admin'), ctrl.savePaymentGatewayPaypal);
+router.put(   '/payment-gateway/wise',      requireRole('tenant_admin'), ctrl.savePaymentGatewayWise);
 router.delete('/payment-gateway/:provider', requireRole('tenant_admin'), ctrl.disconnectPaymentGateway);
 
 // Cloudflare Stream — shared platform-level account, any authenticated user can

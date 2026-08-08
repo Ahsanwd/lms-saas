@@ -129,7 +129,7 @@ const tenantSchema = new mongoose.Schema(
 
     // Bring-your-own payment gateway for course purchases (tenant is paid directly, platform takes no cut)
     paymentGateway: {
-      activeProvider: { type: String, enum: ['stripe', 'safepay', 'manual', null], default: null },
+      activeProvider: { type: String, enum: ['stripe', 'safepay', 'manual', 'paypal', 'wise', null], default: null },
 
       stripe: {
         secretKeyEncrypted: { type: String,  default: null, select: false }, // AES-256 encrypted
@@ -163,6 +163,28 @@ const tenantSchema = new mongoose.Schema(
           bankName:      { type: String, default: null },  // only meaningful when type === 'bank'
         }],
         instructions: { type: String, default: null, maxlength: 2000 },
+      },
+
+      // PayPal Checkout (BYO PayPal Business app) — REST API v2 Orders,
+      // client-side JS SDK button using clientId (public, safe to expose).
+      paypal: {
+        clientId:              { type: String,  default: null }, // safe to expose to frontend
+        clientSecretEncrypted: { type: String,  default: null, select: false }, // AES-256 encrypted
+        mode:                  { type: String,  enum: ['sandbox', 'live'], default: 'sandbox' },
+        verified:              { type: Boolean, default: false },
+        verifiedAt:            { type: Date,    default: null },
+      },
+
+      // Wise — no usable one-off-checkout API for this use case, so it follows
+      // the same pattern as Manual: tenant publishes their Wise account
+      // details, student pays externally and uploads a screenshot as proof.
+      wise: {
+        accountHolderName: { type: String, default: null },
+        email:              { type: String, default: null }, // Wise account email (wise.com/pay/me/<name> or direct transfer)
+        iban:               { type: String, default: null },
+        swiftBic:           { type: String, default: null },
+        accountNumber:      { type: String, default: null },
+        instructions:       { type: String, default: null, maxlength: 2000 },
       },
     },
 

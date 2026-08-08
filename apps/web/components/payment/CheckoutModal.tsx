@@ -1,12 +1,81 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { AxiosError } from 'axios';
 import api from '@/lib/api';
 import { Button, Spinner } from '@/components/ui';
 import { getStripePromise, loadStripeWithKey } from '@/lib/stripe';
+
+declare global {
+  interface Window { paypal?: any }
+}
+
+interface WiseAccount {
+  accountHolderName: string | null;
+  email: string | null;
+  iban: string | null;
+  swiftBic: string | null;
+  accountNumber: string | null;
+}
+
+// Loads the PayPal JS SDK once per clientId+currency combination and renders
+// its Buttons widget — createOrder just hands back the orderID we already
+// created server-side (amount is never client-controlled), onApprove hits
+// our capture endpoint which is the actual source of truth for enrollment.
+function PaypalButton({
+  clientId, currency, orderId, paymentId, confirmUrlBase, onSuccess, onError,
+}: {
+  clientId: string; currency: string; orderId: string; paymentId: string;
+  confirmUrlBase: string; onSuccess: () => void; onError: (msg: string) => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [sdkReady, setSdkReady] = useState(false);
+
+  useEffect(() => {
+    const existing = document.getElementById('paypal-sdk-script') as HTMLScriptElement | null;
+    if (window.paypal) { setSdkReady(true); return; }
+    if (existing) { existing.addEventListener('load', () => setSdkReady(true)); return; }
+
+    const script = document.createElement('script');
+    script.id = 'paypal-sdk-script';
+    script.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(clientId)}&currency=${encodeURIComponent(currency.toUpperCase())}&intent=capture`;
+    script.onload = () => setSdkReady(true);
+    script.onerror = () => onError('Failed to load PayPal — please try again.');
+    document.body.appendChild(script);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientId, currency]);
+
+  useEffect(() => {
+    if (!sdkReady || !window.paypal || !containerRef.current) return;
+    containerRef.current.innerHTML = '';
+
+    const buttons = window.paypal.Buttons({
+      style: { layout: 'vertical', shape: 'rect', label: 'pay' },
+      createOrder: () => orderId,
+      onApprove: async () => {
+        try {
+          await api.post(`${confirmUrlBase}/${paymentId}/capture-paypal`);
+          onSuccess();
+        } catch (e: unknown) {
+          onError((e as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Payment could not be confirmed');
+        }
+      },
+      onError: () => onError('PayPal encountered an error — please try again.'),
+    });
+    buttons.render(containerRef.current);
+
+    return () => { try { buttons.close(); } catch { /* already unmounted */ } };
+  }, [sdkReady, orderId, paymentId, confirmUrlBase, onSuccess, onError]);
+
+  return (
+    <div className="space-y-3">
+      {!sdkReady && <div className="flex justify-center py-6"><Spinner /></div>}
+      <div ref={containerRef} />
+    </div>
+  );
+}
 
 export interface CouponResult {
   code: string;
@@ -127,7 +196,7 @@ export function CheckoutModal({
   successTitle = 'Payment successful!', successMessage = 'You now have access. Enjoy!',
   initialStep = 'method', onSuccess, onClose,
 }: CheckoutModalProps) {
-  const [paymentStep, setPaymentStep]       = useState<'method' | 'card' | 'manual-proof' | 'pending-review' | 'done'>(initialStep);
+  const [paymentStep, setPaymentStep]       = useState<'method' | 'card' | 'manual-proof' | 'wise-proof' | 'paypal' | 'pending-review' | 'done'>(initialStep);
   const [paymentId, setPaymentId]           = useState<string | null>(null);
   const [clientSecret, setClientSecret]     = useState<string | null>(null);
   const [publishableKey, setPublishableKey] = useState<string | null>(null);
@@ -136,6 +205,14 @@ export function CheckoutModal({
   const [manualInstructions, setManualInstructions] = useState<string | null>(null);
   const [proofFile, setProofFile]                   = useState<File | null>(null);
   const [proofError, setProofError]                 = useState('');
+
+  const [wiseAccount, setWiseAccount]         = useState<WiseAccount | null>(null);
+  const [wiseInstructions, setWiseInstructions] = useState<string | null>(null);
+
+  const [paypalOrderId, setPaypalOrderId]   = useState<string | null>(null);
+  const [paypalClientId, setPaypalClientId] = useState<string | null>(null);
+  const [paypalCurrency, setPaypalCurrency] = useState('usd');
+  const [paypalError, setPaypalError]       = useState('');
 
   const [couponInput, setCouponInput]           = useState('');
   const [appliedCoupon, setAppliedCoupon]       = useState<CouponResult | null>(null);
@@ -163,6 +240,19 @@ export function CheckoutModal({
         setManualAccounts(d.accounts ?? []);
         setManualInstructions(d.instructions ?? null);
         setPaymentStep('manual-proof');
+        return;
+      }
+      if (d.provider === 'wise') {
+        setWiseAccount(d.account ?? null);
+        setWiseInstructions(d.instructions ?? null);
+        setPaymentStep('wise-proof');
+        return;
+      }
+      if (d.provider === 'paypal') {
+        setPaypalOrderId(d.paypalOrderId);
+        setPaypalClientId(d.paypalClientId);
+        setPaypalCurrency(d.currency ?? 'usd');
+        setPaymentStep('paypal');
         return;
       }
       setClientSecret(d.clientSecret ?? null);
@@ -326,6 +416,44 @@ export function CheckoutModal({
           </>
         )}
 
+        {/* ── PayPal step ── */}
+        {paymentStep === 'paypal' && (
+          <>
+            <div className="flex items-center gap-3">
+              <button onClick={() => setPaymentStep('method')} className="text-gray-400 hover:text-gray-600">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
+                </svg>
+              </button>
+              <h2 className="text-lg font-semibold text-gray-900 flex-1">Pay with PayPal</h2>
+              <button onClick={() => onClose(false)} className="text-gray-400 hover:text-gray-600">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
+
+            <div className="bg-gray-50 rounded-xl px-4 py-3 flex items-center justify-between">
+              <span className="text-sm text-gray-600 truncate">{itemLabel}</span>
+              <span className="text-base font-bold text-gray-900 ml-3 flex-shrink-0">${displayPrice.toFixed(2)}</span>
+            </div>
+
+            {paypalError && <p className="text-sm text-red-600">{paypalError}</p>}
+
+            {paypalOrderId && paypalClientId && paymentId && (
+              <PaypalButton
+                clientId={paypalClientId}
+                currency={paypalCurrency}
+                orderId={paypalOrderId}
+                paymentId={paymentId}
+                confirmUrlBase={confirmUrlBase}
+                onSuccess={onPaymentSuccess}
+                onError={setPaypalError}
+              />
+            )}
+          </>
+        )}
+
         {/* ── Manual payment: show accounts, upload proof ── */}
         {paymentStep === 'manual-proof' && (
           <>
@@ -361,6 +489,60 @@ export function CheckoutModal({
 
             {manualInstructions && (
               <p className="text-xs text-gray-500 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">{manualInstructions}</p>
+            )}
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">Upload payment screenshot</label>
+              <input type="file" accept="image/*"
+                onChange={e => { setProofError(''); setProofFile(e.target.files?.[0] ?? null); }}
+                className="block w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100" />
+            </div>
+
+            {proofError && <p className="text-sm text-red-600">{proofError}</p>}
+
+            <Button className="w-full" loading={uploadProofMutation.isPending}
+              disabled={!proofFile}
+              onClick={() => uploadProofMutation.mutate()}>
+              Submit for Review
+            </Button>
+          </>
+        )}
+
+        {/* ── Wise payment: show account details, upload proof ── */}
+        {paymentStep === 'wise-proof' && (
+          <>
+            <div className="flex items-center gap-3">
+              <button onClick={() => setPaymentStep('method')} className="text-gray-400 hover:text-gray-600">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/>
+                </svg>
+              </button>
+              <h2 className="text-lg font-semibold text-gray-900 flex-1">Pay via Wise</h2>
+              <button onClick={() => onClose(false)} className="text-gray-400 hover:text-gray-600">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
+
+            <div className="bg-gray-50 rounded-xl px-4 py-3 flex items-center justify-between">
+              <span className="text-sm text-gray-600 truncate">{itemLabel}</span>
+              <span className="text-base font-bold text-gray-900 ml-3 flex-shrink-0">${displayPrice.toFixed(2)}</span>
+            </div>
+
+            {wiseAccount && (
+              <div className="rounded-xl border border-gray-200 p-3 space-y-1">
+                <p className="text-xs font-semibold text-primary-600">Wise Transfer</p>
+                {wiseAccount.accountHolderName && <p className="text-sm text-gray-700">{wiseAccount.accountHolderName}</p>}
+                {wiseAccount.email && <p className="text-sm font-mono text-gray-900">{wiseAccount.email}</p>}
+                {wiseAccount.iban && <p className="text-sm font-mono text-gray-900">IBAN: {wiseAccount.iban}</p>}
+                {wiseAccount.swiftBic && <p className="text-sm font-mono text-gray-900">SWIFT/BIC: {wiseAccount.swiftBic}</p>}
+                {wiseAccount.accountNumber && <p className="text-sm font-mono text-gray-900">Account: {wiseAccount.accountNumber}</p>}
+              </div>
+            )}
+
+            {wiseInstructions && (
+              <p className="text-xs text-gray-500 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">{wiseInstructions}</p>
             )}
 
             <div>

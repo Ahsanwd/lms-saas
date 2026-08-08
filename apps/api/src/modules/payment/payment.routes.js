@@ -23,6 +23,7 @@ router.post('/courses/:courseId/trial',             ctrl.startTrial);
 router.get('/courses/:courseId/trial',              ctrl.trialStatus);
 router.post('/courses/:courseId/trial/upgrade',     ctrl.upgradeTrial);
 router.post('/:paymentId/confirm',                  ctrl.confirm);
+router.post('/:paymentId/capture-paypal',           ctrl.capturePaypal);
 router.post('/:paymentId/proof',                    uploadProofFile, ctrl.submitProof);
 
 // Bundle payment flow (student)

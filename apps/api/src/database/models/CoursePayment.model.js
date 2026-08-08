@@ -29,7 +29,7 @@ const coursePaymentSchema = new mongoose.Schema(
     paypalOrderId:    { type: String, default: null },   // PayPal order ID
     paypalCaptureId:  { type: String, default: null },   // PayPal capture ID (needed for refunds)
     safepayTracker:   { type: String, default: null },   // track_xxx — legacy Safepay hosted-checkout session
-    provider:         { type: String, enum: ['mock', 'stripe', 'safepay', 'paypal', 'manual'], default: 'mock' },
+    provider:         { type: String, enum: ['mock', 'stripe', 'safepay', 'paypal', 'manual', 'wise'], default: 'mock' },
 
     // Manual payment proof (provider === 'manual' only)
     proofImageUrl:   { type: String, default: null },

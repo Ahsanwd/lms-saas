@@ -163,6 +163,20 @@ async function savePaymentGatewayManual(req, res, next) {
   } catch (err) { next(err); }
 }
 
+async function savePaymentGatewayPaypal(req, res, next) {
+  try {
+    const data = await tenantService.savePaypalGateway(req.tenant.tenantId, req.body);
+    R.success(res, data, 'PayPal gateway saved');
+  } catch (err) { next(err); }
+}
+
+async function savePaymentGatewayWise(req, res, next) {
+  try {
+    const data = await tenantService.saveWiseGateway(req.tenant.tenantId, req.body);
+    R.success(res, data, 'Wise payment details saved');
+  } catch (err) { next(err); }
+}
+
 async function disconnectPaymentGateway(req, res, next) {
   try {
     const data = await tenantService.disconnectGateway(req.tenant.tenantId, req.params.provider);
@@ -296,6 +310,8 @@ module.exports = {
   getPaymentGateway,
   savePaymentGatewayStripe,
   savePaymentGatewayManual,
+  savePaymentGatewayPaypal,
+  savePaymentGatewayWise,
   disconnectPaymentGateway,
   getCfStreamStatus,
   getBunnyStreamSettings,
