@@ -38,4 +38,11 @@ async function unreadCount(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { submit, list, updateStatus, unreadCount };
+async function remove(req, res, next) {
+  try {
+    await contactSubmissionService.deleteSubmission(req.tenant.tenantId, req.params.id, req.user.sub);
+    R.success(res, {}, 'Submission deleted');
+  } catch (err) { next(err); }
+}
+
+module.exports = { submit, list, updateStatus, unreadCount, remove };

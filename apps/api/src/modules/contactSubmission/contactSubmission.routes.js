@@ -23,5 +23,6 @@ router.use(authenticate);
 router.get('/', requireRole('tenant_admin'), ctrl.list);
 router.get('/unread-count', requireRole('tenant_admin'), ctrl.unreadCount);
 router.patch('/:id', requireRole('tenant_admin'), ctrl.updateStatus);
+router.delete('/:id', requireRole('tenant_admin'), ctrl.remove);
 
 module.exports = router;

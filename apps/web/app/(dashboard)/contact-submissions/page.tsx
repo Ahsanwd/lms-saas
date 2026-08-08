@@ -45,6 +45,14 @@ export default function ContactSubmissionsPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['contact-submissions'] }),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/tenant/contact-submissions/${id}`),
+    onSuccess: (_data, id) => {
+      qc.invalidateQueries({ queryKey: ['contact-submissions'] });
+      setExpanded((prev) => (prev === id ? null : prev));
+    },
+  });
+
   function toggleExpand(s: ContactSubmission) {
     setExpanded((prev) => (prev === s._id ? null : s._id));
     if (s.status === 'new') markReadMutation.mutate(s._id);
@@ -90,8 +98,15 @@ export default function ContactSubmissionsPage() {
                     <p className="text-xs text-gray-400 flex-shrink-0">{formatDate(s.createdAt)}</p>
                   </button>
                   {expanded === s._id && (
-                    <div className="px-4 pb-4 pl-[4.5rem]">
+                    <div className="px-4 pb-4 pl-[4.5rem] space-y-2">
                       <p className="text-sm text-gray-700 whitespace-pre-wrap break-words bg-gray-50 border border-gray-100 rounded-lg p-3">{s.message}</p>
+                      <button
+                        onClick={() => { if (confirm('Delete this submission? This cannot be undone.')) deleteMutation.mutate(s._id); }}
+                        disabled={deleteMutation.isPending}
+                        className="text-xs text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50"
+                      >
+                        {deleteMutation.isPending && deleteMutation.variables === s._id ? 'Deleting…' : 'Delete'}
+                      </button>
                     </div>
                   )}
                 </div>

@@ -101,4 +101,10 @@ async function markStatus(tenantId, id, status) {
   return submission;
 }
 
-module.exports = { submit, listSubmissions, markStatus, getUnreadCount };
+async function deleteSubmission(tenantId, id, userId) {
+  const submission = await contactSubmissionRepo.softDeleteById(tenantId, id, userId);
+  if (!submission) throw new AppError('Submission not found', 404);
+  return submission;
+}
+
+module.exports = { submit, listSubmissions, markStatus, getUnreadCount, deleteSubmission };

@@ -26,6 +26,12 @@ class ContactSubmissionRepository {
     return ContactSubmission.findByIdAndUpdate(id, { emailDelivered: delivered });
   }
 
+  async softDeleteById(tenantId, id, userId) {
+    const submission = await ContactSubmission.findOne({ _id: id, tenantId, deletedAt: null });
+    if (!submission) return null;
+    return submission.softDelete(userId);
+  }
+
   countUnread(tenantId) {
     return ContactSubmission.countDocuments({ tenantId, status: 'new', deletedAt: null });
   }
