@@ -696,6 +696,16 @@ function CoursesSlider({ courses, linksDisabled }: { courses: PublicCourse[]; li
   );
 }
 
+// Caps the grid to as many columns as there are courses (up to 4) and keeps
+// it centered, instead of always reserving 4 columns' width and leaving a
+// large empty gap when a tenant only has 1-3 published courses.
+function coursesGridClass(count: number): string {
+  if (count <= 1) return 'grid grid-cols-1 gap-6 max-w-sm mx-auto';
+  if (count === 2) return 'grid sm:grid-cols-2 gap-6 max-w-2xl mx-auto';
+  if (count === 3) return 'grid sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-4xl mx-auto';
+  return 'grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mx-auto';
+}
+
 export function CoursesGrid({
   courses, loading, coursesSection, linksDisabled,
 }: {
@@ -738,7 +748,7 @@ export function CoursesGrid({
         ) : coursesSection.layout === 'slider' ? (
           <CoursesSlider courses={shown} linksDisabled={linksDisabled} />
         ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className={coursesGridClass(shown.length)}>
             {shown.map((course) => (
               <CourseCard key={course._id} course={course} linksDisabled={linksDisabled} />
             ))}
