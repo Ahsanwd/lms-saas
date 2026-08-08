@@ -1152,13 +1152,10 @@ async function adminUnenrollUser(tenantId, courseId, targetUserId, actingUser) {
   if (!course) throw new AppError('Course not found', 404);
   if (!canEditCourse(course, actingUser)) throw new AppError('Forbidden', 403);
 
-  const enrollment = await enrollmentRepo.findByUserAndCourse(tenantId, targetUserId, courseId);
-  if (!enrollment || enrollment.status !== 'active')
-    throw new AppError('Active enrollment not found', 404);
+  const enrollment = await enrollmentRepo.findActiveByUserAndCourse(tenantId, targetUserId, courseId);
+  if (!enrollment) throw new AppError('Active enrollment not found', 404);
 
-  await enrollmentRepo.updateByUserAndCourse(tenantId, targetUserId, courseId, {
-    status: 'dropped', droppedAt: new Date(),
-  });
+  await enrollmentRepo.updateById(enrollment._id, { status: 'dropped', droppedAt: new Date() });
   await courseRepo.incrementCounter(tenantId, courseId, { enrollmentCount: -1 });
 
   const { promoteNext } = require('../waitlist/waitlist.service');

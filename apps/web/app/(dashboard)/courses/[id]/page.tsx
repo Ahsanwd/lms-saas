@@ -3143,6 +3143,7 @@ function StudentsTab({ courseId, enrollmentCount }: { courseId: string; enrollme
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['course-students', courseId] });
       setRemovingId(null);
+      setEnrollMsg('');
     },
     onError: (err: AxiosError<{ message: string }>) => {
       setRemovingId(null);
@@ -3200,6 +3201,12 @@ function StudentsTab({ courseId, enrollmentCount }: { courseId: string; enrollme
 
   return (
     <div className="space-y-4">
+      {enrollMsg && !showEnrollModal && (
+        <div className="flex items-center justify-between gap-3 px-3 py-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg">
+          <span>{enrollMsg}</span>
+          <button onClick={() => setEnrollMsg('')} className="text-red-400 hover:text-red-600">✕</button>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <p className="text-sm text-gray-500">{data?.total ?? enrollmentCount} enrolled students</p>
         <div className="flex items-center gap-2">

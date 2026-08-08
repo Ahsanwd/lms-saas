@@ -5,6 +5,13 @@ class EnrollmentRepository {
     return Enrollment.findOne({ tenantId, userId, courseId });
   }
 
+  // Unlike findByUserAndCourse, scoped to the active record — a user can
+  // accumulate multiple enrollment docs over time (drop + re-enroll), and an
+  // unfiltered findOne has no guaranteed ordering across them.
+  findActiveByUserAndCourse(tenantId, userId, courseId) {
+    return Enrollment.findOne({ tenantId, userId, courseId, status: 'active' });
+  }
+
   findByUser(tenantId, userId, filter = {}) {
     return Enrollment.find({ tenantId, userId, ...filter })
       .populate('courseId', 'title thumbnail slug instructorId level certificateEnabled totalLessons');
@@ -27,6 +34,10 @@ class EnrollmentRepository {
 
   updateByUserAndCourse(tenantId, userId, courseId, update) {
     return Enrollment.findOneAndUpdate({ tenantId, userId, courseId }, update, { new: true });
+  }
+
+  updateById(enrollmentId, update) {
+    return Enrollment.findByIdAndUpdate(enrollmentId, update, { new: true });
   }
 
   countActive(tenantId, courseId) {
