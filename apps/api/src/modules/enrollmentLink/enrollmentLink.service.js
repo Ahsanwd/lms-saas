@@ -120,6 +120,15 @@ async function joinViaLink(tenantId, token, user) {
       continue;
     }
 
+    // Paid courses are never free-enrolled through a share link — the link
+    // only grants *access to the offer*, not a discount. The client routes
+    // to the normal checkout (Stripe/PayPal capture, or Manual/Wise proof +
+    // admin approval) for these instead, same as buying directly.
+    if (!courseDoc.isFree && courseDoc.price > 0) {
+      results.push({ courseId, status: 'requires_payment', price: courseDoc.price });
+      continue;
+    }
+
     // Capacity check
     if (courseDoc.capacity > 0) {
       const activeCount = await enrollmentRepo.countActive(tenantId, courseId);

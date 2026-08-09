@@ -6,6 +6,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { useAuthStore } from '@/stores/auth.store';
 import { Button, Spinner, Alert } from '@/components/ui';
+import { CheckoutModal } from '@/components/payment/CheckoutModal';
 import { AxiosError } from 'axios';
 
 interface CourseInfo {
@@ -84,6 +85,7 @@ export default function JoinPage() {
   const { isAuthenticated, hasHydrated } = useAuthStore();
   const [joined, setJoined] = useState(false);
   const [joinError, setJoinError] = useState('');
+  const [showCheckout, setShowCheckout] = useState(false);
 
   const { data: linkInfo, isLoading, isError, error } = useQuery<LinkInfo>({
     queryKey: ['enrollment-link', token],
@@ -93,6 +95,14 @@ export default function JoinPage() {
     },
     retry: false,
   });
+
+  // Only the common single-course case gets a real checkout — a multi-course
+  // link with a mix of free/paid courses isn't a supported flow yet (see the
+  // fallback notice further down).
+  const singleCourse = linkInfo && !linkInfo.isBundle ? linkInfo.courses[0] : null;
+  const isPaidSingle = !!singleCourse && !singleCourse.isFree && (singleCourse.price ?? 0) > 0;
+  const hasUnsupportedPaidBundle = !!linkInfo?.isBundle &&
+    linkInfo.courses.some((c) => !c.isFree && (c.price ?? 0) > 0);
 
   const joinMutation = useMutation({
     mutationFn: () => api.post(`/enrollment-links/join/${token}`),
@@ -121,10 +131,10 @@ export default function JoinPage() {
   const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
   const autoJoin = searchParams?.get('join') === '1';
   useEffect(() => {
-    if (hasHydrated && isAuthenticated && autoJoin && !joined && !joinMutation.isPending) {
-      joinMutation.mutate();
-    }
-  }, [hasHydrated, isAuthenticated, autoJoin]);
+    if (!hasHydrated || !isAuthenticated || !autoJoin || joined || !linkInfo) return;
+    if (isPaidSingle) { setShowCheckout(true); return; }
+    if (!joinMutation.isPending) joinMutation.mutate();
+  }, [hasHydrated, isAuthenticated, autoJoin, linkInfo, isPaidSingle]);
 
   if (isLoading || !hasHydrated) {
     return (
@@ -211,14 +221,21 @@ export default function JoinPage() {
           {joinError && <Alert variant="error">{joinError}</Alert>}
 
           {/* CTA */}
-          {isAuthenticated ? (
+          {hasUnsupportedPaidBundle ? (
+            <Alert variant="error">
+              This link includes one or more paid courses alongside others — bundled paid links
+              aren&apos;t supported yet. Please enroll in each course individually, or contact us for help.
+            </Alert>
+          ) : isAuthenticated ? (
             <Button
               className="w-full"
               size="lg"
               loading={joinMutation.isPending}
-              onClick={() => joinMutation.mutate()}
+              onClick={() => (isPaidSingle ? setShowCheckout(true) : joinMutation.mutate())}
             >
-              {info.isBundle ? `Enroll in all ${info.courses.length} courses` : 'Enroll now — it\'s free'}
+              {isPaidSingle
+                ? `Pay $${singleCourse!.price!.toFixed(2)} to Enroll`
+                : info.isBundle ? `Enroll in all ${info.courses.length} courses` : 'Enroll now — it\'s free'}
             </Button>
           ) : (
             <div className="space-y-3">
@@ -227,7 +244,7 @@ export default function JoinPage() {
                 size="lg"
                 onClick={() => router.push(`/register?redirect=${encodeURIComponent(`/join/${token}?join=1`)}`)}
               >
-                Create free account &amp; enroll
+                {isPaidSingle ? 'Create free account to continue' : 'Create free account & enroll'}
               </Button>
               <button
                 className="w-full text-sm text-gray-500 hover:text-gray-700 text-center py-1"
@@ -240,10 +257,31 @@ export default function JoinPage() {
           )}
 
           <p className="text-xs text-center text-gray-400">
-            This is a free enrollment link — no payment required.
+            {isPaidSingle
+              ? `This course is $${singleCourse!.price!.toFixed(2)} — you'll be taken to secure checkout.`
+              : 'This is a free enrollment link — no payment required.'}
           </p>
         </div>
       </div>
+
+      {showCheckout && singleCourse && (
+        <CheckoutModal
+          itemLabel={singleCourse.title}
+          price={singleCourse.price ?? 0}
+          initiateUrl={`/payments/courses/${singleCourse._id}/initiate`}
+          confirmUrlBase="/payments"
+          successTitle="Payment successful!"
+          successMessage="You're enrolled. Taking you to your course…"
+          onSuccess={() => {}}
+          onClose={(completed) => {
+            setShowCheckout(false);
+            if (completed) {
+              setJoined(true);
+              setTimeout(() => router.push(`/courses/${singleCourse._id}`), 1500);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
