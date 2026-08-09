@@ -63,7 +63,7 @@ function calcExpiresAt(days) {
 // Returns either a Stripe shape ({ clientSecret, publishableKey }) or a manual-
 // payment shape ({ accounts, instructions }) depending on which gateway the
 // tenant has configured.
-async function initiatePayment(tenantId, courseId, userId, { couponCode } = {}) {
+async function initiatePayment(tenantId, courseId, userId, { couponCode, linkToken } = {}) {
   const [course, tenant, user] = await Promise.all([
     Course.findOne({ _id: courseId, tenantId, deletedAt: null }),
     tenantRepo.findById(tenantId),
@@ -82,8 +82,27 @@ async function initiatePayment(tenantId, courseId, userId, { couponCode } = {}) 
   let finalAmount   = Math.round((course.price || 0) * 100); // cents
   let discountAmount = 0;
   let appliedCoupon  = null;
+  let enrollmentLinkDoc = null;
 
-  if (couponCode) {
+  // Enrollment-link custom price — re-verified here (never trusted from
+  // what the client displayed) against the link record itself. Mutually
+  // exclusive with a coupon: a link's own price already *is* the deal.
+  if (linkToken) {
+    const linkRepo = require('../../database/repositories/enrollmentLink.repository');
+    enrollmentLinkDoc = await linkRepo.findByToken(linkToken);
+    if (!enrollmentLinkDoc || !enrollmentLinkDoc.isActive || enrollmentLinkDoc.tenantId?.toString() !== tenantId.toString())
+      throw new AppError('This enrollment link is no longer valid', 410);
+    if (enrollmentLinkDoc.expiresAt && new Date() > new Date(enrollmentLinkDoc.expiresAt))
+      throw new AppError('This enrollment link has expired', 410);
+    if (enrollmentLinkDoc.maxUses > 0 && enrollmentLinkDoc.uses >= enrollmentLinkDoc.maxUses)
+      throw new AppError('This enrollment link has reached its maximum number of uses', 410);
+    const linkedCourseIds = enrollmentLinkDoc.courseIds.map((c) => (c._id || c).toString());
+    if (!linkedCourseIds.includes(courseId.toString()))
+      throw new AppError('This link does not include this course', 400);
+    if (enrollmentLinkDoc.priceOverride != null) {
+      finalAmount = Math.round(enrollmentLinkDoc.priceOverride * 100);
+    }
+  } else if (couponCode) {
     try {
       const couponSvc = require('../coupon/coupon.service');
       const disc = await couponSvc.validateCoupon(tenantId, couponCode, courseId, course.price);
@@ -105,6 +124,7 @@ async function initiatePayment(tenantId, courseId, userId, { couponCode } = {}) 
       currency,
       discountAmount,
       couponCode:    appliedCoupon,
+      enrollmentLinkId: enrollmentLinkDoc?._id || null,
       provider:      'manual',
       receiptNumber: receiptNumber(),
       status:        'pending', // awaiting proof upload
@@ -132,6 +152,7 @@ async function initiatePayment(tenantId, courseId, userId, { couponCode } = {}) 
       currency,
       discountAmount,
       couponCode:    appliedCoupon,
+      enrollmentLinkId: enrollmentLinkDoc?._id || null,
       provider:      'wise',
       receiptNumber: receiptNumber(),
       status:        'pending', // awaiting proof upload
@@ -162,6 +183,7 @@ async function initiatePayment(tenantId, courseId, userId, { couponCode } = {}) 
       currency,
       discountAmount,
       couponCode:    appliedCoupon,
+      enrollmentLinkId: enrollmentLinkDoc?._id || null,
       paypalOrderId: order.id,
       provider:      'paypal',
       receiptNumber: receiptNumber(),
@@ -200,6 +222,7 @@ async function initiatePayment(tenantId, courseId, userId, { couponCode } = {}) 
     currency,
     discountAmount,
     couponCode:      appliedCoupon,
+    enrollmentLinkId: enrollmentLinkDoc?._id || null,
     paymentIntentId: intent.id,
     provider:        resolvedProvider,
     receiptNumber:   receiptNumber(),
@@ -315,6 +338,11 @@ async function _activatePayment(payment) {
   payment.paidAt       = new Date();
   payment.enrollmentId = enrollment._id;
   await payment.save();
+
+  if (payment.enrollmentLinkId) {
+    const linkRepo = require('../../database/repositories/enrollmentLink.repository');
+    linkRepo.incrementUses(payment.enrollmentLinkId).catch(() => {});
+  }
 
   const { emitDashboardUpdated } = require('../../services/socket/io');
   emitDashboardUpdated(payment.tenantId, { event: 'new_enrollment' });

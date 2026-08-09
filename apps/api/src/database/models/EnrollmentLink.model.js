@@ -17,6 +17,14 @@ const enrollmentLinkSchema = new mongoose.Schema(
     maxUses:   { type: Number, default: 0 },   // 0 = unlimited
     uses:      { type: Number, default: 0 },
     expiresAt: { type: Date,   default: null }, // null = no expiry
+
+    // Charges this amount instead of the course's own price at checkout —
+    // e.g. a custom rate for one specific partner/promo. Only ever set for
+    // single-course, non-free links (see enrollmentLink.service.js
+    // createLink); the actual amount charged is always re-verified
+    // server-side against this field in payment.service.js — never trust
+    // a client-supplied price.
+    priceOverride: { type: Number, default: null, min: 0 },
   },
   { timestamps: true }
 );

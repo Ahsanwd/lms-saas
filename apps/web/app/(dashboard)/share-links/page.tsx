@@ -12,6 +12,8 @@ interface CourseOption {
   title: string;
   status: string;
   thumbnail?: string;
+  price?: number;
+  isFree?: boolean;
 }
 
 interface EnrollmentLink {
@@ -23,6 +25,7 @@ interface EnrollmentLink {
   uses: number;
   expiresAt: string | null;
   isActive: boolean;
+  priceOverride: number | null;
   createdBy?: { firstName: string; lastName: string };
   createdAt: string;
 }
@@ -83,7 +86,13 @@ function CreateModal({ courses, onClose, onCreated }: CreateModalProps) {
   const [selected, setSelected]   = useState<string[]>([]);
   const [maxUses, setMaxUses]      = useState('');
   const [expiresAt, setExpiresAt]  = useState('');
+  const [priceOverride, setPriceOverride] = useState('');
   const [error, setError]          = useState('');
+
+  // A custom price only makes sense for exactly one, normally-paid course —
+  // see enrollmentLink.service.js's createLink for the matching backend rule.
+  const selectedCourse = selected.length === 1 ? courses.find(c => c._id === selected[0]) : null;
+  const canSetCustomPrice = !!selectedCourse && !selectedCourse.isFree && (selectedCourse.price ?? 0) > 0;
 
   const mutation = useMutation({
     mutationFn: () => api.post('/enrollment-links', {
@@ -91,6 +100,7 @@ function CreateModal({ courses, onClose, onCreated }: CreateModalProps) {
       courseIds: selected,
       maxUses: maxUses ? parseInt(maxUses) : 0,
       expiresAt: expiresAt || undefined,
+      priceOverride: canSetCustomPrice && priceOverride ? parseFloat(priceOverride) : undefined,
     }),
     onSuccess: () => { onCreated(); onClose(); },
     onError: (err: AxiosError<{ message: string }>) => {
@@ -163,6 +173,31 @@ function CreateModal({ courses, onClose, onCreated }: CreateModalProps) {
               </p>
             )}
           </div>
+
+          {/* Custom price — only for a single, normally-paid course */}
+          {canSetCustomPrice && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Custom price <span className="text-gray-400 font-normal">(optional — overrides the course's own ${selectedCourse!.price?.toFixed(2)} price)</span>
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+                <input
+                  type="number"
+                  min={0.01}
+                  step={0.01}
+                  value={priceOverride}
+                  onChange={e => setPriceOverride(e.target.value)}
+                  placeholder={selectedCourse!.price?.toFixed(2)}
+                  className="w-full pl-7 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-400"
+                />
+              </div>
+              <p className="text-xs text-gray-400 mt-1.5">
+                Anyone using this link pays this price instead — full course access either way, just for a
+                {' '}<strong>different price</strong>, not free.
+              </p>
+            </div>
+          )}
 
           {/* Optional limits */}
           <div className="grid grid-cols-2 gap-4">
@@ -270,8 +305,9 @@ export default function ShareLinksPage() {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
         <span>
-          Anyone who clicks your link will be enrolled instantly — great for social media, email campaigns, or onboarding.
-          Single courses <strong>or</strong> bundles are both supported.
+          Anyone who clicks your link enrolls in a free course instantly — great for social media, email
+          campaigns, or onboarding. Single courses <strong>or</strong> bundles are both supported. For a
+          paid course, the link takes them to checkout instead (optionally at a custom price you set).
         </span>
       </div>
 
@@ -304,6 +340,9 @@ export default function ShareLinksPage() {
                       <Badge variant={STATUS_BADGE[status]} className="capitalize text-xs">{status}</Badge>
                       {link.courseIds.length > 1 && (
                         <Badge variant="default" className="text-xs">Bundle</Badge>
+                      )}
+                      {link.priceOverride != null && (
+                        <Badge variant="default" className="text-xs">${link.priceOverride.toFixed(2)} custom price</Badge>
                       )}
                     </div>
 

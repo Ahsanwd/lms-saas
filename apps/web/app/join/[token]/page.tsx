@@ -270,6 +270,7 @@ export default function JoinPage() {
           price={singleCourse.price ?? 0}
           initiateUrl={`/payments/courses/${singleCourse._id}/initiate`}
           confirmUrlBase="/payments"
+          linkToken={token}
           successTitle="Payment successful!"
           successMessage="You're enrolled. Taking you to your course…"
           onSuccess={() => {}}

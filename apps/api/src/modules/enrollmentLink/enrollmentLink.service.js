@@ -7,7 +7,7 @@ const tenantRepo     = require('../../database/repositories/tenant.repository');
 const Enrollment     = require('../../database/models/Enrollment.model');
 
 // ─── Create Link ──────────────────────────────────────────────────────────────
-async function createLink(tenantId, createdBy, role, { title, courseIds, maxUses, expiresAt }) {
+async function createLink(tenantId, createdBy, role, { title, courseIds, maxUses, expiresAt, priceOverride }) {
   if (!courseIds || courseIds.length === 0)
     throw new AppError('At least one course is required', 400);
   if (courseIds.length > 20)
@@ -25,6 +25,20 @@ async function createLink(tenantId, createdBy, role, { title, courseIds, maxUses
       throw new AppError(`You can only share your own courses`, 403);
   }
 
+  // A custom price only makes sense for a single, normally-paid course —
+  // a bundle of multiple courses has no single natural "price" to override,
+  // and overriding a free course to a price is a different feature (not
+  // what this is for; free courses should get a separate paid course/coupon
+  // instead).
+  let resolvedPriceOverride = null;
+  if (priceOverride !== undefined && priceOverride !== null && priceOverride !== '') {
+    if (courses.length !== 1) throw new AppError('A custom price can only be set for a single-course link', 400);
+    if (courses[0].isFree) throw new AppError('This course is free — a custom price doesn\'t apply', 400);
+    const n = Number(priceOverride);
+    if (!Number.isFinite(n) || n <= 0) throw new AppError('Custom price must be a positive number', 400);
+    resolvedPriceOverride = n;
+  }
+
   const token = crypto.randomBytes(10).toString('hex'); // 20-char hex
 
   return linkRepo.create({
@@ -35,6 +49,7 @@ async function createLink(tenantId, createdBy, role, { title, courseIds, maxUses
     token,
     maxUses: Number(maxUses) || 0,
     expiresAt: expiresAt ? new Date(expiresAt) : null,
+    priceOverride: resolvedPriceOverride,
   });
 }
 
@@ -71,8 +86,18 @@ async function getPublicLink(tenantId, token) {
   // null in that array slot (Mongoose populate convention) rather than
   // being dropped — filter it out before it reaches the frontend, which
   // renders each entry's `._id`/`.title` unconditionally.
-  const courses = link.courseIds.filter(Boolean);
+  let courses = link.courseIds.filter(Boolean);
   if (courses.length === 0) throw new AppError('The courses in this link are no longer available', 410);
+
+  // Reflect the link's custom price directly on the course object the
+  // frontend renders — it already knows how to show/checkout a course's
+  // `price` field, so this needs no separate frontend-side special-casing.
+  // The actual amount charged is independently re-verified server-side in
+  // payment.service.js against this same link record, never trusted from
+  // what the client displays.
+  if (link.priceOverride != null && courses.length === 1) {
+    courses = [{ ...courses[0], price: link.priceOverride, isFree: false }];
+  }
 
   const tenant = await tenantRepo.findById(tenantId);
   return {

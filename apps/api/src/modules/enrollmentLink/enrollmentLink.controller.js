@@ -4,10 +4,10 @@ const R   = require('../../utils/response');
 async function create(req, res, next) {
   try {
     if (!req.tenant) return R.error(res, 'Tenant context missing', 400);
-    const { title, courseIds, maxUses, expiresAt } = req.body;
+    const { title, courseIds, maxUses, expiresAt, priceOverride } = req.body;
     const link = await svc.createLink(
       req.tenant.tenantId, req.user.sub, req.user.role,
-      { title, courseIds, maxUses, expiresAt }
+      { title, courseIds, maxUses, expiresAt, priceOverride }
     );
     R.created(res, { link }, 'Enrollment link created');
   } catch (err) { next(err); }

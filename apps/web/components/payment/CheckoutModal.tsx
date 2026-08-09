@@ -178,6 +178,8 @@ export interface CheckoutModalProps {
   confirmUrlBase: string; // confirm endpoint is `${confirmUrlBase}/${paymentId}/confirm`
   /** Host already resolved a coupon externally (e.g. course page's own coupon UI) */
   couponCode?: string;
+  /** Enrollment share-link token — server re-verifies any link price override against this */
+  linkToken?: string;
   /** Modal owns its own coupon input/apply step (e.g. bundle catalog cards) */
   validateCoupon?: (code: string) => Promise<CouponResult>;
   successTitle?: string;
@@ -195,7 +197,7 @@ export interface CheckoutModalProps {
 }
 
 export function CheckoutModal({
-  itemLabel, price, initiateUrl, confirmUrlBase, couponCode, validateCoupon,
+  itemLabel, price, initiateUrl, confirmUrlBase, couponCode, linkToken, validateCoupon,
   successTitle = 'Payment successful!', successMessage = 'You now have access. Enjoy!',
   initialStep = 'method', onSuccess, onClose,
 }: CheckoutModalProps) {
@@ -235,7 +237,7 @@ export function CheckoutModal({
   const displayPrice = appliedCoupon?.finalPrice ?? price;
 
   const initiateMutation = useMutation({
-    mutationFn: () => api.post(initiateUrl, { couponCode: effectiveCouponCode }),
+    mutationFn: () => api.post(initiateUrl, { couponCode: effectiveCouponCode, linkToken }),
     onSuccess: (res) => {
       const d = res.data.data;
       setPaymentId(d.paymentId);

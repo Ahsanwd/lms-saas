@@ -7,6 +7,10 @@ const coursePaymentSchema = new mongoose.Schema(
     courseId:   { type: mongoose.Schema.Types.ObjectId, ref: 'Course', required: true },
     userId:     { type: mongoose.Schema.Types.ObjectId, ref: 'User',   required: true },
     enrollmentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Enrollment', default: null },
+    // Set when this purchase was made through an enrollment share link —
+    // used to re-verify a link-specific price override server-side and to
+    // credit the link's usage count once the payment actually completes.
+    enrollmentLinkId: { type: mongoose.Schema.Types.ObjectId, ref: 'EnrollmentLink', default: null },
 
     amount:         { type: Number, required: true, min: 0 }, // in cents
     currency:       { type: String, default: 'usd' },
