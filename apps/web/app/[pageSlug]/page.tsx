@@ -5,6 +5,7 @@ import { useParams, notFound } from 'next/navigation';
 import axios from 'axios';
 import { applyBrandColor, applySecondaryColor, applyFontFamily } from '@/lib/brandColor';
 import { useTenantSubdomain } from '@/lib/useTenantSubdomain';
+import { useTenantBrowserChrome } from '@/lib/useTenantBrowserChrome';
 import { resolveSectionCourses } from '@/lib/tenantPageFetch';
 import { PageSectionsRenderer, type PageSection, type PublicCourse, type NavPage, type HeaderConfig, type FooterConfig, type PublicBundle, type PublicMembershipPlan } from '@/components/website/LandingPageSections';
 
@@ -21,6 +22,7 @@ export default function TenantCustomPage() {
   const [notPublished, setNotPublished] = useState(false);
   const [tenantName, setTenantName] = useState('');
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [faviconUrl, setFaviconUrl] = useState<string | null>(null);
   const [sections, setSections] = useState<PageSection[]>([]);
   const [pageId, setPageId] = useState<string | undefined>(undefined);
   const [courses, setCourses] = useState<PublicCourse[]>([]);
@@ -45,6 +47,7 @@ export default function TenantCustomPage() {
       .then(async ([coursesRes, pageRes, navRes, bundlesRes, plansRes]) => {
         setTenantName(coursesRes.data.data.tenantName ?? '');
         setLogoUrl(coursesRes.data.data.branding?.logoUrl ?? null);
+        setFaviconUrl(coursesRes.data.data.branding?.faviconUrl ?? null);
         if (coursesRes.data.data.branding?.primaryColor) applyBrandColor(coursesRes.data.data.branding.primaryColor);
         if (coursesRes.data.data.branding?.secondaryColor) applySecondaryColor(coursesRes.data.data.branding.secondaryColor);
         applyFontFamily(coursesRes.data.data.branding?.fontFamily);
@@ -65,6 +68,8 @@ export default function TenantCustomPage() {
       .catch(() => setNotPublished(true))
       .finally(() => setLoading(false));
   }, [subdomain, pageSlug]);
+
+  useTenantBrowserChrome(tenantName || subdomain || '', faviconUrl, logoUrl);
 
   if (loading || subdomain === null) {
     return (

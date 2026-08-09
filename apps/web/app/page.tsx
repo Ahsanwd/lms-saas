@@ -6,6 +6,7 @@ import axios from 'axios';
 import { applyBrandColor, applySecondaryColor, applyFontFamily } from '@/lib/brandColor';
 import { loadRecaptchaScript, executeRecaptcha } from '@/lib/recaptcha';
 import { useTenantSubdomain } from '@/lib/useTenantSubdomain';
+import { useTenantBrowserChrome } from '@/lib/useTenantBrowserChrome';
 import { resolveSectionCourses } from '@/lib/tenantPageFetch';
 import {
   PageSectionsRenderer,
@@ -131,6 +132,7 @@ function TenantLandingPage({ subdomain }: { subdomain: string }) {
   const [courses, setCourses] = useState<PublicCourse[]>([]);
   const [tenantName, setTenantName] = useState('');
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [faviconUrl, setFaviconUrl] = useState<string | null>(null);
   const [isPublished, setIsPublished] = useState(false);
   const [sections, setSections] = useState<PageSection[]>([]);
   const [pageId, setPageId] = useState<string | undefined>(undefined);
@@ -154,6 +156,7 @@ function TenantLandingPage({ subdomain }: { subdomain: string }) {
         let finalCourses = coursesRes.data.data.courses ?? [];
         setTenantName(coursesRes.data.data.tenantName ?? '');
         setLogoUrl(coursesRes.data.data.branding?.logoUrl ?? null);
+        setFaviconUrl(coursesRes.data.data.branding?.faviconUrl ?? null);
         if (coursesRes.data.data.branding?.primaryColor) applyBrandColor(coursesRes.data.data.branding.primaryColor);
         if (coursesRes.data.data.branding?.secondaryColor) applySecondaryColor(coursesRes.data.data.branding.secondaryColor);
         applyFontFamily(coursesRes.data.data.branding?.fontFamily);
@@ -177,6 +180,8 @@ function TenantLandingPage({ subdomain }: { subdomain: string }) {
   }, [subdomain]);
 
   const displayName = tenantName || subdomain;
+
+  useTenantBrowserChrome(displayName, faviconUrl, logoUrl);
 
   // Wait for branding + published-website state to resolve before rendering
   // anything — otherwise the page briefly flashes the default/fallback
