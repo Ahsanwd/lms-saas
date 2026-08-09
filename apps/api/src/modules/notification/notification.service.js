@@ -34,7 +34,7 @@ const TYPE_SOURCE = {
   chat_message: 'chat', forum_reply: 'discussion', quiz_graded: 'quiz', quiz_published: 'quiz',
   refund_approved: 'refund', refund_rejected: 'refund', live_session_reminder: 'liveClass',
   email_delivery_failed: 'email', discussion_comment: 'discussion', discussion_reply: 'discussion',
-  payment_proof_approved: 'payment', payment_proof_rejected: 'payment',
+  payment_proof_approved: 'payment', payment_proof_rejected: 'payment', payment_proof_submitted: 'payment',
 };
 
 // ── Push (lazy-loaded so server still boots if web-push isn't configured) ─────
@@ -354,6 +354,19 @@ async function notifyPaymentRejected(tenantId, userId, itemName, note = '', item
   });
 }
 
+// Admin-facing — a student just uploaded a manual/Wise payment proof and it
+// needs review. In-app + push only (no email case in buildEmailPayload for
+// this type), same as contact_submission — admins already get an email
+// elsewhere for that flow; this one is intentionally in-app only per request.
+async function notifyPaymentProofSubmitted(tenantId, adminUserIds, studentName, itemName, ctaPath, itemLabel = 'Course') {
+  return createBulk(tenantId, adminUserIds, {
+    type: 'payment_proof_submitted', title: 'New payment proof to review',
+    message: `${studentName} uploaded payment proof for "${itemName}" — awaiting your review.`,
+    link: ctaPath,
+    ctx: { studentName, itemName, itemLabel, ctaPath },
+  });
+}
+
 async function notifyAssignmentGraded(tenantId, userId, assignmentTitle, grade, courseId, ctx = {}) {
   return create(tenantId, userId, {
     type: 'assignment_graded', title: 'Assignment graded',
@@ -501,5 +514,5 @@ module.exports = {
   notifyQuizGraded, notifyRefundApproved, notifyRefundRejected,
   notifyLiveSessionReminder, notifyAssignmentPublished,
   notifyQuizPublished, notifyAssignmentDue, notifyTrialExpiring,
-  notifyPaymentApproved, notifyPaymentRejected,
+  notifyPaymentApproved, notifyPaymentRejected, notifyPaymentProofSubmitted,
 };

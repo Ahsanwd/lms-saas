@@ -339,6 +339,24 @@ async function uploadPaymentProof(tenantId, paymentId, userId, proofUrl) {
   payment.reviewedBy      = null;
   payment.reviewedAt      = null;
   await payment.save();
+
+  // In-app notification to every tenant admin so a new proof doesn't sit
+  // unnoticed in the review queue — intentionally no email (see
+  // notifyPaymentProofSubmitted's comment).
+  const [course, student] = await Promise.all([
+    Course.findById(payment.courseId).select('title'),
+    User.findOne({ _id: userId, tenantId }).select('firstName lastName'),
+  ]);
+  const admins = await User.find({ tenantId, role: 'tenant_admin', deletedAt: null }).select('_id').lean();
+  if (admins.length > 0) {
+    require('../notification/notification.service').notifyPaymentProofSubmitted(
+      tenantId, admins.map((a) => a._id),
+      student ? `${student.firstName} ${student.lastName}`.trim() : 'A student',
+      course?.title ?? 'a course',
+      '/admin/payment-proofs'
+    ).catch(() => {});
+  }
+
   return payment;
 }
 
