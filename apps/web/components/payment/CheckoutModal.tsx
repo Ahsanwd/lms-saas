@@ -187,8 +187,11 @@ export interface CheckoutModalProps {
   /** `completed` is true only when closed from the real success screen — the
    * student is actually enrolled. It's false for every other dismissal
    * (cancelled, or a manual payment still awaiting admin review) — hosts
-   * must not treat those as "go view the content" since nothing was granted. */
-  onClose: (completed: boolean) => void;
+   * must not treat those as "go view the content" since nothing was granted.
+   * `pendingReview` is true specifically when a manual/Wise proof was
+   * submitted and is now awaiting admin approval (as opposed to a plain
+   * cancel) — hosts can use it to show different messaging/navigation. */
+  onClose: (completed: boolean, pendingReview?: boolean) => void;
 }
 
 export function CheckoutModal({
@@ -574,7 +577,7 @@ export function CheckoutModal({
               <p className="text-lg font-semibold text-gray-900">Payment submitted — pending review</p>
               <p className="text-sm text-gray-500 text-center">We'll verify your payment and enroll you shortly. You'll get an email once it's approved.</p>
             </div>
-            <Button className="w-full" onClick={() => onClose(false)}>Close</Button>
+            <Button className="w-full" onClick={() => onClose(false, true)}>Close</Button>
           </>
         )}
 

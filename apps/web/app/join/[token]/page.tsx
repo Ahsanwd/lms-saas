@@ -273,11 +273,13 @@ export default function JoinPage() {
           successTitle="Payment successful!"
           successMessage="You're enrolled. Taking you to your course…"
           onSuccess={() => {}}
-          onClose={(completed) => {
+          onClose={(completed, pendingReview) => {
             setShowCheckout(false);
             if (completed) {
               setJoined(true);
               setTimeout(() => router.push(`/courses/${singleCourse._id}`), 1500);
+            } else if (pendingReview) {
+              router.push('/login?notice=payment-pending');
             }
           }}
         />

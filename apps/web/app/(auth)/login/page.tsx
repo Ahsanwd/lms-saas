@@ -68,6 +68,10 @@ function LoginPage() {
     if (searchParams.get('registered') === '1') {
       setSuccess('Account created! You can now sign in.');
     }
+
+    if (searchParams.get('notice') === 'payment-pending') {
+      setSuccess("Your payment is under review. Once approved, log in here to continue learning.");
+    }
   }, [searchParams]);
 
   async function onEmailSubmit(e: React.FormEvent) {
