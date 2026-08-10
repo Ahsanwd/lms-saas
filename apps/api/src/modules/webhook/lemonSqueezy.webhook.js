@@ -70,6 +70,16 @@ async function handleSubscriptionCreated(data, meta) {
     });
   }
 
+  // Keep Tenant.plan/isOnTrial/trialEndsAt/status in sync — the dashboard's
+  // "Upgrade" banner and trial countdown read these fields directly off the
+  // Tenant document, not the Subscription collection above.
+  await tenantRepo.updateById(tenantId, {
+    plan:          plan._id,
+    planExpiresAt: periodEnd,
+    isOnTrial:     false,
+    status:        'active',
+  });
+
   logger.info(`LS: subscription activated — tenant ${tenantId}, plan ${plan.slug}, ${cycle}`);
 }
 
@@ -81,7 +91,7 @@ async function handleSubscriptionUpdated(data, meta) {
   const periodStart = attrs.created_at ? new Date(attrs.created_at) : new Date();
   const periodEnd   = attrs.renews_at   ? new Date(attrs.renews_at)   : new Date();
 
-  await subscriptionRepo.updateByLsId(lsSubId, {
+  const sub = await subscriptionRepo.updateByLsId(lsSubId, {
     status,
     currentPeriodStart: periodStart,
     currentPeriodEnd:   periodEnd,
@@ -89,24 +99,39 @@ async function handleSubscriptionUpdated(data, meta) {
     cancelledAt:        attrs.cancelled ? (attrs.ends_at ? new Date(attrs.ends_at) : new Date()) : null,
   });
 
+  // Same Tenant-document sync as handleSubscriptionCreated — LS sends
+  // subscription_updated on renewals too, so this keeps the dashboard's
+  // trial banner from going stale on renewal, not just first activation.
+  if (sub && status === 'active') {
+    await tenantRepo.updateById(sub.tenantId, {
+      planExpiresAt: periodEnd,
+      isOnTrial:     false,
+      status:        'active',
+    });
+  }
+
   logger.info(`LS: subscription updated — lsId ${lsSubId}, status ${status}`);
 }
 
 async function handleSubscriptionCancelled(data) {
   const lsSubId = String(data.id);
   const endsAt  = data.attributes.ends_at ? new Date(data.attributes.ends_at) : new Date();
-  await subscriptionRepo.updateByLsId(lsSubId, {
+  const sub = await subscriptionRepo.updateByLsId(lsSubId, {
     autoRenew:   false,
     cancelledAt: new Date(),
     status:      'cancelled',
     currentPeriodEnd: endsAt,
   });
+  // Mirrors admin.billing.service.js's cancelSubscription — same immediate
+  // suspend convention already used for admin-initiated cancellations.
+  if (sub) await tenantRepo.updateById(sub.tenantId, { status: 'suspended' });
   logger.info(`LS: subscription cancelled — lsId ${lsSubId}`);
 }
 
 async function handleSubscriptionExpired(data) {
   const lsSubId = String(data.id);
-  await subscriptionRepo.updateByLsId(lsSubId, { status: 'expired', autoRenew: false });
+  const sub = await subscriptionRepo.updateByLsId(lsSubId, { status: 'expired', autoRenew: false });
+  if (sub) await tenantRepo.updateById(sub.tenantId, { status: 'plan_expired' });
   logger.info(`LS: subscription expired — lsId ${lsSubId}`);
 }
 
