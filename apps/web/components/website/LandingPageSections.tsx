@@ -1685,6 +1685,31 @@ export function PageSectionsRenderer({
 
   const ordered = [...sections].sort((a, b) => a.order - b.order);
 
+  // Cross-page hash links (e.g. an About-page CTA to "/#scholarship") land
+  // here after a client-side route change, but the browser's one-shot,
+  // on-load hash scroll already fired before this page's sections finished
+  // mounting — so it silently misses. Same-page clicks don't need this (the
+  // target id already exists, so the browser's native anchor scroll just
+  // works), but a fresh navigation does, hence the retry loop rather than a
+  // single attempt.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const hash = window.location.hash;
+    if (!hash || hash.length < 2) return;
+    const id = hash.slice(1);
+    let attempts = 0;
+    let cancelled = false;
+    const tryScroll = () => {
+      if (cancelled) return;
+      const el = document.getElementById(id);
+      if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+      attempts += 1;
+      if (attempts < 20) setTimeout(tryScroll, 100);
+    };
+    tryScroll();
+    return () => { cancelled = true; };
+  }, [sections]);
+
   return (
     <div className="min-h-screen bg-white text-gray-900">
       <LandingNavBar
