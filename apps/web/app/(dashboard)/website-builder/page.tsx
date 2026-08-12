@@ -1362,6 +1362,12 @@ function PageEditorScreen({ pageId, onBack }: { pageId: string; onBack: () => vo
                         <textarea className={`${textareaCls} font-mono text-xs`} rows={4} value={customData.js}
                           onChange={(e) => setSectionFieldAt<CustomCodeData>(idx, 'js', e.target.value)} placeholder="console.log('hello');" />
                       </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Anchor ID (optional)</label>
+                        <input className={inputCls} value={customData.anchorId ?? ''}
+                          onChange={(e) => setSectionFieldAt<CustomCodeData>(idx, 'anchorId', e.target.value || null)} placeholder="e.g. scholarship" />
+                        <p className="text-[11px] text-gray-400 mt-1">Lets a nav link jump straight here, e.g. a Header Builder button linking to "/#scholarship".</p>
+                      </div>
                       <p className="text-xs text-gray-400">
                         Height adjusts automatically to fit your content. Runs in a sandboxed frame — it can't access your site's cookies, login sessions, or other tenants' data.
                       </p>

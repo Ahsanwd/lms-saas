@@ -1245,14 +1245,16 @@ export function CustomCodeSection({ data }: { data: CustomCodeData }) {
   const srcDoc = `<!doctype html><html><head><meta charset="utf-8" /><style>body{margin:0;}${data.css || ''}</style></head><body>${data.html || ''}<script>${data.js || ''}<\/script><script>${CUSTOM_CODE_RESIZE_SCRIPT}<\/script></body></html>`;
 
   return (
-    <iframe
-      ref={iframeRef}
-      srcDoc={srcDoc}
-      sandbox="allow-scripts allow-top-navigation-by-user-activation allow-popups allow-popups-to-escape-sandbox allow-forms"
-      referrerPolicy="no-referrer"
-      style={{ width: '100%', height: `${height}px`, border: 'none', display: 'block', transition: 'height 0.15s ease' }}
-      title="Custom section"
-    />
+    <div id={data.anchorId || undefined}>
+      <iframe
+        ref={iframeRef}
+        srcDoc={srcDoc}
+        sandbox="allow-scripts allow-top-navigation-by-user-activation allow-popups allow-popups-to-escape-sandbox allow-forms"
+        referrerPolicy="no-referrer"
+        style={{ width: '100%', height: `${height}px`, border: 'none', display: 'block', transition: 'height 0.15s ease' }}
+        title="Custom section"
+      />
+    </div>
   );
 }
 
@@ -1522,6 +1524,12 @@ export interface CustomCodeData {
   js: string;
   heightPx: number;
   isEnabled: boolean;
+  // Optional id on the section's wrapper element so a nav link (e.g. a
+  // Header Builder CTA button, "/#pricing") can jump straight to it. The
+  // section's own HTML runs inside a sandboxed iframe, so an id inside
+  // that markup is invisible to the parent page's hash-scroll — this is
+  // the only way an anchor link can target a custom section from outside it.
+  anchorId?: string | null;
 }
 
 // Builder-only wrapper around a rendered section — adds a hover outline, a
