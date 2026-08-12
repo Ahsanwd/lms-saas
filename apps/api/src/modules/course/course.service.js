@@ -508,7 +508,34 @@ async function createLesson(tenantId, courseId, sectionId, data, user) {
 
   await sectionRepo.incrementCounter(tenantId, sectionId, { totalLessons: 1 });
   await recalcCourseCounters(tenantId, courseId);
+
+  if (data.type === 'live' && liveClass?.scheduledAt) {
+    notifyLiveScheduled(tenantId, course, lesson).catch(() => {});
+  }
+
   return lesson;
+}
+
+// Tell enrolled students a live class time is on the calendar — fired once
+// on initial schedule and again on any reschedule (see updateLesson), not on
+// unrelated edits. Separate from the 1-hour-before reminder job.
+async function notifyLiveScheduled(tenantId, course, lesson) {
+  const scheduledAt = lesson.liveClass?.scheduledAt;
+  if (!scheduledAt || new Date(scheduledAt).getTime() <= Date.now()) return;
+
+  const [enrollments] = await enrollmentRepo.findByCourse(tenantId, course._id.toString(), {}, { limit: 1000 });
+  const studentIds = (enrollments ?? [])
+    .filter(e => ['active', 'completed'].includes(e.status))
+    .map(e => e.userId?._id?.toString() ?? e.userId?.toString())
+    .filter(Boolean);
+  if (!studentIds.length) return;
+
+  const notifySvc = require('../notification/notification.service');
+  await notifySvc.notifyLiveSessionScheduled(
+    tenantId, studentIds, lesson.title, course.title, course._id.toString(),
+    lesson._id.toString(), scheduledAt, lesson.liveClass?.durationMinutes || null,
+    lesson.liveClass?.platform || 'livekit',
+  );
 }
 
 async function updateLesson(tenantId, courseId, sectionId, lessonId, data, user) {
@@ -598,6 +625,14 @@ async function updateLesson(tenantId, courseId, sectionId, lessonId, data, user)
         backoffMs:   0,
       }).catch(() => {});
     });
+  }
+
+  // Notify enrolled students right away when the class is first scheduled or
+  // rescheduled to a new time — skip when scheduledAt wasn't touched by this
+  // edit, so unrelated field changes (title, instructions, etc.) stay silent.
+  const oldScheduledAt = lesson.liveClass?.scheduledAt ? new Date(lesson.liveClass.scheduledAt).getTime() : null;
+  if (lesson.type === 'live' && newScheduledAt && newScheduledAt.getTime() !== oldScheduledAt) {
+    notifyLiveScheduled(tenantId, course, updated).catch(() => {});
   }
 
   return updated;

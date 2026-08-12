@@ -172,8 +172,8 @@ async function startSession(tenantId, lessonId, user) {
 
   // Notify enrolled students (fire and forget)
   try {
-    const enrollments = await enrollmentRepo.findByCourse(tenantId, lesson.courseId.toString());
-    const studentIds  = (enrollments ?? []).map(e => e.userId?.toString()).filter(Boolean);
+    const [enrollments] = await enrollmentRepo.findByCourse(tenantId, lesson.courseId.toString(), {}, { limit: 1000 });
+    const studentIds  = (enrollments ?? []).map(e => e.userId?._id?.toString() ?? e.userId?.toString()).filter(Boolean);
     if (studentIds.length) {
       const notifySvc = require('../notification/notification.service');
       const pushSvc   = require('../../services/push/push.service');

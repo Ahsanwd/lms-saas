@@ -20,6 +20,7 @@ const refundRejectedTpl       = require('../../services/email/templates/refundRe
 const paymentApprovedTpl      = require('../../services/email/templates/paymentApproved');
 const paymentRejectedTpl      = require('../../services/email/templates/paymentRejected');
 const liveSessionReminderTpl  = require('../../services/email/templates/liveSessionReminder');
+const liveSessionScheduledTpl = require('../../services/email/templates/liveSessionScheduled');
 const forumReplyTpl          = require('../../services/email/templates/forumReply');
 const discussionQuestionTpl  = require('../../services/email/templates/discussionQuestion');
 const { emitNotificationNew } = require('../../services/socket/io');
@@ -33,6 +34,7 @@ const TYPE_SOURCE = {
   course_completed: 'course', certificate_issued: 'course', trial_expiring: 'membership',
   chat_message: 'chat', forum_reply: 'discussion', quiz_graded: 'quiz', quiz_published: 'quiz',
   refund_approved: 'refund', refund_rejected: 'refund', live_session_reminder: 'liveClass',
+  live_session_scheduled: 'liveClass',
   email_delivery_failed: 'email', discussion_comment: 'discussion', discussion_reply: 'discussion',
   payment_proof_approved: 'payment', payment_proof_rejected: 'payment', payment_proof_submitted: 'payment',
 };
@@ -97,6 +99,14 @@ function buildEmailPayload(type, ctx, userDoc, appUrl, tenantName, branding = {}
         lessonTitle: ctx.lessonTitle, courseName: ctx.courseName || null,
         scheduledAt: ctx.scheduledAt, platform: ctx.platform || 'livekit',
         joinUrl: null,
+        courseId: ctx.courseId,
+      });
+    case 'live_session_scheduled':
+      return liveSessionScheduledTpl({
+        ...base, recipientName: base.studentName,
+        lessonTitle: ctx.lessonTitle, courseName: ctx.courseName || null,
+        scheduledAt: ctx.scheduledAt, durationMinutes: ctx.durationMinutes || null,
+        platform: ctx.platform || 'livekit',
         courseId: ctx.courseId,
       });
     case 'discussion_reply':
@@ -457,6 +467,15 @@ async function notifyLiveSessionReminder(tenantId, userIds, lessonTitle, courseN
   });
 }
 
+async function notifyLiveSessionScheduled(tenantId, userIds, lessonTitle, courseName, courseId, lessonId, scheduledAt, durationMinutes, platform, ctx = {}) {
+  return createBulk(tenantId, userIds, {
+    type: 'live_session_scheduled', title: 'New live class scheduled',
+    message: `"${lessonTitle}" has been scheduled. Check the class time (shown in UTC) on the course page.`,
+    link: `/courses/${courseId}/learn?lessonId=${lessonId}`,
+    ctx: { lessonTitle, courseName, courseId, lessonId, scheduledAt, durationMinutes, platform, ...ctx },
+  });
+}
+
 async function notifyAssignmentPublished(tenantId, userIds, assignmentTitle, courseId, assignmentId, ctx = {}) {
   return createBulk(tenantId, userIds, {
     type: 'assignment_published', title: 'New assignment posted',
@@ -512,7 +531,7 @@ module.exports = {
   notifyCoursePublished, notifyCourseCompleted, notifyCertificateIssued,
   notifyChatMessage, notifyForumReply,
   notifyQuizGraded, notifyRefundApproved, notifyRefundRejected,
-  notifyLiveSessionReminder, notifyAssignmentPublished,
+  notifyLiveSessionReminder, notifyLiveSessionScheduled, notifyAssignmentPublished,
   notifyQuizPublished, notifyAssignmentDue, notifyTrialExpiring,
   notifyPaymentApproved, notifyPaymentRejected, notifyPaymentProofSubmitted,
 };

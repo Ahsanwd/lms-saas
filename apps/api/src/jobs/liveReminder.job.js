@@ -19,10 +19,10 @@ async function handleLiveReminder(payload) {
   const course  = await Course.findById(doc.courseId).select('title').lean();
   const tenant  = await Tenant.findById(tenantId).select('name branding').lean();
 
-  const enrollments = await enrollmentRepo.findByCourse(tenantId, doc.courseId.toString());
+  const [enrollments] = await enrollmentRepo.findByCourse(tenantId, doc.courseId.toString(), {}, { limit: 1000 });
   const studentIds  = (enrollments ?? [])
     .filter(e => ['active', 'completed'].includes(e.status))
-    .map(e => e.userId?.toString())
+    .map(e => e.userId?._id?.toString() ?? e.userId?.toString())
     .filter(Boolean);
 
   if (!studentIds.length) return;

@@ -1513,7 +1513,7 @@ function LiveLessonContent({ lesson }: { lesson: Lesson }) {
                   {scheduledAt.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                 </p>
                 <p className="text-xs text-gray-500">
-                  {scheduledAt.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+                  {scheduledAt.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', timeZoneName: 'short' })}
                   {lc?.durationMinutes ? ` · ${lc.durationMinutes} min` : ''}
                 </p>
               </div>
