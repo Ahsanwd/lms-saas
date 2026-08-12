@@ -1428,6 +1428,7 @@ function PageEditorScreen({ pageId, onBack }: { pageId: string; onBack: () => vo
 const DEFAULT_HEADER: HeaderConfig = {
   logoHeightPx: 36, backgroundColor: '#ffffff', menuTextColor: '#4b5563',
   signInText: 'Sign in', signUpText: 'Sign up free', buttonStyle: 'solid', menuOverrides: [],
+  ctaText: null, ctaHref: null,
   customCode: { html: '', css: '', js: '', heightPx: 80, isEnabled: false },
 };
 
@@ -1590,6 +1591,15 @@ function HeaderEditorScreen({ onBack }: { onBack: () => void }) {
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Sign Up Text</label>
               <input className={inputCls} value={form.signUpText} onChange={(e) => set('signUpText', e.target.value)} maxLength={30} placeholder="Sign up free" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Extra Button Text (optional)</label>
+              <input className={inputCls} value={form.ctaText ?? ''} onChange={(e) => set('ctaText', e.target.value || null)} maxLength={30} placeholder="e.g. Humanitarian Tuition" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Extra Button Link</label>
+              <input className={inputCls} value={form.ctaHref ?? ''} onChange={(e) => set('ctaHref', e.target.value || null)} maxLength={200} placeholder="/#scholarship" />
+              <p className="text-[11px] text-gray-400 mt-1">Adds a third nav button (both fields required to show it). Use "/#section-id" to jump to a section on the home page.</p>
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-2">Button Style</label>

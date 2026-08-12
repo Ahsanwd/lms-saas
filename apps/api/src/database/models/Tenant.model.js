@@ -89,6 +89,10 @@ const tenantSchema = new mongoose.Schema(
         signInText:      { type: String, default: 'Sign in', trim: true, maxlength: 30 },
         signUpText:      { type: String, default: 'Sign up free', trim: true, maxlength: 30 },
         buttonStyle:     { type: String, enum: ['solid', 'outline'], default: 'solid' },
+        // Optional third nav button, e.g. linking to a same-page anchor like
+        // "/#scholarship" — null by default so existing tenants see no change.
+        ctaText:         { type: String, default: null, trim: true, maxlength: 30 },
+        ctaHref:         { type: String, default: null, trim: true, maxlength: 200 },
         menuOverrides: [{
           pageSlug:   { type: String, required: true }, // TenantPage.slug ('home' for the home page)
           label:      { type: String, default: null },  // null = use the page's own title

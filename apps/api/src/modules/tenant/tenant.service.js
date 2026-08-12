@@ -487,6 +487,7 @@ const DEFAULT_CUSTOM_CODE = { html: '', css: '', js: '', heightPx: 80, isEnabled
 const DEFAULT_HEADER = {
   logoHeightPx: 36, backgroundColor: '#ffffff', menuTextColor: '#4b5563',
   signInText: 'Sign in', signUpText: 'Sign up free', buttonStyle: 'solid', menuOverrides: [],
+  ctaText: null, ctaHref: null,
   customCode: DEFAULT_CUSTOM_CODE,
 };
 const DEFAULT_FOOTER = {
@@ -536,6 +537,10 @@ function validateHeader(header) {
     throw new AppError('Sign in text is too long (max 30 characters)', 400);
   if (header.signUpText !== undefined && String(header.signUpText).length > 30)
     throw new AppError('Sign up text is too long (max 30 characters)', 400);
+  if (header.ctaText !== undefined && header.ctaText !== null && String(header.ctaText).length > 30)
+    throw new AppError('CTA button text is too long (max 30 characters)', 400);
+  if (header.ctaHref !== undefined && header.ctaHref !== null && String(header.ctaHref).length > 200)
+    throw new AppError('CTA button link is too long (max 200 characters)', 400);
   if (header.menuOverrides !== undefined) {
     if (!Array.isArray(header.menuOverrides)) throw new AppError('menuOverrides must be an array', 400);
     if (header.menuOverrides.length > MAX_MENU_OVERRIDES)

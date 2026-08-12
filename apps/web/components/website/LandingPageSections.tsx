@@ -163,6 +163,10 @@ export interface HeaderConfig {
   signUpText: string;
   buttonStyle: 'solid' | 'outline';
   menuOverrides: MenuOverride[];
+  // Optional third nav button, e.g. linking to a same-page anchor like
+  // "/#scholarship" — unset by default, so existing tenants see no change.
+  ctaText?: string | null;
+  ctaHref?: string | null;
   // Optional extra sandboxed HTML/CSS/JS block rendered below the built-in
   // nav bar — additive, so tenants who never touch it keep today's exact
   // header. Reuses CustomCodeData/CustomCodeSection (declared further down)
@@ -291,6 +295,8 @@ export function LandingNavBar({
   const signInText = headerConfig?.signInText || 'Sign in';
   const signUpText = headerConfig?.signUpText || 'Sign up free';
   const outlineButton = headerConfig?.buttonStyle === 'outline';
+  const ctaText = headerConfig?.ctaText || null;
+  const ctaHref = headerConfig?.ctaHref || null;
 
   return (
     <>
@@ -322,6 +328,12 @@ export function LandingNavBar({
         </div>
 
         <div className="hidden lg:flex items-center gap-3 flex-shrink-0">
+          {ctaText && ctaHref && (
+            <MaybeLink href={ctaHref} disabled={linksDisabled}
+              className="text-sm font-semibold border-2 border-primary-600 text-primary-600 px-4 py-2 rounded-lg hover:bg-primary-600 hover:text-white transition-colors cursor-pointer">
+              {ctaText}
+            </MaybeLink>
+          )}
           <MaybeLink href="/login" disabled={linksDisabled} className={linkClass}>
             <span style={linkStyle}>{signInText}</span>
           </MaybeLink>
@@ -392,6 +404,14 @@ export function LandingNavBar({
                 ))}
           </div>
           <div className="pt-3 mt-2 border-t border-gray-100 flex flex-col gap-2">
+            {ctaText && ctaHref && (
+              <MaybeLink
+                href={ctaHref} disabled={linksDisabled} onClick={() => setMenuOpen(false)}
+                className="text-center text-sm font-semibold border-2 border-primary-600 text-primary-600 py-2.5 rounded-lg hover:bg-primary-600 hover:text-white transition-colors cursor-pointer"
+              >
+                {ctaText}
+              </MaybeLink>
+            )}
             <MaybeLink
               href="/login" disabled={linksDisabled}
               className="text-center text-sm font-medium text-gray-600 hover:text-primary-600 py-2.5 rounded-lg border border-gray-200 cursor-pointer"
