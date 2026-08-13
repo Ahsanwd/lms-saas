@@ -1173,7 +1173,7 @@ const CONTACT_ICON_PATHS: Record<'email' | 'phone' | 'address', string> = {
 
 function ContactInfoCard({ type, label, value }: { type: 'email' | 'phone' | 'address'; label: string; value: string }) {
   return (
-    <div className="flex flex-col items-center text-center p-6 rounded-2xl border border-gray-200 bg-gray-50">
+    <div className="w-full sm:w-72 flex flex-col items-center text-center p-6 rounded-2xl border border-gray-200 bg-gray-50">
       <div className="w-12 h-12 rounded-xl bg-primary-100 text-primary-600 flex items-center justify-center mb-4">
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d={CONTACT_ICON_PATHS[type]} />
@@ -1193,7 +1193,7 @@ export function ContactSection({ contact }: { contact: WebsiteContent['contact']
         <SectionEyebrow text="Get In Touch" />
         <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">We&apos;d love to hear from you</h2>
         <HeadingAccent />
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 mt-10">
+        <div className="flex flex-wrap justify-center gap-5 mt-10">
           {contact.email && <ContactInfoCard type="email" label="Email" value={contact.email} />}
           {contact.phone && <ContactInfoCard type="phone" label="Phone" value={contact.phone} />}
           {contact.address && <ContactInfoCard type="address" label="Address" value={contact.address} />}
