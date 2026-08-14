@@ -45,7 +45,7 @@ function getPushService() {
 }
 
 // ── Build email payload from notification context ─────────────────────────────
-function buildEmailPayload(type, ctx, userDoc, appUrl, tenantName, branding = {}) {
+function buildEmailPayload(type, ctx, userDoc, appUrl, tenantName, branding = {}, tenantTimezone = 'UTC') {
   const base = { studentName: `${userDoc.firstName} ${userDoc.lastName}`, tenantName, appUrl, branding };
 
   switch (type) {
@@ -100,6 +100,7 @@ function buildEmailPayload(type, ctx, userDoc, appUrl, tenantName, branding = {}
         scheduledAt: ctx.scheduledAt, platform: ctx.platform || 'livekit',
         joinUrl: null,
         courseId: ctx.courseId,
+        tenantTimezone,
       });
     case 'live_session_scheduled':
       return liveSessionScheduledTpl({
@@ -108,6 +109,7 @@ function buildEmailPayload(type, ctx, userDoc, appUrl, tenantName, branding = {}
         scheduledAt: ctx.scheduledAt, durationMinutes: ctx.durationMinutes || null,
         platform: ctx.platform || 'livekit',
         courseId: ctx.courseId,
+        tenantTimezone,
       });
     case 'discussion_reply':
       return forumReplyTpl({
@@ -144,7 +146,7 @@ async function dispatch(userId, type, title, message, link, ctx = {}) {
 
     const tenantId   = userDoc.tenantId?.toString();
     const appUrl     = config.app.url;
-    const { tenantName: resolvedName, branding } = await tenantRepo.getBranding(tenantId);
+    const { tenantName: resolvedName, branding, timezone } = await tenantRepo.getBranding(tenantId);
     const tenantName = ctx.tenantName || resolvedName;
 
     // Respect user notification preferences (missing key = default enabled)
@@ -155,7 +157,7 @@ async function dispatch(userId, type, title, message, link, ctx = {}) {
 
     // Email
     if (emailOk) {
-      const emailPayload = buildEmailPayload(type, { ...ctx, link }, userDoc, appUrl, tenantName, branding);
+      const emailPayload = buildEmailPayload(type, { ...ctx, link }, userDoc, appUrl, tenantName, branding, timezone);
       if (emailPayload) {
         await queueEmail({ to: userDoc.email, tenantId: tenantId || null, ...emailPayload });
       }

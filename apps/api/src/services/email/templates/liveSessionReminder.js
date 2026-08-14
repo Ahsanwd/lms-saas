@@ -1,10 +1,13 @@
-function liveSessionReminder({ recipientName, lessonTitle, courseName, scheduledAt, platform, joinUrl, courseId, tenantName, branding, appUrl }) {
+function liveSessionReminder({ recipientName, lessonTitle, courseName, scheduledAt, platform, joinUrl, courseId, tenantName, branding, appUrl, tenantTimezone = 'UTC' }) {
   const platformLabel = { livekit: 'Live Class', zoom: 'Zoom', meet: 'Google Meet', teams: 'Microsoft Teams', youtube_live: 'YouTube Live', custom: 'Online Meeting' }[platform] || 'Online Meeting';
   // Explicit timeZone: 'UTC' — don't rely on the server host's implicit zone
   // (would silently drift if the process env/OS zone ever changes), and UTC
   // is the one reference point every recipient, regardless of their own
   // timezone, can convert from unambiguously.
   const dateStr = scheduledAt ? new Date(scheduledAt).toLocaleString('en-US', { weekday: 'long', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'UTC', timeZoneName: 'short' }) : '';
+  const tenantDateStr = (scheduledAt && tenantTimezone && tenantTimezone !== 'UTC')
+    ? new Date(scheduledAt).toLocaleString('en-US', { weekday: 'long', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: tenantTimezone, timeZoneName: 'short' })
+    : null;
   const accent = branding?.primaryColor || '#4f46e5';
   const logo = branding?.logoUrl || null;
   const courseLink = `${appUrl}/courses/${courseId}/learn`;
@@ -39,6 +42,7 @@ function liveSessionReminder({ recipientName, lessonTitle, courseName, scheduled
               <td style="vertical-align:top;width:50%;padding-right:12px;">
                 <p style="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;margin:0 0 4px;">Scheduled (UTC)</p>
                 <p style="color:#1e293b;font-size:14px;font-weight:600;margin:0;">${dateStr}</p>
+                ${tenantDateStr ? `<p style="color:#64748b;font-size:12px;margin:4px 0 0;">${tenantDateStr}</p>` : ''}
               </td>
               <td style="vertical-align:top;width:50%;padding-left:12px;">
                 <p style="color:#94a3b8;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;margin:0 0 4px;">Platform</p>

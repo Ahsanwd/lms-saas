@@ -49,13 +49,14 @@ class TenantRepository {
   }
 
   async getBranding(tenantId) {
-    if (!tenantId) return { tenantName: 'LMS Platform', branding: {} };
+    if (!tenantId) return { tenantName: 'LMS Platform', branding: {}, timezone: 'UTC' };
     const tenant = await Tenant.findById(tenantId)
-      .select('name settings.logo settings.favicon settings.primaryColor settings.secondaryColor settings.fontFamily settings.header settings.footer')
+      .select('name settings.logo settings.favicon settings.primaryColor settings.secondaryColor settings.fontFamily settings.header settings.footer settings.timezone')
       .lean();
-    if (!tenant) return { tenantName: 'LMS Platform', branding: {} };
+    if (!tenant) return { tenantName: 'LMS Platform', branding: {}, timezone: 'UTC' };
     return {
       tenantName: tenant.name || 'LMS Platform',
+      timezone: tenant.settings?.timezone || 'UTC',
       branding: {
         logoUrl:        tenant.settings?.logo           || null,
         faviconUrl:     tenant.settings?.favicon        || null,
