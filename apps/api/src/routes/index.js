@@ -21,6 +21,9 @@ router.get('/verify-certificate/:certificateId', require('../modules/course/cour
 // tied to any tenant, notifies the platform owner directly.
 router.use('/contact', require('../modules/platformContact/platformContact.routes'));
 
+// Platform-level lead capture (e.g. /checklist opt-in) — not tied to any tenant.
+router.use('/marketing', require('../modules/marketingLead/marketingLead.routes'));
+
 // ── All routes below require tenant resolution ────────────────────────────────
 router.use(resolveTenant);
 

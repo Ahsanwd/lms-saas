@@ -91,7 +91,11 @@ if (!skipEmail && !skipRedis) {
   });
 }
 
-function queueEmail(data) {
+// `opts.delay` (ms) schedules a future send via Bull — used by drip
+// sequences (see marketingLead.service.js). Only honored on the real Redis
+// queue path: the skipRedis dev fallback has no delay mechanism, so it sends
+// immediately instead of silently dropping the delay.
+function queueEmail(data, opts = {}) {
   if (skipEmail) {
     logger.info(`[DEV] Email skipped — to: ${data.to} | subject: ${data.subject}`);
     return Promise.resolve();
@@ -113,7 +117,7 @@ function queueEmail(data) {
   }
 
   const { emailQueue } = require('./queue');
-  return emailQueue().add(data);
+  return emailQueue().add(data, opts.delay ? { delay: opts.delay } : undefined);
 }
 
 module.exports = { queueEmail };

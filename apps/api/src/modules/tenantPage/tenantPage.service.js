@@ -43,7 +43,7 @@ const RESERVED_SLUGS = new Set([
   'notifications', 'profile', 'quizzes', 'refunds', 'search', 'settings',
   'share-links', 'users', 'website-builder',
   // top-level
-  'join', 'privacy', 'refund-policy', 'terms', 'verify',
+  'checklist', 'join', 'privacy', 'refund-policy', 'terms', 'verify',
 ]);
 
 // ─── Section conversion helper (used by the one-time migration backfill) ─────
