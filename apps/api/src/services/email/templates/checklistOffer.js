@@ -8,9 +8,10 @@ module.exports = () => ({
     body: `
       <h2 style="margin:0 0 8px;font-size:19px;color:#111827">Ready when you are</h2>
       <p style="color:#111827;margin:0 0 16px;line-height:1.7">
-        Quick recap: Coursel connects to Safepay and Stripe out of the box, prices in PKR or USD, and
-        includes courses, quizzes, certificates, and your own branded launch page — everything in the
-        checklist you got on day one.
+        Quick recap: Coursel supports Stripe if you have access to it, plus direct bank transfer,
+        JazzCash, or EasyPaisa payments that you review and approve yourself — prices in PKR or USD,
+        and includes courses, quizzes, certificates, and your own branded launch page — everything in
+        the checklist you got on day one.
       </p>
       <p style="color:#111827;margin:0 0 24px;line-height:1.7">
         No card required to start. If it's not a fit, you've lost ten minutes, not a subscription.

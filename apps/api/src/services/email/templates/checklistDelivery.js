@@ -28,9 +28,9 @@ const STAGES = [
     title: 'Stage 3 — Get paid (the part that stops most people)',
     items: [
       'Drop the assumption that you need a US/UK company to sell online — you don’t',
-      'Pick a platform that connects directly to Safepay, JazzCash, or Easypaisa',
-      'Set up your gateway and run one real test transaction before inviting students',
-      'Confirm your payout timeline in writing before launch day',
+      'Pick a platform that lets students pay you directly by bank transfer, JazzCash, or EasyPaisa — no gateway approval to wait on',
+      'Test the full flow yourself first: transfer, upload proof, approve it, confirm enrollment unlocks',
+      'Decide how fast you’ll review and approve payments — slow approval is the #1 way this flow frustrates students',
     ],
     highlight: true,
   },

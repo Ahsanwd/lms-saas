@@ -33,9 +33,9 @@ const STAGES: Stage[] = [
     title: 'Stage 3 — Get paid (the part that stops most people)',
     items: [
       { text: 'Drop the assumption that you need a US/UK company to sell online', note: 'You don’t — this is the myth that stalls most launches here' },
-      { text: 'Pick a platform that connects directly to Safepay, JazzCash, or Easypaisa', note: 'Not one that only integrates Stripe' },
-      { text: 'Set up your gateway and run one real test transaction', note: 'Before you invite a single real student' },
-      { text: 'Confirm your payout timeline in writing', note: 'Local gateways settle on a different schedule than card processors' },
+      { text: 'Pick a platform that lets students pay you directly by bank transfer, JazzCash, or EasyPaisa', note: 'No gateway approval to wait on' },
+      { text: 'Test the full flow yourself first', note: 'Transfer, upload proof, approve it, confirm enrollment unlocks' },
+      { text: 'Decide how fast you’ll review and approve payments', note: 'Slow approval is the #1 way this flow frustrates students' },
     ],
     highlight: true,
   },
@@ -240,7 +240,7 @@ export function ChecklistOptIn() {
               <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-2">If Stage 3 is what's been holding you back</p>
               <h3 className="text-xl font-bold text-gray-900 mb-3">That's the one problem Coursel was built to solve.</h3>
               <p className="text-sm text-gray-600 mb-6 max-w-md mx-auto">
-                Safepay and Stripe both connect out of the box — no foreign company, no workaround.
+                Stripe works if you have access to it — if you don't, students pay you directly by bank transfer, JazzCash, or EasyPaisa, and you approve each one. No foreign company required.
               </p>
               <Link
                 href="/register-tenant"
