@@ -17,6 +17,7 @@ import {
   type FooterConfig,
   type PublicBundle,
   type PublicMembershipPlan,
+  SOCIAL_ICON_PATHS,
 } from '@/components/website/LandingPageSections';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -807,13 +808,24 @@ function PlatformLandingPage() {
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-400">
           <span className="font-semibold text-indigo-600">Coursel</span>
           <span>© {new Date().getFullYear()} Coursel. All rights reserved.</span>
-          <div className="flex flex-wrap justify-center gap-6">
+          <div className="flex flex-wrap items-center justify-center gap-6">
             <Link href="/login" className="hover:text-gray-600 transition-colors">Sign in</Link>
             <Link href="/register-tenant" className="hover:text-gray-600 transition-colors">Get started</Link>
             <Link href="/guides" className="hover:text-gray-600 transition-colors">Guides</Link>
             <Link href="/privacy" className="hover:text-gray-600 transition-colors">Privacy Policy</Link>
             <Link href="/terms" className="hover:text-gray-600 transition-colors">Terms of Service</Link>
             <Link href="/refund-policy" className="hover:text-gray-600 transition-colors">Refund Policy</Link>
+            <a
+              href="https://www.facebook.com/profile.php?id=61593305887586"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Coursel on Facebook"
+              className="hover:text-gray-600 transition-colors"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                <path d={SOCIAL_ICON_PATHS.facebook} />
+              </svg>
+            </a>
           </div>
         </div>
       </footer>
