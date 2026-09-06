@@ -19,6 +19,16 @@ function getQueue(name) {
         removeOnComplete: 100,
         removeOnFail: 500,
       },
+      // Bull's defaults (stalledInterval/guardInterval: 5000ms) poll Redis
+      // continuously even when the queue is idle — this is what burned
+      // through the Upstash free-tier command quota (see queue-level
+      // comment below), not real email volume. Emails aren't latency
+      // sensitive enough to need sub-minute stalled-job or delayed-job
+      // checks, so both are relaxed to cut that polling ~12x.
+      settings: {
+        stalledInterval: 60000,
+        guardInterval: 60000,
+      },
     });
 
     q.on('failed', (job, err) => {
